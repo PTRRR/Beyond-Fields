@@ -1,12 +1,3910 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var str = Object.prototype.toString
+
+module.exports = anArray
+
+function anArray(arr) {
+  return (
+       arr.BYTES_PER_ELEMENT
+    && str.call(arr.buffer) === '[object ArrayBuffer]'
+    || Array.isArray(arr)
+  )
+}
+
+},{}],2:[function(require,module,exports){
+module.exports = function numtype(num, def) {
+	return typeof num === 'number'
+		? num 
+		: (typeof def === 'number' ? def : 0)
+}
+},{}],3:[function(require,module,exports){
+'use strict'
+
+exports.byteLength = byteLength
+exports.toByteArray = toByteArray
+exports.fromByteArray = fromByteArray
+
+var lookup = []
+var revLookup = []
+var Arr = typeof Uint8Array !== 'undefined' ? Uint8Array : Array
+
+var code = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+for (var i = 0, len = code.length; i < len; ++i) {
+  lookup[i] = code[i]
+  revLookup[code.charCodeAt(i)] = i
+}
+
+revLookup['-'.charCodeAt(0)] = 62
+revLookup['_'.charCodeAt(0)] = 63
+
+function placeHoldersCount (b64) {
+  var len = b64.length
+  if (len % 4 > 0) {
+    throw new Error('Invalid string. Length must be a multiple of 4')
+  }
+
+  // the number of equal signs (place holders)
+  // if there are two placeholders, than the two characters before it
+  // represent one byte
+  // if there is only one, then the three characters before it represent 2 bytes
+  // this is just a cheap hack to not do indexOf twice
+  return b64[len - 2] === '=' ? 2 : b64[len - 1] === '=' ? 1 : 0
+}
+
+function byteLength (b64) {
+  // base64 is 4/3 + up to two characters of the original data
+  return b64.length * 3 / 4 - placeHoldersCount(b64)
+}
+
+function toByteArray (b64) {
+  var i, j, l, tmp, placeHolders, arr
+  var len = b64.length
+  placeHolders = placeHoldersCount(b64)
+
+  arr = new Arr(len * 3 / 4 - placeHolders)
+
+  // if there are placeholders, only get up to the last complete 4 chars
+  l = placeHolders > 0 ? len - 4 : len
+
+  var L = 0
+
+  for (i = 0, j = 0; i < l; i += 4, j += 3) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 18) | (revLookup[b64.charCodeAt(i + 1)] << 12) | (revLookup[b64.charCodeAt(i + 2)] << 6) | revLookup[b64.charCodeAt(i + 3)]
+    arr[L++] = (tmp >> 16) & 0xFF
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  if (placeHolders === 2) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 2) | (revLookup[b64.charCodeAt(i + 1)] >> 4)
+    arr[L++] = tmp & 0xFF
+  } else if (placeHolders === 1) {
+    tmp = (revLookup[b64.charCodeAt(i)] << 10) | (revLookup[b64.charCodeAt(i + 1)] << 4) | (revLookup[b64.charCodeAt(i + 2)] >> 2)
+    arr[L++] = (tmp >> 8) & 0xFF
+    arr[L++] = tmp & 0xFF
+  }
+
+  return arr
+}
+
+function tripletToBase64 (num) {
+  return lookup[num >> 18 & 0x3F] + lookup[num >> 12 & 0x3F] + lookup[num >> 6 & 0x3F] + lookup[num & 0x3F]
+}
+
+function encodeChunk (uint8, start, end) {
+  var tmp
+  var output = []
+  for (var i = start; i < end; i += 3) {
+    tmp = (uint8[i] << 16) + (uint8[i + 1] << 8) + (uint8[i + 2])
+    output.push(tripletToBase64(tmp))
+  }
+  return output.join('')
+}
+
+function fromByteArray (uint8) {
+  var tmp
+  var len = uint8.length
+  var extraBytes = len % 3 // if we have 1 byte left, pad 2 bytes
+  var output = ''
+  var parts = []
+  var maxChunkLength = 16383 // must be multiple of 3
+
+  // go through the array every three bytes, we'll deal with trailing stuff later
+  for (var i = 0, len2 = len - extraBytes; i < len2; i += maxChunkLength) {
+    parts.push(encodeChunk(uint8, i, (i + maxChunkLength) > len2 ? len2 : (i + maxChunkLength)))
+  }
+
+  // pad the end with zeros, but make sure to not forget the extra bytes
+  if (extraBytes === 1) {
+    tmp = uint8[len - 1]
+    output += lookup[tmp >> 2]
+    output += lookup[(tmp << 4) & 0x3F]
+    output += '=='
+  } else if (extraBytes === 2) {
+    tmp = (uint8[len - 2] << 8) + (uint8[len - 1])
+    output += lookup[tmp >> 10]
+    output += lookup[(tmp >> 4) & 0x3F]
+    output += lookup[(tmp << 2) & 0x3F]
+    output += '='
+  }
+
+  parts.push(output)
+
+  return parts.join('')
+}
+
+},{}],4:[function(require,module,exports){
+var Buffer = require('buffer').Buffer; // for use with browserify
+
+module.exports = function (a, b) {
+    if (!Buffer.isBuffer(a)) return undefined;
+    if (!Buffer.isBuffer(b)) return undefined;
+    if (typeof a.equals === 'function') return a.equals(b);
+    if (a.length !== b.length) return false;
+    
+    for (var i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    
+    return true;
+};
+
+},{"buffer":5}],5:[function(require,module,exports){
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+/* eslint-disable no-proto */
+
+'use strict'
+
+var base64 = require('base64-js')
+var ieee754 = require('ieee754')
+
+exports.Buffer = Buffer
+exports.SlowBuffer = SlowBuffer
+exports.INSPECT_MAX_BYTES = 50
+
+var K_MAX_LENGTH = 0x7fffffff
+exports.kMaxLength = K_MAX_LENGTH
+
+/**
+ * If `Buffer.TYPED_ARRAY_SUPPORT`:
+ *   === true    Use Uint8Array implementation (fastest)
+ *   === false   Print warning and recommend using `buffer` v4.x which has an Object
+ *               implementation (most compatible, even IE6)
+ *
+ * Browsers that support typed arrays are IE 10+, Firefox 4+, Chrome 7+, Safari 5.1+,
+ * Opera 11.6+, iOS 4.2+.
+ *
+ * We report that the browser does not support typed arrays if the are not subclassable
+ * using __proto__. Firefox 4-29 lacks support for adding new properties to `Uint8Array`
+ * (See: https://bugzilla.mozilla.org/show_bug.cgi?id=695438). IE 10 lacks support
+ * for __proto__ and has a buggy typed array implementation.
+ */
+Buffer.TYPED_ARRAY_SUPPORT = typedArraySupport()
+
+if (!Buffer.TYPED_ARRAY_SUPPORT && typeof console !== 'undefined' &&
+    typeof console.error === 'function') {
+  console.error(
+    'This browser lacks typed array (Uint8Array) support which is required by ' +
+    '`buffer` v5.x. Use `buffer` v4.x if you require old browser support.'
+  )
+}
+
+function typedArraySupport () {
+  // Can typed array instances can be augmented?
+  try {
+    var arr = new Uint8Array(1)
+    arr.__proto__ = {__proto__: Uint8Array.prototype, foo: function () { return 42 }}
+    return arr.foo() === 42
+  } catch (e) {
+    return false
+  }
+}
+
+function createBuffer (length) {
+  if (length > K_MAX_LENGTH) {
+    throw new RangeError('Invalid typed array length')
+  }
+  // Return an augmented `Uint8Array` instance
+  var buf = new Uint8Array(length)
+  buf.__proto__ = Buffer.prototype
+  return buf
+}
+
+/**
+ * The Buffer constructor returns instances of `Uint8Array` that have their
+ * prototype changed to `Buffer.prototype`. Furthermore, `Buffer` is a subclass of
+ * `Uint8Array`, so the returned instances will have all the node `Buffer` methods
+ * and the `Uint8Array` methods. Square bracket notation works as expected -- it
+ * returns a single octet.
+ *
+ * The `Uint8Array` prototype remains unmodified.
+ */
+
+function Buffer (arg, encodingOrOffset, length) {
+  // Common case.
+  if (typeof arg === 'number') {
+    if (typeof encodingOrOffset === 'string') {
+      throw new Error(
+        'If encoding is specified then the first argument must be a string'
+      )
+    }
+    return allocUnsafe(arg)
+  }
+  return from(arg, encodingOrOffset, length)
+}
+
+// Fix subarray() in ES2016. See: https://github.com/feross/buffer/pull/97
+if (typeof Symbol !== 'undefined' && Symbol.species &&
+    Buffer[Symbol.species] === Buffer) {
+  Object.defineProperty(Buffer, Symbol.species, {
+    value: null,
+    configurable: true,
+    enumerable: false,
+    writable: false
+  })
+}
+
+Buffer.poolSize = 8192 // not used by this implementation
+
+function from (value, encodingOrOffset, length) {
+  if (typeof value === 'number') {
+    throw new TypeError('"value" argument must not be a number')
+  }
+
+  if (value instanceof ArrayBuffer) {
+    return fromArrayBuffer(value, encodingOrOffset, length)
+  }
+
+  if (typeof value === 'string') {
+    return fromString(value, encodingOrOffset)
+  }
+
+  return fromObject(value)
+}
+
+/**
+ * Functionally equivalent to Buffer(arg, encoding) but throws a TypeError
+ * if value is a number.
+ * Buffer.from(str[, encoding])
+ * Buffer.from(array)
+ * Buffer.from(buffer)
+ * Buffer.from(arrayBuffer[, byteOffset[, length]])
+ **/
+Buffer.from = function (value, encodingOrOffset, length) {
+  return from(value, encodingOrOffset, length)
+}
+
+// Note: Change prototype *after* Buffer.from is defined to workaround Chrome bug:
+// https://github.com/feross/buffer/pull/148
+Buffer.prototype.__proto__ = Uint8Array.prototype
+Buffer.__proto__ = Uint8Array
+
+function assertSize (size) {
+  if (typeof size !== 'number') {
+    throw new TypeError('"size" argument must be a number')
+  } else if (size < 0) {
+    throw new RangeError('"size" argument must not be negative')
+  }
+}
+
+function alloc (size, fill, encoding) {
+  assertSize(size)
+  if (size <= 0) {
+    return createBuffer(size)
+  }
+  if (fill !== undefined) {
+    // Only pay attention to encoding if it's a string. This
+    // prevents accidentally sending in a number that would
+    // be interpretted as a start offset.
+    return typeof encoding === 'string'
+      ? createBuffer(size).fill(fill, encoding)
+      : createBuffer(size).fill(fill)
+  }
+  return createBuffer(size)
+}
+
+/**
+ * Creates a new filled Buffer instance.
+ * alloc(size[, fill[, encoding]])
+ **/
+Buffer.alloc = function (size, fill, encoding) {
+  return alloc(size, fill, encoding)
+}
+
+function allocUnsafe (size) {
+  assertSize(size)
+  return createBuffer(size < 0 ? 0 : checked(size) | 0)
+}
+
+/**
+ * Equivalent to Buffer(num), by default creates a non-zero-filled Buffer instance.
+ * */
+Buffer.allocUnsafe = function (size) {
+  return allocUnsafe(size)
+}
+/**
+ * Equivalent to SlowBuffer(num), by default creates a non-zero-filled Buffer instance.
+ */
+Buffer.allocUnsafeSlow = function (size) {
+  return allocUnsafe(size)
+}
+
+function fromString (string, encoding) {
+  if (typeof encoding !== 'string' || encoding === '') {
+    encoding = 'utf8'
+  }
+
+  if (!Buffer.isEncoding(encoding)) {
+    throw new TypeError('"encoding" must be a valid string encoding')
+  }
+
+  var length = byteLength(string, encoding) | 0
+  var buf = createBuffer(length)
+
+  var actual = buf.write(string, encoding)
+
+  if (actual !== length) {
+    // Writing a hex string, for example, that contains invalid characters will
+    // cause everything after the first invalid character to be ignored. (e.g.
+    // 'abxxcd' will be treated as 'ab')
+    buf = buf.slice(0, actual)
+  }
+
+  return buf
+}
+
+function fromArrayLike (array) {
+  var length = array.length < 0 ? 0 : checked(array.length) | 0
+  var buf = createBuffer(length)
+  for (var i = 0; i < length; i += 1) {
+    buf[i] = array[i] & 255
+  }
+  return buf
+}
+
+function fromArrayBuffer (array, byteOffset, length) {
+  if (byteOffset < 0 || array.byteLength < byteOffset) {
+    throw new RangeError('\'offset\' is out of bounds')
+  }
+
+  if (array.byteLength < byteOffset + (length || 0)) {
+    throw new RangeError('\'length\' is out of bounds')
+  }
+
+  var buf
+  if (byteOffset === undefined && length === undefined) {
+    buf = new Uint8Array(array)
+  } else if (length === undefined) {
+    buf = new Uint8Array(array, byteOffset)
+  } else {
+    buf = new Uint8Array(array, byteOffset, length)
+  }
+
+  // Return an augmented `Uint8Array` instance
+  buf.__proto__ = Buffer.prototype
+  return buf
+}
+
+function fromObject (obj) {
+  if (Buffer.isBuffer(obj)) {
+    var len = checked(obj.length) | 0
+    var buf = createBuffer(len)
+
+    if (buf.length === 0) {
+      return buf
+    }
+
+    obj.copy(buf, 0, 0, len)
+    return buf
+  }
+
+  if (obj) {
+    if (isArrayBufferView(obj) || 'length' in obj) {
+      if (typeof obj.length !== 'number' || numberIsNaN(obj.length)) {
+        return createBuffer(0)
+      }
+      return fromArrayLike(obj)
+    }
+
+    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
+      return fromArrayLike(obj.data)
+    }
+  }
+
+  throw new TypeError('First argument must be a string, Buffer, ArrayBuffer, Array, or array-like object.')
+}
+
+function checked (length) {
+  // Note: cannot use `length < K_MAX_LENGTH` here because that fails when
+  // length is NaN (which is otherwise coerced to zero.)
+  if (length >= K_MAX_LENGTH) {
+    throw new RangeError('Attempt to allocate Buffer larger than maximum ' +
+                         'size: 0x' + K_MAX_LENGTH.toString(16) + ' bytes')
+  }
+  return length | 0
+}
+
+function SlowBuffer (length) {
+  if (+length != length) { // eslint-disable-line eqeqeq
+    length = 0
+  }
+  return Buffer.alloc(+length)
+}
+
+Buffer.isBuffer = function isBuffer (b) {
+  return b != null && b._isBuffer === true
+}
+
+Buffer.compare = function compare (a, b) {
+  if (!Buffer.isBuffer(a) || !Buffer.isBuffer(b)) {
+    throw new TypeError('Arguments must be Buffers')
+  }
+
+  if (a === b) return 0
+
+  var x = a.length
+  var y = b.length
+
+  for (var i = 0, len = Math.min(x, y); i < len; ++i) {
+    if (a[i] !== b[i]) {
+      x = a[i]
+      y = b[i]
+      break
+    }
+  }
+
+  if (x < y) return -1
+  if (y < x) return 1
+  return 0
+}
+
+Buffer.isEncoding = function isEncoding (encoding) {
+  switch (String(encoding).toLowerCase()) {
+    case 'hex':
+    case 'utf8':
+    case 'utf-8':
+    case 'ascii':
+    case 'latin1':
+    case 'binary':
+    case 'base64':
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return true
+    default:
+      return false
+  }
+}
+
+Buffer.concat = function concat (list, length) {
+  if (!Array.isArray(list)) {
+    throw new TypeError('"list" argument must be an Array of Buffers')
+  }
+
+  if (list.length === 0) {
+    return Buffer.alloc(0)
+  }
+
+  var i
+  if (length === undefined) {
+    length = 0
+    for (i = 0; i < list.length; ++i) {
+      length += list[i].length
+    }
+  }
+
+  var buffer = Buffer.allocUnsafe(length)
+  var pos = 0
+  for (i = 0; i < list.length; ++i) {
+    var buf = list[i]
+    if (!Buffer.isBuffer(buf)) {
+      throw new TypeError('"list" argument must be an Array of Buffers')
+    }
+    buf.copy(buffer, pos)
+    pos += buf.length
+  }
+  return buffer
+}
+
+function byteLength (string, encoding) {
+  if (Buffer.isBuffer(string)) {
+    return string.length
+  }
+  if (isArrayBufferView(string) || string instanceof ArrayBuffer) {
+    return string.byteLength
+  }
+  if (typeof string !== 'string') {
+    string = '' + string
+  }
+
+  var len = string.length
+  if (len === 0) return 0
+
+  // Use a for loop to avoid recursion
+  var loweredCase = false
+  for (;;) {
+    switch (encoding) {
+      case 'ascii':
+      case 'latin1':
+      case 'binary':
+        return len
+      case 'utf8':
+      case 'utf-8':
+      case undefined:
+        return utf8ToBytes(string).length
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return len * 2
+      case 'hex':
+        return len >>> 1
+      case 'base64':
+        return base64ToBytes(string).length
+      default:
+        if (loweredCase) return utf8ToBytes(string).length // assume utf8
+        encoding = ('' + encoding).toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+Buffer.byteLength = byteLength
+
+function slowToString (encoding, start, end) {
+  var loweredCase = false
+
+  // No need to verify that "this.length <= MAX_UINT32" since it's a read-only
+  // property of a typed array.
+
+  // This behaves neither like String nor Uint8Array in that we set start/end
+  // to their upper/lower bounds if the value passed is out of range.
+  // undefined is handled specially as per ECMA-262 6th Edition,
+  // Section 13.3.3.7 Runtime Semantics: KeyedBindingInitialization.
+  if (start === undefined || start < 0) {
+    start = 0
+  }
+  // Return early if start > this.length. Done here to prevent potential uint32
+  // coercion fail below.
+  if (start > this.length) {
+    return ''
+  }
+
+  if (end === undefined || end > this.length) {
+    end = this.length
+  }
+
+  if (end <= 0) {
+    return ''
+  }
+
+  // Force coersion to uint32. This will also coerce falsey/NaN values to 0.
+  end >>>= 0
+  start >>>= 0
+
+  if (end <= start) {
+    return ''
+  }
+
+  if (!encoding) encoding = 'utf8'
+
+  while (true) {
+    switch (encoding) {
+      case 'hex':
+        return hexSlice(this, start, end)
+
+      case 'utf8':
+      case 'utf-8':
+        return utf8Slice(this, start, end)
+
+      case 'ascii':
+        return asciiSlice(this, start, end)
+
+      case 'latin1':
+      case 'binary':
+        return latin1Slice(this, start, end)
+
+      case 'base64':
+        return base64Slice(this, start, end)
+
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return utf16leSlice(this, start, end)
+
+      default:
+        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
+        encoding = (encoding + '').toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+
+// This property is used by `Buffer.isBuffer` (and the `is-buffer` npm package)
+// to detect a Buffer instance. It's not possible to use `instanceof Buffer`
+// reliably in a browserify context because there could be multiple different
+// copies of the 'buffer' package in use. This method works even for Buffer
+// instances that were created from another copy of the `buffer` package.
+// See: https://github.com/feross/buffer/issues/154
+Buffer.prototype._isBuffer = true
+
+function swap (b, n, m) {
+  var i = b[n]
+  b[n] = b[m]
+  b[m] = i
+}
+
+Buffer.prototype.swap16 = function swap16 () {
+  var len = this.length
+  if (len % 2 !== 0) {
+    throw new RangeError('Buffer size must be a multiple of 16-bits')
+  }
+  for (var i = 0; i < len; i += 2) {
+    swap(this, i, i + 1)
+  }
+  return this
+}
+
+Buffer.prototype.swap32 = function swap32 () {
+  var len = this.length
+  if (len % 4 !== 0) {
+    throw new RangeError('Buffer size must be a multiple of 32-bits')
+  }
+  for (var i = 0; i < len; i += 4) {
+    swap(this, i, i + 3)
+    swap(this, i + 1, i + 2)
+  }
+  return this
+}
+
+Buffer.prototype.swap64 = function swap64 () {
+  var len = this.length
+  if (len % 8 !== 0) {
+    throw new RangeError('Buffer size must be a multiple of 64-bits')
+  }
+  for (var i = 0; i < len; i += 8) {
+    swap(this, i, i + 7)
+    swap(this, i + 1, i + 6)
+    swap(this, i + 2, i + 5)
+    swap(this, i + 3, i + 4)
+  }
+  return this
+}
+
+Buffer.prototype.toString = function toString () {
+  var length = this.length
+  if (length === 0) return ''
+  if (arguments.length === 0) return utf8Slice(this, 0, length)
+  return slowToString.apply(this, arguments)
+}
+
+Buffer.prototype.equals = function equals (b) {
+  if (!Buffer.isBuffer(b)) throw new TypeError('Argument must be a Buffer')
+  if (this === b) return true
+  return Buffer.compare(this, b) === 0
+}
+
+Buffer.prototype.inspect = function inspect () {
+  var str = ''
+  var max = exports.INSPECT_MAX_BYTES
+  if (this.length > 0) {
+    str = this.toString('hex', 0, max).match(/.{2}/g).join(' ')
+    if (this.length > max) str += ' ... '
+  }
+  return '<Buffer ' + str + '>'
+}
+
+Buffer.prototype.compare = function compare (target, start, end, thisStart, thisEnd) {
+  if (!Buffer.isBuffer(target)) {
+    throw new TypeError('Argument must be a Buffer')
+  }
+
+  if (start === undefined) {
+    start = 0
+  }
+  if (end === undefined) {
+    end = target ? target.length : 0
+  }
+  if (thisStart === undefined) {
+    thisStart = 0
+  }
+  if (thisEnd === undefined) {
+    thisEnd = this.length
+  }
+
+  if (start < 0 || end > target.length || thisStart < 0 || thisEnd > this.length) {
+    throw new RangeError('out of range index')
+  }
+
+  if (thisStart >= thisEnd && start >= end) {
+    return 0
+  }
+  if (thisStart >= thisEnd) {
+    return -1
+  }
+  if (start >= end) {
+    return 1
+  }
+
+  start >>>= 0
+  end >>>= 0
+  thisStart >>>= 0
+  thisEnd >>>= 0
+
+  if (this === target) return 0
+
+  var x = thisEnd - thisStart
+  var y = end - start
+  var len = Math.min(x, y)
+
+  var thisCopy = this.slice(thisStart, thisEnd)
+  var targetCopy = target.slice(start, end)
+
+  for (var i = 0; i < len; ++i) {
+    if (thisCopy[i] !== targetCopy[i]) {
+      x = thisCopy[i]
+      y = targetCopy[i]
+      break
+    }
+  }
+
+  if (x < y) return -1
+  if (y < x) return 1
+  return 0
+}
+
+// Finds either the first index of `val` in `buffer` at offset >= `byteOffset`,
+// OR the last index of `val` in `buffer` at offset <= `byteOffset`.
+//
+// Arguments:
+// - buffer - a Buffer to search
+// - val - a string, Buffer, or number
+// - byteOffset - an index into `buffer`; will be clamped to an int32
+// - encoding - an optional encoding, relevant is val is a string
+// - dir - true for indexOf, false for lastIndexOf
+function bidirectionalIndexOf (buffer, val, byteOffset, encoding, dir) {
+  // Empty buffer means no match
+  if (buffer.length === 0) return -1
+
+  // Normalize byteOffset
+  if (typeof byteOffset === 'string') {
+    encoding = byteOffset
+    byteOffset = 0
+  } else if (byteOffset > 0x7fffffff) {
+    byteOffset = 0x7fffffff
+  } else if (byteOffset < -0x80000000) {
+    byteOffset = -0x80000000
+  }
+  byteOffset = +byteOffset  // Coerce to Number.
+  if (numberIsNaN(byteOffset)) {
+    // byteOffset: it it's undefined, null, NaN, "foo", etc, search whole buffer
+    byteOffset = dir ? 0 : (buffer.length - 1)
+  }
+
+  // Normalize byteOffset: negative offsets start from the end of the buffer
+  if (byteOffset < 0) byteOffset = buffer.length + byteOffset
+  if (byteOffset >= buffer.length) {
+    if (dir) return -1
+    else byteOffset = buffer.length - 1
+  } else if (byteOffset < 0) {
+    if (dir) byteOffset = 0
+    else return -1
+  }
+
+  // Normalize val
+  if (typeof val === 'string') {
+    val = Buffer.from(val, encoding)
+  }
+
+  // Finally, search either indexOf (if dir is true) or lastIndexOf
+  if (Buffer.isBuffer(val)) {
+    // Special case: looking for empty string/buffer always fails
+    if (val.length === 0) {
+      return -1
+    }
+    return arrayIndexOf(buffer, val, byteOffset, encoding, dir)
+  } else if (typeof val === 'number') {
+    val = val & 0xFF // Search for a byte value [0-255]
+    if (typeof Uint8Array.prototype.indexOf === 'function') {
+      if (dir) {
+        return Uint8Array.prototype.indexOf.call(buffer, val, byteOffset)
+      } else {
+        return Uint8Array.prototype.lastIndexOf.call(buffer, val, byteOffset)
+      }
+    }
+    return arrayIndexOf(buffer, [ val ], byteOffset, encoding, dir)
+  }
+
+  throw new TypeError('val must be string, number or Buffer')
+}
+
+function arrayIndexOf (arr, val, byteOffset, encoding, dir) {
+  var indexSize = 1
+  var arrLength = arr.length
+  var valLength = val.length
+
+  if (encoding !== undefined) {
+    encoding = String(encoding).toLowerCase()
+    if (encoding === 'ucs2' || encoding === 'ucs-2' ||
+        encoding === 'utf16le' || encoding === 'utf-16le') {
+      if (arr.length < 2 || val.length < 2) {
+        return -1
+      }
+      indexSize = 2
+      arrLength /= 2
+      valLength /= 2
+      byteOffset /= 2
+    }
+  }
+
+  function read (buf, i) {
+    if (indexSize === 1) {
+      return buf[i]
+    } else {
+      return buf.readUInt16BE(i * indexSize)
+    }
+  }
+
+  var i
+  if (dir) {
+    var foundIndex = -1
+    for (i = byteOffset; i < arrLength; i++) {
+      if (read(arr, i) === read(val, foundIndex === -1 ? 0 : i - foundIndex)) {
+        if (foundIndex === -1) foundIndex = i
+        if (i - foundIndex + 1 === valLength) return foundIndex * indexSize
+      } else {
+        if (foundIndex !== -1) i -= i - foundIndex
+        foundIndex = -1
+      }
+    }
+  } else {
+    if (byteOffset + valLength > arrLength) byteOffset = arrLength - valLength
+    for (i = byteOffset; i >= 0; i--) {
+      var found = true
+      for (var j = 0; j < valLength; j++) {
+        if (read(arr, i + j) !== read(val, j)) {
+          found = false
+          break
+        }
+      }
+      if (found) return i
+    }
+  }
+
+  return -1
+}
+
+Buffer.prototype.includes = function includes (val, byteOffset, encoding) {
+  return this.indexOf(val, byteOffset, encoding) !== -1
+}
+
+Buffer.prototype.indexOf = function indexOf (val, byteOffset, encoding) {
+  return bidirectionalIndexOf(this, val, byteOffset, encoding, true)
+}
+
+Buffer.prototype.lastIndexOf = function lastIndexOf (val, byteOffset, encoding) {
+  return bidirectionalIndexOf(this, val, byteOffset, encoding, false)
+}
+
+function hexWrite (buf, string, offset, length) {
+  offset = Number(offset) || 0
+  var remaining = buf.length - offset
+  if (!length) {
+    length = remaining
+  } else {
+    length = Number(length)
+    if (length > remaining) {
+      length = remaining
+    }
+  }
+
+  // must be an even number of digits
+  var strLen = string.length
+  if (strLen % 2 !== 0) throw new TypeError('Invalid hex string')
+
+  if (length > strLen / 2) {
+    length = strLen / 2
+  }
+  for (var i = 0; i < length; ++i) {
+    var parsed = parseInt(string.substr(i * 2, 2), 16)
+    if (numberIsNaN(parsed)) return i
+    buf[offset + i] = parsed
+  }
+  return i
+}
+
+function utf8Write (buf, string, offset, length) {
+  return blitBuffer(utf8ToBytes(string, buf.length - offset), buf, offset, length)
+}
+
+function asciiWrite (buf, string, offset, length) {
+  return blitBuffer(asciiToBytes(string), buf, offset, length)
+}
+
+function latin1Write (buf, string, offset, length) {
+  return asciiWrite(buf, string, offset, length)
+}
+
+function base64Write (buf, string, offset, length) {
+  return blitBuffer(base64ToBytes(string), buf, offset, length)
+}
+
+function ucs2Write (buf, string, offset, length) {
+  return blitBuffer(utf16leToBytes(string, buf.length - offset), buf, offset, length)
+}
+
+Buffer.prototype.write = function write (string, offset, length, encoding) {
+  // Buffer#write(string)
+  if (offset === undefined) {
+    encoding = 'utf8'
+    length = this.length
+    offset = 0
+  // Buffer#write(string, encoding)
+  } else if (length === undefined && typeof offset === 'string') {
+    encoding = offset
+    length = this.length
+    offset = 0
+  // Buffer#write(string, offset[, length][, encoding])
+  } else if (isFinite(offset)) {
+    offset = offset >>> 0
+    if (isFinite(length)) {
+      length = length >>> 0
+      if (encoding === undefined) encoding = 'utf8'
+    } else {
+      encoding = length
+      length = undefined
+    }
+  } else {
+    throw new Error(
+      'Buffer.write(string, encoding, offset[, length]) is no longer supported'
+    )
+  }
+
+  var remaining = this.length - offset
+  if (length === undefined || length > remaining) length = remaining
+
+  if ((string.length > 0 && (length < 0 || offset < 0)) || offset > this.length) {
+    throw new RangeError('Attempt to write outside buffer bounds')
+  }
+
+  if (!encoding) encoding = 'utf8'
+
+  var loweredCase = false
+  for (;;) {
+    switch (encoding) {
+      case 'hex':
+        return hexWrite(this, string, offset, length)
+
+      case 'utf8':
+      case 'utf-8':
+        return utf8Write(this, string, offset, length)
+
+      case 'ascii':
+        return asciiWrite(this, string, offset, length)
+
+      case 'latin1':
+      case 'binary':
+        return latin1Write(this, string, offset, length)
+
+      case 'base64':
+        // Warning: maxLength not taken into account in base64Write
+        return base64Write(this, string, offset, length)
+
+      case 'ucs2':
+      case 'ucs-2':
+      case 'utf16le':
+      case 'utf-16le':
+        return ucs2Write(this, string, offset, length)
+
+      default:
+        if (loweredCase) throw new TypeError('Unknown encoding: ' + encoding)
+        encoding = ('' + encoding).toLowerCase()
+        loweredCase = true
+    }
+  }
+}
+
+Buffer.prototype.toJSON = function toJSON () {
+  return {
+    type: 'Buffer',
+    data: Array.prototype.slice.call(this._arr || this, 0)
+  }
+}
+
+function base64Slice (buf, start, end) {
+  if (start === 0 && end === buf.length) {
+    return base64.fromByteArray(buf)
+  } else {
+    return base64.fromByteArray(buf.slice(start, end))
+  }
+}
+
+function utf8Slice (buf, start, end) {
+  end = Math.min(buf.length, end)
+  var res = []
+
+  var i = start
+  while (i < end) {
+    var firstByte = buf[i]
+    var codePoint = null
+    var bytesPerSequence = (firstByte > 0xEF) ? 4
+      : (firstByte > 0xDF) ? 3
+      : (firstByte > 0xBF) ? 2
+      : 1
+
+    if (i + bytesPerSequence <= end) {
+      var secondByte, thirdByte, fourthByte, tempCodePoint
+
+      switch (bytesPerSequence) {
+        case 1:
+          if (firstByte < 0x80) {
+            codePoint = firstByte
+          }
+          break
+        case 2:
+          secondByte = buf[i + 1]
+          if ((secondByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0x1F) << 0x6 | (secondByte & 0x3F)
+            if (tempCodePoint > 0x7F) {
+              codePoint = tempCodePoint
+            }
+          }
+          break
+        case 3:
+          secondByte = buf[i + 1]
+          thirdByte = buf[i + 2]
+          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0xF) << 0xC | (secondByte & 0x3F) << 0x6 | (thirdByte & 0x3F)
+            if (tempCodePoint > 0x7FF && (tempCodePoint < 0xD800 || tempCodePoint > 0xDFFF)) {
+              codePoint = tempCodePoint
+            }
+          }
+          break
+        case 4:
+          secondByte = buf[i + 1]
+          thirdByte = buf[i + 2]
+          fourthByte = buf[i + 3]
+          if ((secondByte & 0xC0) === 0x80 && (thirdByte & 0xC0) === 0x80 && (fourthByte & 0xC0) === 0x80) {
+            tempCodePoint = (firstByte & 0xF) << 0x12 | (secondByte & 0x3F) << 0xC | (thirdByte & 0x3F) << 0x6 | (fourthByte & 0x3F)
+            if (tempCodePoint > 0xFFFF && tempCodePoint < 0x110000) {
+              codePoint = tempCodePoint
+            }
+          }
+      }
+    }
+
+    if (codePoint === null) {
+      // we did not generate a valid codePoint so insert a
+      // replacement char (U+FFFD) and advance only 1 byte
+      codePoint = 0xFFFD
+      bytesPerSequence = 1
+    } else if (codePoint > 0xFFFF) {
+      // encode to utf16 (surrogate pair dance)
+      codePoint -= 0x10000
+      res.push(codePoint >>> 10 & 0x3FF | 0xD800)
+      codePoint = 0xDC00 | codePoint & 0x3FF
+    }
+
+    res.push(codePoint)
+    i += bytesPerSequence
+  }
+
+  return decodeCodePointsArray(res)
+}
+
+// Based on http://stackoverflow.com/a/22747272/680742, the browser with
+// the lowest limit is Chrome, with 0x10000 args.
+// We go 1 magnitude less, for safety
+var MAX_ARGUMENTS_LENGTH = 0x1000
+
+function decodeCodePointsArray (codePoints) {
+  var len = codePoints.length
+  if (len <= MAX_ARGUMENTS_LENGTH) {
+    return String.fromCharCode.apply(String, codePoints) // avoid extra slice()
+  }
+
+  // Decode in chunks to avoid "call stack size exceeded".
+  var res = ''
+  var i = 0
+  while (i < len) {
+    res += String.fromCharCode.apply(
+      String,
+      codePoints.slice(i, i += MAX_ARGUMENTS_LENGTH)
+    )
+  }
+  return res
+}
+
+function asciiSlice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; ++i) {
+    ret += String.fromCharCode(buf[i] & 0x7F)
+  }
+  return ret
+}
+
+function latin1Slice (buf, start, end) {
+  var ret = ''
+  end = Math.min(buf.length, end)
+
+  for (var i = start; i < end; ++i) {
+    ret += String.fromCharCode(buf[i])
+  }
+  return ret
+}
+
+function hexSlice (buf, start, end) {
+  var len = buf.length
+
+  if (!start || start < 0) start = 0
+  if (!end || end < 0 || end > len) end = len
+
+  var out = ''
+  for (var i = start; i < end; ++i) {
+    out += toHex(buf[i])
+  }
+  return out
+}
+
+function utf16leSlice (buf, start, end) {
+  var bytes = buf.slice(start, end)
+  var res = ''
+  for (var i = 0; i < bytes.length; i += 2) {
+    res += String.fromCharCode(bytes[i] + (bytes[i + 1] * 256))
+  }
+  return res
+}
+
+Buffer.prototype.slice = function slice (start, end) {
+  var len = this.length
+  start = ~~start
+  end = end === undefined ? len : ~~end
+
+  if (start < 0) {
+    start += len
+    if (start < 0) start = 0
+  } else if (start > len) {
+    start = len
+  }
+
+  if (end < 0) {
+    end += len
+    if (end < 0) end = 0
+  } else if (end > len) {
+    end = len
+  }
+
+  if (end < start) end = start
+
+  var newBuf = this.subarray(start, end)
+  // Return an augmented `Uint8Array` instance
+  newBuf.__proto__ = Buffer.prototype
+  return newBuf
+}
+
+/*
+ * Need to make sure that buffer isn't trying to write out of bounds.
+ */
+function checkOffset (offset, ext, length) {
+  if ((offset % 1) !== 0 || offset < 0) throw new RangeError('offset is not uint')
+  if (offset + ext > length) throw new RangeError('Trying to access beyond buffer length')
+}
+
+Buffer.prototype.readUIntLE = function readUIntLE (offset, byteLength, noAssert) {
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var val = this[offset]
+  var mul = 1
+  var i = 0
+  while (++i < byteLength && (mul *= 0x100)) {
+    val += this[offset + i] * mul
+  }
+
+  return val
+}
+
+Buffer.prototype.readUIntBE = function readUIntBE (offset, byteLength, noAssert) {
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) {
+    checkOffset(offset, byteLength, this.length)
+  }
+
+  var val = this[offset + --byteLength]
+  var mul = 1
+  while (byteLength > 0 && (mul *= 0x100)) {
+    val += this[offset + --byteLength] * mul
+  }
+
+  return val
+}
+
+Buffer.prototype.readUInt8 = function readUInt8 (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 1, this.length)
+  return this[offset]
+}
+
+Buffer.prototype.readUInt16LE = function readUInt16LE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  return this[offset] | (this[offset + 1] << 8)
+}
+
+Buffer.prototype.readUInt16BE = function readUInt16BE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  return (this[offset] << 8) | this[offset + 1]
+}
+
+Buffer.prototype.readUInt32LE = function readUInt32LE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return ((this[offset]) |
+      (this[offset + 1] << 8) |
+      (this[offset + 2] << 16)) +
+      (this[offset + 3] * 0x1000000)
+}
+
+Buffer.prototype.readUInt32BE = function readUInt32BE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset] * 0x1000000) +
+    ((this[offset + 1] << 16) |
+    (this[offset + 2] << 8) |
+    this[offset + 3])
+}
+
+Buffer.prototype.readIntLE = function readIntLE (offset, byteLength, noAssert) {
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var val = this[offset]
+  var mul = 1
+  var i = 0
+  while (++i < byteLength && (mul *= 0x100)) {
+    val += this[offset + i] * mul
+  }
+  mul *= 0x80
+
+  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
+
+  return val
+}
+
+Buffer.prototype.readIntBE = function readIntBE (offset, byteLength, noAssert) {
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) checkOffset(offset, byteLength, this.length)
+
+  var i = byteLength
+  var mul = 1
+  var val = this[offset + --i]
+  while (i > 0 && (mul *= 0x100)) {
+    val += this[offset + --i] * mul
+  }
+  mul *= 0x80
+
+  if (val >= mul) val -= Math.pow(2, 8 * byteLength)
+
+  return val
+}
+
+Buffer.prototype.readInt8 = function readInt8 (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 1, this.length)
+  if (!(this[offset] & 0x80)) return (this[offset])
+  return ((0xff - this[offset] + 1) * -1)
+}
+
+Buffer.prototype.readInt16LE = function readInt16LE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  var val = this[offset] | (this[offset + 1] << 8)
+  return (val & 0x8000) ? val | 0xFFFF0000 : val
+}
+
+Buffer.prototype.readInt16BE = function readInt16BE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 2, this.length)
+  var val = this[offset + 1] | (this[offset] << 8)
+  return (val & 0x8000) ? val | 0xFFFF0000 : val
+}
+
+Buffer.prototype.readInt32LE = function readInt32LE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset]) |
+    (this[offset + 1] << 8) |
+    (this[offset + 2] << 16) |
+    (this[offset + 3] << 24)
+}
+
+Buffer.prototype.readInt32BE = function readInt32BE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+
+  return (this[offset] << 24) |
+    (this[offset + 1] << 16) |
+    (this[offset + 2] << 8) |
+    (this[offset + 3])
+}
+
+Buffer.prototype.readFloatLE = function readFloatLE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+  return ieee754.read(this, offset, true, 23, 4)
+}
+
+Buffer.prototype.readFloatBE = function readFloatBE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 4, this.length)
+  return ieee754.read(this, offset, false, 23, 4)
+}
+
+Buffer.prototype.readDoubleLE = function readDoubleLE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 8, this.length)
+  return ieee754.read(this, offset, true, 52, 8)
+}
+
+Buffer.prototype.readDoubleBE = function readDoubleBE (offset, noAssert) {
+  offset = offset >>> 0
+  if (!noAssert) checkOffset(offset, 8, this.length)
+  return ieee754.read(this, offset, false, 52, 8)
+}
+
+function checkInt (buf, value, offset, ext, max, min) {
+  if (!Buffer.isBuffer(buf)) throw new TypeError('"buffer" argument must be a Buffer instance')
+  if (value > max || value < min) throw new RangeError('"value" argument is out of bounds')
+  if (offset + ext > buf.length) throw new RangeError('Index out of range')
+}
+
+Buffer.prototype.writeUIntLE = function writeUIntLE (value, offset, byteLength, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) {
+    var maxBytes = Math.pow(2, 8 * byteLength) - 1
+    checkInt(this, value, offset, byteLength, maxBytes, 0)
+  }
+
+  var mul = 1
+  var i = 0
+  this[offset] = value & 0xFF
+  while (++i < byteLength && (mul *= 0x100)) {
+    this[offset + i] = (value / mul) & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeUIntBE = function writeUIntBE (value, offset, byteLength, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  byteLength = byteLength >>> 0
+  if (!noAssert) {
+    var maxBytes = Math.pow(2, 8 * byteLength) - 1
+    checkInt(this, value, offset, byteLength, maxBytes, 0)
+  }
+
+  var i = byteLength - 1
+  var mul = 1
+  this[offset + i] = value & 0xFF
+  while (--i >= 0 && (mul *= 0x100)) {
+    this[offset + i] = (value / mul) & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeUInt8 = function writeUInt8 (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 1, 0xff, 0)
+  this[offset] = (value & 0xff)
+  return offset + 1
+}
+
+Buffer.prototype.writeUInt16LE = function writeUInt16LE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
+  this[offset] = (value & 0xff)
+  this[offset + 1] = (value >>> 8)
+  return offset + 2
+}
+
+Buffer.prototype.writeUInt16BE = function writeUInt16BE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0xffff, 0)
+  this[offset] = (value >>> 8)
+  this[offset + 1] = (value & 0xff)
+  return offset + 2
+}
+
+Buffer.prototype.writeUInt32LE = function writeUInt32LE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
+  this[offset + 3] = (value >>> 24)
+  this[offset + 2] = (value >>> 16)
+  this[offset + 1] = (value >>> 8)
+  this[offset] = (value & 0xff)
+  return offset + 4
+}
+
+Buffer.prototype.writeUInt32BE = function writeUInt32BE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0xffffffff, 0)
+  this[offset] = (value >>> 24)
+  this[offset + 1] = (value >>> 16)
+  this[offset + 2] = (value >>> 8)
+  this[offset + 3] = (value & 0xff)
+  return offset + 4
+}
+
+Buffer.prototype.writeIntLE = function writeIntLE (value, offset, byteLength, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) {
+    var limit = Math.pow(2, (8 * byteLength) - 1)
+
+    checkInt(this, value, offset, byteLength, limit - 1, -limit)
+  }
+
+  var i = 0
+  var mul = 1
+  var sub = 0
+  this[offset] = value & 0xFF
+  while (++i < byteLength && (mul *= 0x100)) {
+    if (value < 0 && sub === 0 && this[offset + i - 1] !== 0) {
+      sub = 1
+    }
+    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeIntBE = function writeIntBE (value, offset, byteLength, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) {
+    var limit = Math.pow(2, (8 * byteLength) - 1)
+
+    checkInt(this, value, offset, byteLength, limit - 1, -limit)
+  }
+
+  var i = byteLength - 1
+  var mul = 1
+  var sub = 0
+  this[offset + i] = value & 0xFF
+  while (--i >= 0 && (mul *= 0x100)) {
+    if (value < 0 && sub === 0 && this[offset + i + 1] !== 0) {
+      sub = 1
+    }
+    this[offset + i] = ((value / mul) >> 0) - sub & 0xFF
+  }
+
+  return offset + byteLength
+}
+
+Buffer.prototype.writeInt8 = function writeInt8 (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 1, 0x7f, -0x80)
+  if (value < 0) value = 0xff + value + 1
+  this[offset] = (value & 0xff)
+  return offset + 1
+}
+
+Buffer.prototype.writeInt16LE = function writeInt16LE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
+  this[offset] = (value & 0xff)
+  this[offset + 1] = (value >>> 8)
+  return offset + 2
+}
+
+Buffer.prototype.writeInt16BE = function writeInt16BE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 2, 0x7fff, -0x8000)
+  this[offset] = (value >>> 8)
+  this[offset + 1] = (value & 0xff)
+  return offset + 2
+}
+
+Buffer.prototype.writeInt32LE = function writeInt32LE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
+  this[offset] = (value & 0xff)
+  this[offset + 1] = (value >>> 8)
+  this[offset + 2] = (value >>> 16)
+  this[offset + 3] = (value >>> 24)
+  return offset + 4
+}
+
+Buffer.prototype.writeInt32BE = function writeInt32BE (value, offset, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) checkInt(this, value, offset, 4, 0x7fffffff, -0x80000000)
+  if (value < 0) value = 0xffffffff + value + 1
+  this[offset] = (value >>> 24)
+  this[offset + 1] = (value >>> 16)
+  this[offset + 2] = (value >>> 8)
+  this[offset + 3] = (value & 0xff)
+  return offset + 4
+}
+
+function checkIEEE754 (buf, value, offset, ext, max, min) {
+  if (offset + ext > buf.length) throw new RangeError('Index out of range')
+  if (offset < 0) throw new RangeError('Index out of range')
+}
+
+function writeFloat (buf, value, offset, littleEndian, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) {
+    checkIEEE754(buf, value, offset, 4, 3.4028234663852886e+38, -3.4028234663852886e+38)
+  }
+  ieee754.write(buf, value, offset, littleEndian, 23, 4)
+  return offset + 4
+}
+
+Buffer.prototype.writeFloatLE = function writeFloatLE (value, offset, noAssert) {
+  return writeFloat(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeFloatBE = function writeFloatBE (value, offset, noAssert) {
+  return writeFloat(this, value, offset, false, noAssert)
+}
+
+function writeDouble (buf, value, offset, littleEndian, noAssert) {
+  value = +value
+  offset = offset >>> 0
+  if (!noAssert) {
+    checkIEEE754(buf, value, offset, 8, 1.7976931348623157E+308, -1.7976931348623157E+308)
+  }
+  ieee754.write(buf, value, offset, littleEndian, 52, 8)
+  return offset + 8
+}
+
+Buffer.prototype.writeDoubleLE = function writeDoubleLE (value, offset, noAssert) {
+  return writeDouble(this, value, offset, true, noAssert)
+}
+
+Buffer.prototype.writeDoubleBE = function writeDoubleBE (value, offset, noAssert) {
+  return writeDouble(this, value, offset, false, noAssert)
+}
+
+// copy(targetBuffer, targetStart=0, sourceStart=0, sourceEnd=buffer.length)
+Buffer.prototype.copy = function copy (target, targetStart, start, end) {
+  if (!start) start = 0
+  if (!end && end !== 0) end = this.length
+  if (targetStart >= target.length) targetStart = target.length
+  if (!targetStart) targetStart = 0
+  if (end > 0 && end < start) end = start
+
+  // Copy 0 bytes; we're done
+  if (end === start) return 0
+  if (target.length === 0 || this.length === 0) return 0
+
+  // Fatal error conditions
+  if (targetStart < 0) {
+    throw new RangeError('targetStart out of bounds')
+  }
+  if (start < 0 || start >= this.length) throw new RangeError('sourceStart out of bounds')
+  if (end < 0) throw new RangeError('sourceEnd out of bounds')
+
+  // Are we oob?
+  if (end > this.length) end = this.length
+  if (target.length - targetStart < end - start) {
+    end = target.length - targetStart + start
+  }
+
+  var len = end - start
+  var i
+
+  if (this === target && start < targetStart && targetStart < end) {
+    // descending copy from end
+    for (i = len - 1; i >= 0; --i) {
+      target[i + targetStart] = this[i + start]
+    }
+  } else if (len < 1000) {
+    // ascending copy from start
+    for (i = 0; i < len; ++i) {
+      target[i + targetStart] = this[i + start]
+    }
+  } else {
+    Uint8Array.prototype.set.call(
+      target,
+      this.subarray(start, start + len),
+      targetStart
+    )
+  }
+
+  return len
+}
+
+// Usage:
+//    buffer.fill(number[, offset[, end]])
+//    buffer.fill(buffer[, offset[, end]])
+//    buffer.fill(string[, offset[, end]][, encoding])
+Buffer.prototype.fill = function fill (val, start, end, encoding) {
+  // Handle string cases:
+  if (typeof val === 'string') {
+    if (typeof start === 'string') {
+      encoding = start
+      start = 0
+      end = this.length
+    } else if (typeof end === 'string') {
+      encoding = end
+      end = this.length
+    }
+    if (val.length === 1) {
+      var code = val.charCodeAt(0)
+      if (code < 256) {
+        val = code
+      }
+    }
+    if (encoding !== undefined && typeof encoding !== 'string') {
+      throw new TypeError('encoding must be a string')
+    }
+    if (typeof encoding === 'string' && !Buffer.isEncoding(encoding)) {
+      throw new TypeError('Unknown encoding: ' + encoding)
+    }
+  } else if (typeof val === 'number') {
+    val = val & 255
+  }
+
+  // Invalid ranges are not set to a default, so can range check early.
+  if (start < 0 || this.length < start || this.length < end) {
+    throw new RangeError('Out of range index')
+  }
+
+  if (end <= start) {
+    return this
+  }
+
+  start = start >>> 0
+  end = end === undefined ? this.length : end >>> 0
+
+  if (!val) val = 0
+
+  var i
+  if (typeof val === 'number') {
+    for (i = start; i < end; ++i) {
+      this[i] = val
+    }
+  } else {
+    var bytes = Buffer.isBuffer(val)
+      ? val
+      : new Buffer(val, encoding)
+    var len = bytes.length
+    for (i = 0; i < end - start; ++i) {
+      this[i + start] = bytes[i % len]
+    }
+  }
+
+  return this
+}
+
+// HELPER FUNCTIONS
+// ================
+
+var INVALID_BASE64_RE = /[^+/0-9A-Za-z-_]/g
+
+function base64clean (str) {
+  // Node strips out invalid characters like \n and \t from the string, base64-js does not
+  str = str.trim().replace(INVALID_BASE64_RE, '')
+  // Node converts strings with length < 2 to ''
+  if (str.length < 2) return ''
+  // Node allows for non-padded base64 strings (missing trailing ===), base64-js does not
+  while (str.length % 4 !== 0) {
+    str = str + '='
+  }
+  return str
+}
+
+function toHex (n) {
+  if (n < 16) return '0' + n.toString(16)
+  return n.toString(16)
+}
+
+function utf8ToBytes (string, units) {
+  units = units || Infinity
+  var codePoint
+  var length = string.length
+  var leadSurrogate = null
+  var bytes = []
+
+  for (var i = 0; i < length; ++i) {
+    codePoint = string.charCodeAt(i)
+
+    // is surrogate component
+    if (codePoint > 0xD7FF && codePoint < 0xE000) {
+      // last char was a lead
+      if (!leadSurrogate) {
+        // no lead yet
+        if (codePoint > 0xDBFF) {
+          // unexpected trail
+          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+          continue
+        } else if (i + 1 === length) {
+          // unpaired lead
+          if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+          continue
+        }
+
+        // valid lead
+        leadSurrogate = codePoint
+
+        continue
+      }
+
+      // 2 leads in a row
+      if (codePoint < 0xDC00) {
+        if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+        leadSurrogate = codePoint
+        continue
+      }
+
+      // valid surrogate pair
+      codePoint = (leadSurrogate - 0xD800 << 10 | codePoint - 0xDC00) + 0x10000
+    } else if (leadSurrogate) {
+      // valid bmp char, but last char was a lead
+      if ((units -= 3) > -1) bytes.push(0xEF, 0xBF, 0xBD)
+    }
+
+    leadSurrogate = null
+
+    // encode utf8
+    if (codePoint < 0x80) {
+      if ((units -= 1) < 0) break
+      bytes.push(codePoint)
+    } else if (codePoint < 0x800) {
+      if ((units -= 2) < 0) break
+      bytes.push(
+        codePoint >> 0x6 | 0xC0,
+        codePoint & 0x3F | 0x80
+      )
+    } else if (codePoint < 0x10000) {
+      if ((units -= 3) < 0) break
+      bytes.push(
+        codePoint >> 0xC | 0xE0,
+        codePoint >> 0x6 & 0x3F | 0x80,
+        codePoint & 0x3F | 0x80
+      )
+    } else if (codePoint < 0x110000) {
+      if ((units -= 4) < 0) break
+      bytes.push(
+        codePoint >> 0x12 | 0xF0,
+        codePoint >> 0xC & 0x3F | 0x80,
+        codePoint >> 0x6 & 0x3F | 0x80,
+        codePoint & 0x3F | 0x80
+      )
+    } else {
+      throw new Error('Invalid code point')
+    }
+  }
+
+  return bytes
+}
+
+function asciiToBytes (str) {
+  var byteArray = []
+  for (var i = 0; i < str.length; ++i) {
+    // Node's code seems to be doing this and not & 0x7F..
+    byteArray.push(str.charCodeAt(i) & 0xFF)
+  }
+  return byteArray
+}
+
+function utf16leToBytes (str, units) {
+  var c, hi, lo
+  var byteArray = []
+  for (var i = 0; i < str.length; ++i) {
+    if ((units -= 2) < 0) break
+
+    c = str.charCodeAt(i)
+    hi = c >> 8
+    lo = c % 256
+    byteArray.push(lo)
+    byteArray.push(hi)
+  }
+
+  return byteArray
+}
+
+function base64ToBytes (str) {
+  return base64.toByteArray(base64clean(str))
+}
+
+function blitBuffer (src, dst, offset, length) {
+  for (var i = 0; i < length; ++i) {
+    if ((i + offset >= dst.length) || (i >= src.length)) break
+    dst[i + offset] = src[i]
+  }
+  return i
+}
+
+// Node 0.10 supports `ArrayBuffer` but lacks `ArrayBuffer.isView`
+function isArrayBufferView (obj) {
+  return (typeof ArrayBuffer.isView === 'function') && ArrayBuffer.isView(obj)
+}
+
+function numberIsNaN (obj) {
+  return obj !== obj // eslint-disable-line no-self-compare
+}
+
+},{"base64-js":3,"ieee754":10}],6:[function(require,module,exports){
+module.exports = function(dtype) {
+  switch (dtype) {
+    case 'int8':
+      return Int8Array
+    case 'int16':
+      return Int16Array
+    case 'int32':
+      return Int32Array
+    case 'uint8':
+      return Uint8Array
+    case 'uint16':
+      return Uint16Array
+    case 'uint32':
+      return Uint32Array
+    case 'float32':
+      return Float32Array
+    case 'float64':
+      return Float64Array
+    case 'array':
+      return Array
+    case 'uint8_clamped':
+      return Uint8ClampedArray
+  }
+}
+
+},{}],7:[function(require,module,exports){
+/*eslint new-cap:0*/
+var dtype = require('dtype')
+module.exports = flattenVertexData
+function flattenVertexData (data, output, offset) {
+  if (!data) throw new TypeError('must specify data as first parameter')
+  offset = +(offset || 0) | 0
+
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    var dim = data[0].length
+    var length = data.length * dim
+
+    // no output specified, create a new typed array
+    if (!output || typeof output === 'string') {
+      output = new (dtype(output || 'float32'))(length + offset)
+    }
+
+    var dstLength = output.length - offset
+    if (length !== dstLength) {
+      throw new Error('source length ' + length + ' (' + dim + 'x' + data.length + ')' +
+        ' does not match destination length ' + dstLength)
+    }
+
+    for (var i = 0, k = offset; i < data.length; i++) {
+      for (var j = 0; j < dim; j++) {
+        output[k++] = data[i][j]
+      }
+    }
+  } else {
+    if (!output || typeof output === 'string') {
+      // no output, create a new one
+      var Ctor = dtype(output || 'float32')
+      if (offset === 0) {
+        output = new Ctor(data)
+      } else {
+        output = new Ctor(data.length + offset)
+        output.set(data, offset)
+      }
+    } else {
+      // store output in existing array
+      output.set(data, offset)
+    }
+  }
+
+  return output
+}
+
+},{"dtype":6}],8:[function(require,module,exports){
+var isFunction = require('is-function')
+
+module.exports = forEach
+
+var toString = Object.prototype.toString
+var hasOwnProperty = Object.prototype.hasOwnProperty
+
+function forEach(list, iterator, context) {
+    if (!isFunction(iterator)) {
+        throw new TypeError('iterator must be a function')
+    }
+
+    if (arguments.length < 3) {
+        context = this
+    }
+    
+    if (toString.call(list) === '[object Array]')
+        forEachArray(list, iterator, context)
+    else if (typeof list === 'string')
+        forEachString(list, iterator, context)
+    else
+        forEachObject(list, iterator, context)
+}
+
+function forEachArray(array, iterator, context) {
+    for (var i = 0, len = array.length; i < len; i++) {
+        if (hasOwnProperty.call(array, i)) {
+            iterator.call(context, array[i], i, array)
+        }
+    }
+}
+
+function forEachString(string, iterator, context) {
+    for (var i = 0, len = string.length; i < len; i++) {
+        // no such thing as a sparse string.
+        iterator.call(context, string.charAt(i), i, string)
+    }
+}
+
+function forEachObject(object, iterator, context) {
+    for (var k in object) {
+        if (hasOwnProperty.call(object, k)) {
+            iterator.call(context, object[k], k, object)
+        }
+    }
+}
+
+},{"is-function":13}],9:[function(require,module,exports){
+(function (global){
+var win;
+
+if (typeof window !== "undefined") {
+    win = window;
+} else if (typeof global !== "undefined") {
+    win = global;
+} else if (typeof self !== "undefined"){
+    win = self;
+} else {
+    win = {};
+}
+
+module.exports = win;
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],10:[function(require,module,exports){
+exports.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var nBits = -7
+  var i = isLE ? (nBytes - 1) : 0
+  var d = isLE ? -1 : 1
+  var s = buffer[offset + i]
+
+  i += d
+
+  e = s & ((1 << (-nBits)) - 1)
+  s >>= (-nBits)
+  nBits += eLen
+  for (; nBits > 0; e = e * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1)
+  e >>= (-nBits)
+  nBits += mLen
+  for (; nBits > 0; m = m * 256 + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
+  } else {
+    m = m + Math.pow(2, mLen)
+    e = e - eBias
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+}
+
+exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c
+  var eLen = nBytes * 8 - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
+  var i = isLE ? 0 : (nBytes - 1)
+  var d = isLE ? 1 : -1
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+
+  value = Math.abs(value)
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0
+    e = eMax
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2)
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--
+      c *= 2
+    }
+    if (e + eBias >= 1) {
+      value += rt / c
+    } else {
+      value += rt * Math.pow(2, 1 - eBias)
+    }
+    if (value * c >= 2) {
+      e++
+      c /= 2
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0
+      e = eMax
+    } else if (e + eBias >= 1) {
+      m = (value * c - 1) * Math.pow(2, mLen)
+      e = e + eBias
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
+      e = 0
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m
+  eLen += mLen
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128
+}
+
+},{}],11:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+},{}],12:[function(require,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <feross@feross.org> <http://feross.org>
+ * @license  MIT
+ */
+
+// The _isBuffer check is for Safari 5-7 support, because it's missing
+// Object.prototype.constructor. Remove this eventually
+module.exports = function (obj) {
+  return obj != null && (isBuffer(obj) || isSlowBuffer(obj) || !!obj._isBuffer)
+}
+
+function isBuffer (obj) {
+  return !!obj.constructor && typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+// For Node v0.10 support. Remove this eventually.
+function isSlowBuffer (obj) {
+  return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
+}
+
+},{}],13:[function(require,module,exports){
+module.exports = isFunction
+
+var toString = Object.prototype.toString
+
+function isFunction (fn) {
+  var string = toString.call(fn)
+  return string === '[object Function]' ||
+    (typeof fn === 'function' && string !== '[object RegExp]') ||
+    (typeof window !== 'undefined' &&
+     // IE8 and below
+     (fn === window.setTimeout ||
+      fn === window.alert ||
+      fn === window.confirm ||
+      fn === window.prompt))
+};
+
+},{}],14:[function(require,module,exports){
+var wordWrap = require('word-wrapper')
+var xtend = require('xtend')
+var number = require('as-number')
+
+var X_HEIGHTS = ['x', 'e', 'a', 'o', 'n', 's', 'r', 'c', 'u', 'm', 'v', 'w', 'z']
+var M_WIDTHS = ['m', 'w']
+var CAP_HEIGHTS = ['H', 'I', 'N', 'E', 'F', 'K', 'L', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+
+
+var TAB_ID = '\t'.charCodeAt(0)
+var SPACE_ID = ' '.charCodeAt(0)
+var ALIGN_LEFT = 0, 
+    ALIGN_CENTER = 1, 
+    ALIGN_RIGHT = 2
+
+module.exports = function createLayout(opt) {
+  return new TextLayout(opt)
+}
+
+function TextLayout(opt) {
+  this.glyphs = []
+  this._measure = this.computeMetrics.bind(this)
+  this.update(opt)
+}
+
+TextLayout.prototype.update = function(opt) {
+  opt = xtend({
+    measure: this._measure
+  }, opt)
+  this._opt = opt
+  this._opt.tabSize = number(this._opt.tabSize, 4)
+
+  if (!opt.font)
+    throw new Error('must provide a valid bitmap font')
+
+  var glyphs = this.glyphs
+  var text = opt.text||'' 
+  var font = opt.font
+  this._setupSpaceGlyphs(font)
+  
+  var lines = wordWrap.lines(text, opt)
+  var minWidth = opt.width || 0
+
+  //clear glyphs
+  glyphs.length = 0
+
+  //get max line width
+  var maxLineWidth = lines.reduce(function(prev, line) {
+    return Math.max(prev, line.width, minWidth)
+  }, 0)
+
+  //the pen position
+  var x = 0
+  var y = 0
+  var lineHeight = number(opt.lineHeight, font.common.lineHeight)
+  var baseline = font.common.base
+  var descender = lineHeight-baseline
+  var letterSpacing = opt.letterSpacing || 0
+  var height = lineHeight * lines.length - descender
+  var align = getAlignType(this._opt.align)
+
+  //draw text along baseline
+  y -= height
+  
+  //the metrics for this text layout
+  this._width = maxLineWidth
+  this._height = height
+  this._descender = lineHeight - baseline
+  this._baseline = baseline
+  this._xHeight = getXHeight(font)
+  this._capHeight = getCapHeight(font)
+  this._lineHeight = lineHeight
+  this._ascender = lineHeight - descender - this._xHeight
+    
+  //layout each glyph
+  var self = this
+  lines.forEach(function(line, lineIndex) {
+    var start = line.start
+    var end = line.end
+    var lineWidth = line.width
+    var lastGlyph
+    
+    //for each glyph in that line...
+    for (var i=start; i<end; i++) {
+      var id = text.charCodeAt(i)
+      var glyph = self.getGlyph(font, id)
+      if (glyph) {
+        if (lastGlyph) 
+          x += getKerning(font, lastGlyph.id, glyph.id)
+
+        var tx = x
+        if (align === ALIGN_CENTER) 
+          tx += (maxLineWidth-lineWidth)/2
+        else if (align === ALIGN_RIGHT)
+          tx += (maxLineWidth-lineWidth)
+
+        glyphs.push({
+          position: [tx, y],
+          data: glyph,
+          index: i,
+          line: lineIndex
+        })  
+
+        //move pen forward
+        x += glyph.xadvance + letterSpacing
+        lastGlyph = glyph
+      }
+    }
+
+    //next line down
+    y += lineHeight
+    x = 0
+  })
+  this._linesTotal = lines.length;
+}
+
+TextLayout.prototype._setupSpaceGlyphs = function(font) {
+  //These are fallbacks, when the font doesn't include
+  //' ' or '\t' glyphs
+  this._fallbackSpaceGlyph = null
+  this._fallbackTabGlyph = null
+
+  if (!font.chars || font.chars.length === 0)
+    return
+
+  //try to get space glyph
+  //then fall back to the 'm' or 'w' glyphs
+  //then fall back to the first glyph available
+  var space = getGlyphById(font, SPACE_ID) 
+          || getMGlyph(font) 
+          || font.chars[0]
+
+  //and create a fallback for tab
+  var tabWidth = this._opt.tabSize * space.xadvance
+  this._fallbackSpaceGlyph = space
+  this._fallbackTabGlyph = xtend(space, {
+    x: 0, y: 0, xadvance: tabWidth, id: TAB_ID, 
+    xoffset: 0, yoffset: 0, width: 0, height: 0
+  })
+}
+
+TextLayout.prototype.getGlyph = function(font, id) {
+  var glyph = getGlyphById(font, id)
+  if (glyph)
+    return glyph
+  else if (id === TAB_ID) 
+    return this._fallbackTabGlyph
+  else if (id === SPACE_ID) 
+    return this._fallbackSpaceGlyph
+  return null
+}
+
+TextLayout.prototype.computeMetrics = function(text, start, end, width) {
+  var letterSpacing = this._opt.letterSpacing || 0
+  var font = this._opt.font
+  var curPen = 0
+  var curWidth = 0
+  var count = 0
+  var glyph
+  var lastGlyph
+
+  if (!font.chars || font.chars.length === 0) {
+    return {
+      start: start,
+      end: start,
+      width: 0
+    }
+  }
+
+  end = Math.min(text.length, end)
+  for (var i=start; i < end; i++) {
+    var id = text.charCodeAt(i)
+    var glyph = this.getGlyph(font, id)
+
+    if (glyph) {
+      //move pen forward
+      var xoff = glyph.xoffset
+      var kern = lastGlyph ? getKerning(font, lastGlyph.id, glyph.id) : 0
+      curPen += kern
+
+      var nextPen = curPen + glyph.xadvance + letterSpacing
+      var nextWidth = curPen + glyph.width
+
+      //we've hit our limit; we can't move onto the next glyph
+      if (nextWidth >= width || nextPen >= width)
+        break
+
+      //otherwise continue along our line
+      curPen = nextPen
+      curWidth = nextWidth
+      lastGlyph = glyph
+    }
+    count++
+  }
+  
+  //make sure rightmost edge lines up with rendered glyphs
+  if (lastGlyph)
+    curWidth += lastGlyph.xoffset
+
+  return {
+    start: start,
+    end: start + count,
+    width: curWidth
+  }
+}
+
+//getters for the private vars
+;['width', 'height', 
+  'descender', 'ascender',
+  'xHeight', 'baseline',
+  'capHeight',
+  'lineHeight' ].forEach(addGetter)
+
+function addGetter(name) {
+  Object.defineProperty(TextLayout.prototype, name, {
+    get: wrapper(name),
+    configurable: true
+  })
+}
+
+//create lookups for private vars
+function wrapper(name) {
+  return (new Function([
+    'return function '+name+'() {',
+    '  return this._'+name,
+    '}'
+  ].join('\n')))()
+}
+
+function getGlyphById(font, id) {
+  if (!font.chars || font.chars.length === 0)
+    return null
+
+  var glyphIdx = findChar(font.chars, id)
+  if (glyphIdx >= 0)
+    return font.chars[glyphIdx]
+  return null
+}
+
+function getXHeight(font) {
+  for (var i=0; i<X_HEIGHTS.length; i++) {
+    var id = X_HEIGHTS[i].charCodeAt(0)
+    var idx = findChar(font.chars, id)
+    if (idx >= 0) 
+      return font.chars[idx].height
+  }
+  return 0
+}
+
+function getMGlyph(font) {
+  for (var i=0; i<M_WIDTHS.length; i++) {
+    var id = M_WIDTHS[i].charCodeAt(0)
+    var idx = findChar(font.chars, id)
+    if (idx >= 0) 
+      return font.chars[idx]
+  }
+  return 0
+}
+
+function getCapHeight(font) {
+  for (var i=0; i<CAP_HEIGHTS.length; i++) {
+    var id = CAP_HEIGHTS[i].charCodeAt(0)
+    var idx = findChar(font.chars, id)
+    if (idx >= 0) 
+      return font.chars[idx].height
+  }
+  return 0
+}
+
+function getKerning(font, left, right) {
+  if (!font.kernings || font.kernings.length === 0)
+    return 0
+
+  var table = font.kernings
+  for (var i=0; i<table.length; i++) {
+    var kern = table[i]
+    if (kern.first === left && kern.second === right)
+      return kern.amount
+  }
+  return 0
+}
+
+function getAlignType(align) {
+  if (align === 'center')
+    return ALIGN_CENTER
+  else if (align === 'right')
+    return ALIGN_RIGHT
+  return ALIGN_LEFT
+}
+
+function findChar (array, value, start) {
+  start = start || 0
+  for (var i = start; i < array.length; i++) {
+    if (array[i].id === value) {
+      return i
+    }
+  }
+  return -1
+}
+},{"as-number":2,"word-wrapper":29,"xtend":32}],15:[function(require,module,exports){
+(function (Buffer){
+var xhr = require('xhr')
+var noop = function(){}
+var parseASCII = require('parse-bmfont-ascii')
+var parseXML = require('parse-bmfont-xml')
+var readBinary = require('parse-bmfont-binary')
+var isBinaryFormat = require('./lib/is-binary')
+var xtend = require('xtend')
+
+var xml2 = (function hasXML2() {
+  return self.XMLHttpRequest && "withCredentials" in new XMLHttpRequest
+})()
+
+module.exports = function(opt, cb) {
+  cb = typeof cb === 'function' ? cb : noop
+
+  if (typeof opt === 'string')
+    opt = { uri: opt }
+  else if (!opt)
+    opt = {}
+
+  var expectBinary = opt.binary
+  if (expectBinary)
+    opt = getBinaryOpts(opt)
+
+  xhr(opt, function(err, res, body) {
+    if (err)
+      return cb(err)
+    if (!/^2/.test(res.statusCode))
+      return cb(new Error('http status code: '+res.statusCode))
+    if (!body)
+      return cb(new Error('no body result'))
+
+    var binary = false 
+
+    //if the response type is an array buffer,
+    //we need to convert it into a regular Buffer object
+    if (isArrayBuffer(body)) {
+      var array = new Uint8Array(body)
+      body = new Buffer(array, 'binary')
+    }
+
+    //now check the string/Buffer response
+    //and see if it has a binary BMF header
+    if (isBinaryFormat(body)) {
+      binary = true
+      //if we have a string, turn it into a Buffer
+      if (typeof body === 'string') 
+        body = new Buffer(body, 'binary')
+    } 
+
+    //we are not parsing a binary format, just ASCII/XML/etc
+    if (!binary) {
+      //might still be a buffer if responseType is 'arraybuffer'
+      if (Buffer.isBuffer(body))
+        body = body.toString(opt.encoding)
+      body = body.trim()
+    }
+
+    var result
+    try {
+      var type = res.headers['content-type']
+      if (binary)
+        result = readBinary(body)
+      else if (/json/.test(type) || body.charAt(0) === '{')
+        result = JSON.parse(body)
+      else if (/xml/.test(type)  || body.charAt(0) === '<')
+        result = parseXML(body)
+      else
+        result = parseASCII(body)
+    } catch (e) {
+      cb(new Error('error parsing font '+e.message))
+      cb = noop
+    }
+    cb(null, result)
+  })
+}
+
+function isArrayBuffer(arr) {
+  var str = Object.prototype.toString
+  return str.call(arr) === '[object ArrayBuffer]'
+}
+
+function getBinaryOpts(opt) {
+  //IE10+ and other modern browsers support array buffers
+  if (xml2)
+    return xtend(opt, { responseType: 'arraybuffer' })
+  
+  if (typeof self.XMLHttpRequest === 'undefined')
+    throw new Error('your browser does not support XHR loading')
+
+  //IE9 and XML1 browsers could still use an override
+  var req = new self.XMLHttpRequest()
+  req.overrideMimeType('text/plain; charset=x-user-defined')
+  return xtend({
+    xhr: req
+  }, opt)
+}
+
+}).call(this,require("buffer").Buffer)
+},{"./lib/is-binary":16,"buffer":5,"parse-bmfont-ascii":18,"parse-bmfont-binary":19,"parse-bmfont-xml":20,"xhr":30,"xtend":32}],16:[function(require,module,exports){
+(function (Buffer){
+var equal = require('buffer-equal')
+var HEADER = new Buffer([66, 77, 70, 3])
+
+module.exports = function(buf) {
+  if (typeof buf === 'string')
+    return buf.substring(0, 3) === 'BMF'
+  return buf.length > 4 && equal(buf.slice(0, 4), HEADER)
+}
+}).call(this,require("buffer").Buffer)
+},{"buffer":5,"buffer-equal":4}],17:[function(require,module,exports){
+/*
+object-assign
+(c) Sindre Sorhus
+@license MIT
+*/
+
+'use strict';
+/* eslint-disable no-unused-vars */
+var getOwnPropertySymbols = Object.getOwnPropertySymbols;
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+var propIsEnumerable = Object.prototype.propertyIsEnumerable;
+
+function toObject(val) {
+	if (val === null || val === undefined) {
+		throw new TypeError('Object.assign cannot be called with null or undefined');
+	}
+
+	return Object(val);
+}
+
+function shouldUseNative() {
+	try {
+		if (!Object.assign) {
+			return false;
+		}
+
+		// Detect buggy property enumeration order in older V8 versions.
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=4118
+		var test1 = new String('abc');  // eslint-disable-line no-new-wrappers
+		test1[5] = 'de';
+		if (Object.getOwnPropertyNames(test1)[0] === '5') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test2 = {};
+		for (var i = 0; i < 10; i++) {
+			test2['_' + String.fromCharCode(i)] = i;
+		}
+		var order2 = Object.getOwnPropertyNames(test2).map(function (n) {
+			return test2[n];
+		});
+		if (order2.join('') !== '0123456789') {
+			return false;
+		}
+
+		// https://bugs.chromium.org/p/v8/issues/detail?id=3056
+		var test3 = {};
+		'abcdefghijklmnopqrst'.split('').forEach(function (letter) {
+			test3[letter] = letter;
+		});
+		if (Object.keys(Object.assign({}, test3)).join('') !==
+				'abcdefghijklmnopqrst') {
+			return false;
+		}
+
+		return true;
+	} catch (err) {
+		// We don't expect any of the above to throw, but better to be safe.
+		return false;
+	}
+}
+
+module.exports = shouldUseNative() ? Object.assign : function (target, source) {
+	var from;
+	var to = toObject(target);
+	var symbols;
+
+	for (var s = 1; s < arguments.length; s++) {
+		from = Object(arguments[s]);
+
+		for (var key in from) {
+			if (hasOwnProperty.call(from, key)) {
+				to[key] = from[key];
+			}
+		}
+
+		if (getOwnPropertySymbols) {
+			symbols = getOwnPropertySymbols(from);
+			for (var i = 0; i < symbols.length; i++) {
+				if (propIsEnumerable.call(from, symbols[i])) {
+					to[symbols[i]] = from[symbols[i]];
+				}
+			}
+		}
+	}
+
+	return to;
+};
+
+},{}],18:[function(require,module,exports){
+module.exports = function parseBMFontAscii(data) {
+  if (!data)
+    throw new Error('no data provided')
+  data = data.toString().trim()
+
+  var output = {
+    pages: [],
+    chars: [],
+    kernings: []
+  }
+
+  var lines = data.split(/\r\n?|\n/g)
+
+  if (lines.length === 0)
+    throw new Error('no data in BMFont file')
+
+  for (var i = 0; i < lines.length; i++) {
+    var lineData = splitLine(lines[i], i)
+    if (!lineData) //skip empty lines
+      continue
+
+    if (lineData.key === 'page') {
+      if (typeof lineData.data.id !== 'number')
+        throw new Error('malformed file at line ' + i + ' -- needs page id=N')
+      if (typeof lineData.data.file !== 'string')
+        throw new Error('malformed file at line ' + i + ' -- needs page file="path"')
+      output.pages[lineData.data.id] = lineData.data.file
+    } else if (lineData.key === 'chars' || lineData.key === 'kernings') {
+      //... do nothing for these two ...
+    } else if (lineData.key === 'char') {
+      output.chars.push(lineData.data)
+    } else if (lineData.key === 'kerning') {
+      output.kernings.push(lineData.data)
+    } else {
+      output[lineData.key] = lineData.data
+    }
+  }
+
+  return output
+}
+
+function splitLine(line, idx) {
+  line = line.replace(/\t+/g, ' ').trim()
+  if (!line)
+    return null
+
+  var space = line.indexOf(' ')
+  if (space === -1) 
+    throw new Error("no named row at line " + idx)
+
+  var key = line.substring(0, space)
+
+  line = line.substring(space + 1)
+  //clear "letter" field as it is non-standard and
+  //requires additional complexity to parse " / = symbols
+  line = line.replace(/letter=[\'\"]\S+[\'\"]/gi, '')  
+  line = line.split("=")
+  line = line.map(function(str) {
+    return str.trim().match((/(".*?"|[^"\s]+)+(?=\s*|\s*$)/g))
+  })
+
+  var data = []
+  for (var i = 0; i < line.length; i++) {
+    var dt = line[i]
+    if (i === 0) {
+      data.push({
+        key: dt[0],
+        data: ""
+      })
+    } else if (i === line.length - 1) {
+      data[data.length - 1].data = parseData(dt[0])
+    } else {
+      data[data.length - 1].data = parseData(dt[0])
+      data.push({
+        key: dt[1],
+        data: ""
+      })
+    }
+  }
+
+  var out = {
+    key: key,
+    data: {}
+  }
+
+  data.forEach(function(v) {
+    out.data[v.key] = v.data;
+  })
+
+  return out
+}
+
+function parseData(data) {
+  if (!data || data.length === 0)
+    return ""
+
+  if (data.indexOf('"') === 0 || data.indexOf("'") === 0)
+    return data.substring(1, data.length - 1)
+  if (data.indexOf(',') !== -1)
+    return parseIntList(data)
+  return parseInt(data, 10)
+}
+
+function parseIntList(data) {
+  return data.split(',').map(function(val) {
+    return parseInt(val, 10)
+  })
+}
+},{}],19:[function(require,module,exports){
+var HEADER = [66, 77, 70]
+
+module.exports = function readBMFontBinary(buf) {
+  if (buf.length < 6)
+    throw new Error('invalid buffer length for BMFont')
+
+  var header = HEADER.every(function(byte, i) {
+    return buf.readUInt8(i) === byte
+  })
+
+  if (!header)
+    throw new Error('BMFont missing BMF byte header')
+
+  var i = 3
+  var vers = buf.readUInt8(i++)
+  if (vers > 3)
+    throw new Error('Only supports BMFont Binary v3 (BMFont App v1.10)')
+  
+  var target = { kernings: [], chars: [] }
+  for (var b=0; b<5; b++)
+    i += readBlock(target, buf, i)
+  return target
+}
+
+function readBlock(target, buf, i) {
+  if (i > buf.length-1)
+    return 0
+
+  var blockID = buf.readUInt8(i++)
+  var blockSize = buf.readInt32LE(i)
+  i += 4
+
+  switch(blockID) {
+    case 1: 
+      target.info = readInfo(buf, i)
+      break
+    case 2:
+      target.common = readCommon(buf, i)
+      break
+    case 3:
+      target.pages = readPages(buf, i, blockSize)
+      break
+    case 4:
+      target.chars = readChars(buf, i, blockSize)
+      break
+    case 5:
+      target.kernings = readKernings(buf, i, blockSize)
+      break
+  }
+  return 5 + blockSize
+}
+
+function readInfo(buf, i) {
+  var info = {}
+  info.size = buf.readInt16LE(i)
+
+  var bitField = buf.readUInt8(i+2)
+  info.smooth = (bitField >> 7) & 1
+  info.unicode = (bitField >> 6) & 1
+  info.italic = (bitField >> 5) & 1
+  info.bold = (bitField >> 4) & 1
+  
+  //fixedHeight is only mentioned in binary spec 
+  if ((bitField >> 3) & 1)
+    info.fixedHeight = 1
+  
+  info.charset = buf.readUInt8(i+3) || ''
+  info.stretchH = buf.readUInt16LE(i+4)
+  info.aa = buf.readUInt8(i+6)
+  info.padding = [
+    buf.readInt8(i+7),
+    buf.readInt8(i+8),
+    buf.readInt8(i+9),
+    buf.readInt8(i+10)
+  ]
+  info.spacing = [
+    buf.readInt8(i+11),
+    buf.readInt8(i+12)
+  ]
+  info.outline = buf.readUInt8(i+13)
+  info.face = readStringNT(buf, i+14)
+  return info
+}
+
+function readCommon(buf, i) {
+  var common = {}
+  common.lineHeight = buf.readUInt16LE(i)
+  common.base = buf.readUInt16LE(i+2)
+  common.scaleW = buf.readUInt16LE(i+4)
+  common.scaleH = buf.readUInt16LE(i+6)
+  common.pages = buf.readUInt16LE(i+8)
+  var bitField = buf.readUInt8(i+10)
+  common.packed = 0
+  common.alphaChnl = buf.readUInt8(i+11)
+  common.redChnl = buf.readUInt8(i+12)
+  common.greenChnl = buf.readUInt8(i+13)
+  common.blueChnl = buf.readUInt8(i+14)
+  return common
+}
+
+function readPages(buf, i, size) {
+  var pages = []
+  var text = readNameNT(buf, i)
+  var len = text.length+1
+  var count = size / len
+  for (var c=0; c<count; c++) {
+    pages[c] = buf.slice(i, i+text.length).toString('utf8')
+    i += len
+  }
+  return pages
+}
+
+function readChars(buf, i, blockSize) {
+  var chars = []
+
+  var count = blockSize / 20
+  for (var c=0; c<count; c++) {
+    var char = {}
+    var off = c*20
+    char.id = buf.readUInt32LE(i + 0 + off)
+    char.x = buf.readUInt16LE(i + 4 + off)
+    char.y = buf.readUInt16LE(i + 6 + off)
+    char.width = buf.readUInt16LE(i + 8 + off)
+    char.height = buf.readUInt16LE(i + 10 + off)
+    char.xoffset = buf.readInt16LE(i + 12 + off)
+    char.yoffset = buf.readInt16LE(i + 14 + off)
+    char.xadvance = buf.readInt16LE(i + 16 + off)
+    char.page = buf.readUInt8(i + 18 + off)
+    char.chnl = buf.readUInt8(i + 19 + off)
+    chars[c] = char
+  }
+  return chars
+}
+
+function readKernings(buf, i, blockSize) {
+  var kernings = []
+  var count = blockSize / 10
+  for (var c=0; c<count; c++) {
+    var kern = {}
+    var off = c*10
+    kern.first = buf.readUInt32LE(i + 0 + off)
+    kern.second = buf.readUInt32LE(i + 4 + off)
+    kern.amount = buf.readInt16LE(i + 8 + off)
+    kernings[c] = kern
+  }
+  return kernings
+}
+
+function readNameNT(buf, offset) {
+  var pos=offset
+  for (; pos<buf.length; pos++) {
+    if (buf[pos] === 0x00) 
+      break
+  }
+  return buf.slice(offset, pos)
+}
+
+function readStringNT(buf, offset) {
+  return readNameNT(buf, offset).toString('utf8')
+}
+},{}],20:[function(require,module,exports){
+var parseAttributes = require('./parse-attribs')
+var parseFromString = require('xml-parse-from-string')
+
+//In some cases element.attribute.nodeName can return
+//all lowercase values.. so we need to map them to the correct 
+//case
+var NAME_MAP = {
+  scaleh: 'scaleH',
+  scalew: 'scaleW',
+  stretchh: 'stretchH',
+  lineheight: 'lineHeight',
+  alphachnl: 'alphaChnl',
+  redchnl: 'redChnl',
+  greenchnl: 'greenChnl',
+  bluechnl: 'blueChnl'
+}
+
+module.exports = function parse(data) {
+  data = data.toString()
+  
+  var xmlRoot = parseFromString(data)
+  var output = {
+    pages: [],
+    chars: [],
+    kernings: []
+  }
+
+  //get config settings
+  ;['info', 'common'].forEach(function(key) {
+    var element = xmlRoot.getElementsByTagName(key)[0]
+    if (element)
+      output[key] = parseAttributes(getAttribs(element))
+  })
+
+  //get page info
+  var pageRoot = xmlRoot.getElementsByTagName('pages')[0]
+  if (!pageRoot)
+    throw new Error('malformed file -- no <pages> element')
+  var pages = pageRoot.getElementsByTagName('page')
+  for (var i=0; i<pages.length; i++) {
+    var p = pages[i]
+    var id = parseInt(p.getAttribute('id'), 10)
+    var file = p.getAttribute('file')
+    if (isNaN(id))
+      throw new Error('malformed file -- page "id" attribute is NaN')
+    if (!file)
+      throw new Error('malformed file -- needs page "file" attribute')
+    output.pages[parseInt(id, 10)] = file
+  }
+
+  //get kernings / chars
+  ;['chars', 'kernings'].forEach(function(key) {
+    var element = xmlRoot.getElementsByTagName(key)[0]
+    if (!element)
+      return
+    var childTag = key.substring(0, key.length-1)
+    var children = element.getElementsByTagName(childTag)
+    for (var i=0; i<children.length; i++) {      
+      var child = children[i]
+      output[key].push(parseAttributes(getAttribs(child)))
+    }
+  })
+  return output
+}
+
+function getAttribs(element) {
+  var attribs = getAttribList(element)
+  return attribs.reduce(function(dict, attrib) {
+    var key = mapName(attrib.nodeName)
+    dict[key] = attrib.nodeValue
+    return dict
+  }, {})
+}
+
+function getAttribList(element) {
+  //IE8+ and modern browsers
+  var attribs = []
+  for (var i=0; i<element.attributes.length; i++)
+    attribs.push(element.attributes[i])
+  return attribs
+}
+
+function mapName(nodeName) {
+  return NAME_MAP[nodeName.toLowerCase()] || nodeName
+}
+},{"./parse-attribs":21,"xml-parse-from-string":31}],21:[function(require,module,exports){
+//Some versions of GlyphDesigner have a typo
+//that causes some bugs with parsing. 
+//Need to confirm with recent version of the software
+//to see whether this is still an issue or not.
+var GLYPH_DESIGNER_ERROR = 'chasrset'
+
+module.exports = function parseAttributes(obj) {
+  if (GLYPH_DESIGNER_ERROR in obj) {
+    obj['charset'] = obj[GLYPH_DESIGNER_ERROR]
+    delete obj[GLYPH_DESIGNER_ERROR]
+  }
+
+  for (var k in obj) {
+    if (k === 'face' || k === 'charset') 
+      continue
+    else if (k === 'padding' || k === 'spacing')
+      obj[k] = parseIntList(obj[k])
+    else
+      obj[k] = parseInt(obj[k], 10) 
+  }
+  return obj
+}
+
+function parseIntList(data) {
+  return data.split(',').map(function(val) {
+    return parseInt(val, 10)
+  })
+}
+},{}],22:[function(require,module,exports){
+var trim = require('trim')
+  , forEach = require('for-each')
+  , isArray = function(arg) {
+      return Object.prototype.toString.call(arg) === '[object Array]';
+    }
+
+module.exports = function (headers) {
+  if (!headers)
+    return {}
+
+  var result = {}
+
+  forEach(
+      trim(headers).split('\n')
+    , function (row) {
+        var index = row.indexOf(':')
+          , key = trim(row.slice(0, index)).toLowerCase()
+          , value = trim(row.slice(index + 1))
+
+        if (typeof(result[key]) === 'undefined') {
+          result[key] = value
+        } else if (isArray(result[key])) {
+          result[key].push(value)
+        } else {
+          result[key] = [ result[key], value ]
+        }
+      }
+  )
+
+  return result
+}
+},{"for-each":8,"trim":28}],23:[function(require,module,exports){
+var dtype = require('dtype')
+var anArray = require('an-array')
+var isBuffer = require('is-buffer')
+
+var CW = [0, 2, 3]
+var CCW = [2, 1, 3]
+
+module.exports = function createQuadElements(array, opt) {
+    //if user didn't specify an output array
+    if (!array || !(anArray(array) || isBuffer(array))) {
+        opt = array || {}
+        array = null
+    }
+
+    if (typeof opt === 'number') //backwards-compatible
+        opt = { count: opt }
+    else
+        opt = opt || {}
+
+    var type = typeof opt.type === 'string' ? opt.type : 'uint16'
+    var count = typeof opt.count === 'number' ? opt.count : 1
+    var start = (opt.start || 0) 
+
+    var dir = opt.clockwise !== false ? CW : CCW,
+        a = dir[0], 
+        b = dir[1],
+        c = dir[2]
+
+    var numIndices = count * 6
+
+    var indices = array || new (dtype(type))(numIndices)
+    for (var i = 0, j = 0; i < numIndices; i += 6, j += 4) {
+        var x = i + start
+        indices[x + 0] = j + 0
+        indices[x + 1] = j + 1
+        indices[x + 2] = j + 2
+        indices[x + 3] = j + a
+        indices[x + 4] = j + b
+        indices[x + 5] = j + c
+    }
+    return indices
+}
+},{"an-array":1,"dtype":6,"is-buffer":12}],24:[function(require,module,exports){
+var createLayout = require('layout-bmfont-text')
+var inherits = require('inherits')
+var createIndices = require('quad-indices')
+var buffer = require('three-buffer-vertex-data')
+var assign = require('object-assign')
+
+var vertices = require('./lib/vertices')
+var utils = require('./lib/utils')
+
+var Base = THREE.BufferGeometry
+
+module.exports = function createTextGeometry (opt) {
+  return new TextGeometry(opt)
+}
+
+function TextGeometry (opt) {
+  Base.call(this)
+
+  if (typeof opt === 'string') {
+    opt = { text: opt }
+  }
+
+  // use these as default values for any subsequent
+  // calls to update()
+  this._opt = assign({}, opt)
+
+  // also do an initial setup...
+  if (opt) this.update(opt)
+}
+
+inherits(TextGeometry, Base)
+
+TextGeometry.prototype.update = function (opt) {
+  if (typeof opt === 'string') {
+    opt = { text: opt }
+  }
+
+  // use constructor defaults
+  opt = assign({}, this._opt, opt)
+
+  if (!opt.font) {
+    throw new TypeError('must specify a { font } in options')
+  }
+
+  this.layout = createLayout(opt)
+
+  // get vec2 texcoords
+  var flipY = opt.flipY !== false
+
+  // the desired BMFont data
+  var font = opt.font
+
+  // determine texture size from font file
+  var texWidth = font.common.scaleW
+  var texHeight = font.common.scaleH
+
+  // get visible glyphs
+  var glyphs = this.layout.glyphs.filter(function (glyph) {
+    var bitmap = glyph.data
+    return bitmap.width * bitmap.height > 0
+  })
+
+  // provide visible glyphs for convenience
+  this.visibleGlyphs = glyphs
+
+  // get common vertex data
+  var positions = vertices.positions(glyphs)
+  var uvs = vertices.uvs(glyphs, texWidth, texHeight, flipY)
+  var indices = createIndices({
+    clockwise: true,
+    type: 'uint16',
+    count: glyphs.length
+  })
+
+  // update vertex data
+  buffer.index(this, indices, 1, 'uint16')
+  buffer.attr(this, 'position', positions, 2)
+  buffer.attr(this, 'uv', uvs, 2)
+
+  // update multipage data
+  if (!opt.multipage && 'page' in this.attributes) {
+    // disable multipage rendering
+    this.removeAttribute('page')
+  } else if (opt.multipage) {
+    var pages = vertices.pages(glyphs)
+    // enable multipage rendering
+    buffer.attr(this, 'page', pages, 1)
+  }
+}
+
+TextGeometry.prototype.computeBoundingSphere = function () {
+  if (this.boundingSphere === null) {
+    this.boundingSphere = new THREE.Sphere()
+  }
+
+  var positions = this.attributes.position.array
+  var itemSize = this.attributes.position.itemSize
+  if (!positions || !itemSize || positions.length < 2) {
+    this.boundingSphere.radius = 0
+    this.boundingSphere.center.set(0, 0, 0)
+    return
+  }
+  utils.computeSphere(positions, this.boundingSphere)
+  if (isNaN(this.boundingSphere.radius)) {
+    console.error('THREE.BufferGeometry.computeBoundingSphere(): ' +
+      'Computed radius is NaN. The ' +
+      '"position" attribute is likely to have NaN values.')
+  }
+}
+
+TextGeometry.prototype.computeBoundingBox = function () {
+  if (this.boundingBox === null) {
+    this.boundingBox = new THREE.Box3()
+  }
+
+  var bbox = this.boundingBox
+  var positions = this.attributes.position.array
+  var itemSize = this.attributes.position.itemSize
+  if (!positions || !itemSize || positions.length < 2) {
+    bbox.makeEmpty()
+    return
+  }
+  utils.computeBox(positions, bbox)
+}
+
+},{"./lib/utils":25,"./lib/vertices":26,"inherits":11,"layout-bmfont-text":14,"object-assign":17,"quad-indices":23,"three-buffer-vertex-data":27}],25:[function(require,module,exports){
+var itemSize = 2
+var box = { min: [0, 0], max: [0, 0] }
+
+function bounds (positions) {
+  var count = positions.length / itemSize
+  box.min[0] = positions[0]
+  box.min[1] = positions[1]
+  box.max[0] = positions[0]
+  box.max[1] = positions[1]
+
+  for (var i = 0; i < count; i++) {
+    var x = positions[i * itemSize + 0]
+    var y = positions[i * itemSize + 1]
+    box.min[0] = Math.min(x, box.min[0])
+    box.min[1] = Math.min(y, box.min[1])
+    box.max[0] = Math.max(x, box.max[0])
+    box.max[1] = Math.max(y, box.max[1])
+  }
+}
+
+module.exports.computeBox = function (positions, output) {
+  bounds(positions)
+  output.min.set(box.min[0], box.min[1], 0)
+  output.max.set(box.max[0], box.max[1], 0)
+}
+
+module.exports.computeSphere = function (positions, output) {
+  bounds(positions)
+  var minX = box.min[0]
+  var minY = box.min[1]
+  var maxX = box.max[0]
+  var maxY = box.max[1]
+  var width = maxX - minX
+  var height = maxY - minY
+  var length = Math.sqrt(width * width + height * height)
+  output.center.set(minX + width / 2, minY + height / 2, 0)
+  output.radius = length / 2
+}
+
+},{}],26:[function(require,module,exports){
+module.exports.pages = function pages (glyphs) {
+  var pages = new Float32Array(glyphs.length * 4 * 1)
+  var i = 0
+  glyphs.forEach(function (glyph) {
+    var id = glyph.data.page || 0
+    pages[i++] = id
+    pages[i++] = id
+    pages[i++] = id
+    pages[i++] = id
+  })
+  return pages
+}
+
+module.exports.uvs = function uvs (glyphs, texWidth, texHeight, flipY) {
+  var uvs = new Float32Array(glyphs.length * 4 * 2)
+  var i = 0
+  glyphs.forEach(function (glyph) {
+    var bitmap = glyph.data
+    var bw = (bitmap.x + bitmap.width)
+    var bh = (bitmap.y + bitmap.height)
+
+    // top left position
+    var u0 = bitmap.x / texWidth
+    var v1 = bitmap.y / texHeight
+    var u1 = bw / texWidth
+    var v0 = bh / texHeight
+
+    if (flipY) {
+      v1 = (texHeight - bitmap.y) / texHeight
+      v0 = (texHeight - bh) / texHeight
+    }
+
+    // BL
+    uvs[i++] = u0
+    uvs[i++] = v1
+    // TL
+    uvs[i++] = u0
+    uvs[i++] = v0
+    // TR
+    uvs[i++] = u1
+    uvs[i++] = v0
+    // BR
+    uvs[i++] = u1
+    uvs[i++] = v1
+  })
+  return uvs
+}
+
+module.exports.positions = function positions (glyphs) {
+  var positions = new Float32Array(glyphs.length * 4 * 2)
+  var i = 0
+  glyphs.forEach(function (glyph) {
+    var bitmap = glyph.data
+
+    // bottom left position
+    var x = glyph.position[0] + bitmap.xoffset
+    var y = glyph.position[1] + bitmap.yoffset
+
+    // quad size
+    var w = bitmap.width
+    var h = bitmap.height
+
+    // BL
+    positions[i++] = x
+    positions[i++] = y
+    // TL
+    positions[i++] = x
+    positions[i++] = y + h
+    // TR
+    positions[i++] = x + w
+    positions[i++] = y + h
+    // BR
+    positions[i++] = x + w
+    positions[i++] = y
+  })
+  return positions
+}
+
+},{}],27:[function(require,module,exports){
+var flatten = require('flatten-vertex-data')
+var warned = false;
+
+module.exports.attr = setAttribute
+module.exports.index = setIndex
+
+function setIndex (geometry, data, itemSize, dtype) {
+  if (typeof itemSize !== 'number') itemSize = 1
+  if (typeof dtype !== 'string') dtype = 'uint16'
+
+  var isR69 = !geometry.index && typeof geometry.setIndex !== 'function'
+  var attrib = isR69 ? geometry.getAttribute('index') : geometry.index
+  var newAttrib = updateAttribute(attrib, data, itemSize, dtype)
+  if (newAttrib) {
+    if (isR69) geometry.addAttribute('index', newAttrib)
+    else geometry.index = newAttrib
+  }
+}
+
+function setAttribute (geometry, key, data, itemSize, dtype) {
+  if (typeof itemSize !== 'number') itemSize = 3
+  if (typeof dtype !== 'string') dtype = 'float32'
+  if (Array.isArray(data) &&
+    Array.isArray(data[0]) &&
+    data[0].length !== itemSize) {
+    throw new Error('Nested vertex array has unexpected size; expected ' +
+      itemSize + ' but found ' + data[0].length)
+  }
+
+  var attrib = geometry.getAttribute(key)
+  var newAttrib = updateAttribute(attrib, data, itemSize, dtype)
+  if (newAttrib) {
+    geometry.addAttribute(key, newAttrib)
+  }
+}
+
+function updateAttribute (attrib, data, itemSize, dtype) {
+  data = data || []
+  if (!attrib || rebuildAttribute(attrib, data, itemSize)) {
+    // create a new array with desired type
+    data = flatten(data, dtype)
+
+    var needsNewBuffer = attrib && typeof attrib.setArray !== 'function'
+    if (!attrib || needsNewBuffer) {
+      // We are on an old version of ThreeJS which can't
+      // support growing / shrinking buffers, so we need
+      // to build a new buffer
+      if (needsNewBuffer && !warned) {
+        warned = true
+        console.warn([
+          'A WebGL buffer is being updated with a new size or itemSize, ',
+          'however this version of ThreeJS only supports fixed-size buffers.',
+          '\nThe old buffer may still be kept in memory.\n',
+          'To avoid memory leaks, it is recommended that you dispose ',
+          'your geometries and create new ones, or update to ThreeJS r82 or newer.\n',
+          'See here for discussion:\n',
+          'https://github.com/mrdoob/three.js/pull/9631'
+        ].join(''))
+      }
+
+      // Build a new attribute
+      attrib = new THREE.BufferAttribute(data, itemSize);
+    }
+
+    attrib.itemSize = itemSize
+    attrib.needsUpdate = true
+
+    // New versions of ThreeJS suggest using setArray
+    // to change the data. It will use bufferData internally,
+    // so you can change the array size without any issues
+    if (typeof attrib.setArray === 'function') {
+      attrib.setArray(data)
+    }
+
+    return attrib
+  } else {
+    // copy data into the existing array
+    flatten(data, attrib.array)
+    attrib.needsUpdate = true
+    return null
+  }
+}
+
+// Test whether the attribute needs to be re-created,
+// returns false if we can re-use it as-is.
+function rebuildAttribute (attrib, data, itemSize) {
+  if (attrib.itemSize !== itemSize) return true
+  if (!attrib.array) return true
+  var attribLength = attrib.array.length
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    // [ [ x, y, z ] ]
+    return attribLength !== data.length * itemSize
+  } else {
+    // [ x, y, z ]
+    return attribLength !== data.length
+  }
+  return false
+}
+
+},{"flatten-vertex-data":7}],28:[function(require,module,exports){
+
+exports = module.exports = trim;
+
+function trim(str){
+  return str.replace(/^\s*|\s*$/g, '');
+}
+
+exports.left = function(str){
+  return str.replace(/^\s*/, '');
+};
+
+exports.right = function(str){
+  return str.replace(/\s*$/, '');
+};
+
+},{}],29:[function(require,module,exports){
+var newline = /\n/
+var newlineChar = '\n'
+var whitespace = /\s/
+
+module.exports = function(text, opt) {
+    var lines = module.exports.lines(text, opt)
+    return lines.map(function(line) {
+        return text.substring(line.start, line.end)
+    }).join('\n')
+}
+
+module.exports.lines = function wordwrap(text, opt) {
+    opt = opt||{}
+
+    //zero width results in nothing visible
+    if (opt.width === 0 && opt.mode !== 'nowrap') 
+        return []
+
+    text = text||''
+    var width = typeof opt.width === 'number' ? opt.width : Number.MAX_VALUE
+    var start = Math.max(0, opt.start||0)
+    var end = typeof opt.end === 'number' ? opt.end : text.length
+    var mode = opt.mode
+
+    var measure = opt.measure || monospace
+    if (mode === 'pre')
+        return pre(measure, text, start, end, width)
+    else
+        return greedy(measure, text, start, end, width, mode)
+}
+
+function idxOf(text, chr, start, end) {
+    var idx = text.indexOf(chr, start)
+    if (idx === -1 || idx > end)
+        return end
+    return idx
+}
+
+function isWhitespace(chr) {
+    return whitespace.test(chr)
+}
+
+function pre(measure, text, start, end, width) {
+    var lines = []
+    var lineStart = start
+    for (var i=start; i<end && i<text.length; i++) {
+        var chr = text.charAt(i)
+        var isNewline = newline.test(chr)
+
+        //If we've reached a newline, then step down a line
+        //Or if we've reached the EOF
+        if (isNewline || i===end-1) {
+            var lineEnd = isNewline ? i : i+1
+            var measured = measure(text, lineStart, lineEnd, width)
+            lines.push(measured)
+            
+            lineStart = i+1
+        }
+    }
+    return lines
+}
+
+function greedy(measure, text, start, end, width, mode) {
+    //A greedy word wrapper based on LibGDX algorithm
+    //https://github.com/libgdx/libgdx/blob/master/gdx/src/com/badlogic/gdx/graphics/g2d/BitmapFontCache.java
+    var lines = []
+
+    var testWidth = width
+    //if 'nowrap' is specified, we only wrap on newline chars
+    if (mode === 'nowrap')
+        testWidth = Number.MAX_VALUE
+
+    while (start < end && start < text.length) {
+        //get next newline position
+        var newLine = idxOf(text, newlineChar, start, end)
+
+        //eat whitespace at start of line
+        while (start < newLine) {
+            if (!isWhitespace( text.charAt(start) ))
+                break
+            start++
+        }
+
+        //determine visible # of glyphs for the available width
+        var measured = measure(text, start, newLine, testWidth)
+
+        var lineEnd = start + (measured.end-measured.start)
+        var nextStart = lineEnd + newlineChar.length
+
+        //if we had to cut the line before the next newline...
+        if (lineEnd < newLine) {
+            //find char to break on
+            while (lineEnd > start) {
+                if (isWhitespace(text.charAt(lineEnd)))
+                    break
+                lineEnd--
+            }
+            if (lineEnd === start) {
+                if (nextStart > start + newlineChar.length) nextStart--
+                lineEnd = nextStart // If no characters to break, show all.
+            } else {
+                nextStart = lineEnd
+                //eat whitespace at end of line
+                while (lineEnd > start) {
+                    if (!isWhitespace(text.charAt(lineEnd - newlineChar.length)))
+                        break
+                    lineEnd--
+                }
+            }
+        }
+        if (lineEnd >= start) {
+            var result = measure(text, start, lineEnd, testWidth)
+            lines.push(result)
+        }
+        start = nextStart
+    }
+    return lines
+}
+
+//determines the visible number of glyphs within a given width
+function monospace(text, start, end, width) {
+    var glyphs = Math.min(width, end-start)
+    return {
+        start: start,
+        end: start+glyphs
+    }
+}
+},{}],30:[function(require,module,exports){
+"use strict";
+var window = require("global/window")
+var isFunction = require("is-function")
+var parseHeaders = require("parse-headers")
+var xtend = require("xtend")
+
+module.exports = createXHR
+createXHR.XMLHttpRequest = window.XMLHttpRequest || noop
+createXHR.XDomainRequest = "withCredentials" in (new createXHR.XMLHttpRequest()) ? createXHR.XMLHttpRequest : window.XDomainRequest
+
+forEachArray(["get", "put", "post", "patch", "head", "delete"], function(method) {
+    createXHR[method === "delete" ? "del" : method] = function(uri, options, callback) {
+        options = initParams(uri, options, callback)
+        options.method = method.toUpperCase()
+        return _createXHR(options)
+    }
+})
+
+function forEachArray(array, iterator) {
+    for (var i = 0; i < array.length; i++) {
+        iterator(array[i])
+    }
+}
+
+function isEmpty(obj){
+    for(var i in obj){
+        if(obj.hasOwnProperty(i)) return false
+    }
+    return true
+}
+
+function initParams(uri, options, callback) {
+    var params = uri
+
+    if (isFunction(options)) {
+        callback = options
+        if (typeof uri === "string") {
+            params = {uri:uri}
+        }
+    } else {
+        params = xtend(options, {uri: uri})
+    }
+
+    params.callback = callback
+    return params
+}
+
+function createXHR(uri, options, callback) {
+    options = initParams(uri, options, callback)
+    return _createXHR(options)
+}
+
+function _createXHR(options) {
+    if(typeof options.callback === "undefined"){
+        throw new Error("callback argument missing")
+    }
+
+    var called = false
+    var callback = function cbOnce(err, response, body){
+        if(!called){
+            called = true
+            options.callback(err, response, body)
+        }
+    }
+
+    function readystatechange() {
+        if (xhr.readyState === 4) {
+            setTimeout(loadFunc, 0)
+        }
+    }
+
+    function getBody() {
+        // Chrome with requestType=blob throws errors arround when even testing access to responseText
+        var body = undefined
+
+        if (xhr.response) {
+            body = xhr.response
+        } else {
+            body = xhr.responseText || getXml(xhr)
+        }
+
+        if (isJson) {
+            try {
+                body = JSON.parse(body)
+            } catch (e) {}
+        }
+
+        return body
+    }
+
+    function errorFunc(evt) {
+        clearTimeout(timeoutTimer)
+        if(!(evt instanceof Error)){
+            evt = new Error("" + (evt || "Unknown XMLHttpRequest Error") )
+        }
+        evt.statusCode = 0
+        return callback(evt, failureResponse)
+    }
+
+    // will load the data & process the response in a special response object
+    function loadFunc() {
+        if (aborted) return
+        var status
+        clearTimeout(timeoutTimer)
+        if(options.useXDR && xhr.status===undefined) {
+            //IE8 CORS GET successful response doesn't have a status field, but body is fine
+            status = 200
+        } else {
+            status = (xhr.status === 1223 ? 204 : xhr.status)
+        }
+        var response = failureResponse
+        var err = null
+
+        if (status !== 0){
+            response = {
+                body: getBody(),
+                statusCode: status,
+                method: method,
+                headers: {},
+                url: uri,
+                rawRequest: xhr
+            }
+            if(xhr.getAllResponseHeaders){ //remember xhr can in fact be XDR for CORS in IE
+                response.headers = parseHeaders(xhr.getAllResponseHeaders())
+            }
+        } else {
+            err = new Error("Internal XMLHttpRequest Error")
+        }
+        return callback(err, response, response.body)
+    }
+
+    var xhr = options.xhr || null
+
+    if (!xhr) {
+        if (options.cors || options.useXDR) {
+            xhr = new createXHR.XDomainRequest()
+        }else{
+            xhr = new createXHR.XMLHttpRequest()
+        }
+    }
+
+    var key
+    var aborted
+    var uri = xhr.url = options.uri || options.url
+    var method = xhr.method = options.method || "GET"
+    var body = options.body || options.data
+    var headers = xhr.headers = options.headers || {}
+    var sync = !!options.sync
+    var isJson = false
+    var timeoutTimer
+    var failureResponse = {
+        body: undefined,
+        headers: {},
+        statusCode: 0,
+        method: method,
+        url: uri,
+        rawRequest: xhr
+    }
+
+    if ("json" in options && options.json !== false) {
+        isJson = true
+        headers["accept"] || headers["Accept"] || (headers["Accept"] = "application/json") //Don't override existing accept header declared by user
+        if (method !== "GET" && method !== "HEAD") {
+            headers["content-type"] || headers["Content-Type"] || (headers["Content-Type"] = "application/json") //Don't override existing accept header declared by user
+            body = JSON.stringify(options.json === true ? body : options.json)
+        }
+    }
+
+    xhr.onreadystatechange = readystatechange
+    xhr.onload = loadFunc
+    xhr.onerror = errorFunc
+    // IE9 must have onprogress be set to a unique function.
+    xhr.onprogress = function () {
+        // IE must die
+    }
+    xhr.onabort = function(){
+        aborted = true;
+    }
+    xhr.ontimeout = errorFunc
+    xhr.open(method, uri, !sync, options.username, options.password)
+    //has to be after open
+    if(!sync) {
+        xhr.withCredentials = !!options.withCredentials
+    }
+    // Cannot set timeout with sync request
+    // not setting timeout on the xhr object, because of old webkits etc. not handling that correctly
+    // both npm's request and jquery 1.x use this kind of timeout, so this is being consistent
+    if (!sync && options.timeout > 0 ) {
+        timeoutTimer = setTimeout(function(){
+            if (aborted) return
+            aborted = true//IE9 may still call readystatechange
+            xhr.abort("timeout")
+            var e = new Error("XMLHttpRequest timeout")
+            e.code = "ETIMEDOUT"
+            errorFunc(e)
+        }, options.timeout )
+    }
+
+    if (xhr.setRequestHeader) {
+        for(key in headers){
+            if(headers.hasOwnProperty(key)){
+                xhr.setRequestHeader(key, headers[key])
+            }
+        }
+    } else if (options.headers && !isEmpty(options.headers)) {
+        throw new Error("Headers cannot be set on an XDomainRequest object")
+    }
+
+    if ("responseType" in options) {
+        xhr.responseType = options.responseType
+    }
+
+    if ("beforeSend" in options &&
+        typeof options.beforeSend === "function"
+    ) {
+        options.beforeSend(xhr)
+    }
+
+    // Microsoft Edge browser sends "undefined" when send is called with undefined value.
+    // XMLHttpRequest spec says to pass null as body to indicate no body
+    // See https://github.com/naugtur/xhr/issues/100.
+    xhr.send(body || null)
+
+    return xhr
+
+
+}
+
+function getXml(xhr) {
+    if (xhr.responseType === "document") {
+        return xhr.responseXML
+    }
+    var firefoxBugTakenEffect = xhr.responseXML && xhr.responseXML.documentElement.nodeName === "parsererror"
+    if (xhr.responseType === "" && !firefoxBugTakenEffect) {
+        return xhr.responseXML
+    }
+
+    return null
+}
+
+function noop() {}
+
+},{"global/window":9,"is-function":13,"parse-headers":22,"xtend":32}],31:[function(require,module,exports){
+module.exports = (function xmlparser() {
+  //common browsers
+  if (typeof self.DOMParser !== 'undefined') {
+    return function(str) {
+      var parser = new self.DOMParser()
+      return parser.parseFromString(str, 'application/xml')
+    }
+  } 
+
+  //IE8 fallback
+  if (typeof self.ActiveXObject !== 'undefined'
+      && new self.ActiveXObject('Microsoft.XMLDOM')) {
+    return function(str) {
+      var xmlDoc = new self.ActiveXObject("Microsoft.XMLDOM")
+      xmlDoc.async = "false"
+      xmlDoc.loadXML(str)
+      return xmlDoc
+    }
+  }
+
+  //last resort fallback
+  return function(str) {
+    var div = document.createElement('div')
+    div.innerHTML = str
+    return div
+  }
+})()
+
+},{}],32:[function(require,module,exports){
+module.exports = extend
+
+var hasOwnProperty = Object.prototype.hasOwnProperty;
+
+function extend() {
+    var target = {}
+
+    for (var i = 0; i < arguments.length; i++) {
+        var source = arguments[i]
+
+        for (var key in source) {
+            if (hasOwnProperty.call(source, key)) {
+                target[key] = source[key]
+            }
+        }
+    }
+
+    return target
+}
+
+},{}],33:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-	value: true
+		value: true
 });
-exports.GravityLevel = undefined;
+exports.BlackMatter = undefined;
 
-var _LevelCore2 = require("./LevelCore");
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement2 = require("./PhysicalElement");
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -14,27 +3912,806 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-var GravityLevel = exports.GravityLevel = function (_LevelCore) {
-	_inherits(GravityLevel, _LevelCore);
+var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
+		_inherits(BlackMatter, _PhysicalElement);
 
-	function GravityLevel() {
-		_classCallCheck(this, GravityLevel);
+		function BlackMatter(_options) {
+				_classCallCheck(this, BlackMatter);
 
-		return _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this));
-	}
+				var _this = _possibleConstructorReturn(this, (BlackMatter.__proto__ || Object.getPrototypeOf(BlackMatter)).call(this, _options));
 
-	return GravityLevel;
-}(_LevelCore2.LevelCore);
+				_this.targetScale = vec3.clone(_this.scale);
+				_this.scale = vec3.create();
+				_this.applyForce([(Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70]);
 
-},{"./LevelCore":4}],2:[function(require,module,exports){
+				_this.targetMass = _this.mass;
+				_this.mass = 0;
+
+				return _this;
+		}
+
+		_createClass(BlackMatter, [{
+				key: "update",
+				value: function update() {
+
+						_get(BlackMatter.prototype.__proto__ || Object.getPrototypeOf(BlackMatter.prototype), "update", this).call(this);
+
+						this.scale[0] += (this.targetScale[0] - this.scale[0]) * 0.07;
+						this.scale[1] += (this.targetScale[1] - this.scale[1]) * 0.07;
+						this.scale[2] += (this.targetScale[2] - this.scale[2]) * 0.07;
+
+						this.mass = this.scale[0] / this.targetScale[0] * this.targetMass;
+
+						this.color[3] = this.lifePercent;
+				}
+		}]);
+
+		return BlackMatter;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],34:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-	value: true
+		value: true
+});
+exports.ElectricLevel = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _LevelCore2 = require("./LevelCore");
+
+var _shaderHelper = require("./shaderHelper");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
+		_inherits(ElectricLevel, _LevelCore);
+
+		function ElectricLevel(_options) {
+				_classCallCheck(this, ElectricLevel);
+
+				try {
+						var _this = _possibleConstructorReturn(this, (ElectricLevel.__proto__ || Object.getPrototypeOf(ElectricLevel)).call(this, _options));
+
+						_this.build();
+				} catch (e) {
+
+						console.error(e);
+				}
+
+				_this.ready = false;
+				_this.createdInstance = null;
+				_this.currentInstance = null;
+				_this.mouseOnDown = null;
+
+				return _this;
+		}
+
+		_createClass(ElectricLevel, [{
+				key: "build",
+				value: function build() {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "build", this).call(this);
+				}
+		}, {
+				key: "onUp",
+				value: function onUp(_position) {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onUp", this).call(this, _position);
+
+						this.currentInstance = null;
+						this.createdInstance = null;
+				}
+		}, {
+				key: "onDown",
+				value: function onDown(_position) {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDown", this).call(this, _position);
+
+						if (!this.activeScreen) {
+
+								this.currentInstance = this.checkCharges(vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z));
+
+								if (!this.currentInstance) {
+
+										this.createdInstance = this.addInstanceOf('charges', {
+
+												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
+												color: [0.0, 0.0, 0.0, 1.0],
+												rotation: [0, 0, Math.random() * Math.PI * 2],
+												mass: 15,
+												drag: 0.85,
+												enabled: true
+
+										});
+								}
+						}
+
+						this.mouseOnDown = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
+				}
+		}, {
+				key: "onClick",
+				value: function onClick(_position) {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onClick", this).call(this, _position);
+				}
+		}, {
+				key: "onMove",
+				value: function onMove(_position) {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onMove", this).call(this, _position);
+				}
+		}, {
+				key: "onDrag",
+				value: function onDrag(_position) {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDrag", this).call(this, _position);
+
+						var mouse = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
+
+						if (this.createdInstance) {
+
+								var dist = vec3.length(vec3.sub(vec3.create(), this.createdInstance.position, mouse));
+								var yDist = mouse[1] - this.createdInstance.position[1];
+								this.createdInstance.sign = Math.sign(yDist);
+								this.createdInstance.targetRadius = dist;
+						} else if (this.currentInstance) {
+
+								var dir = null;
+								var _dist = null;
+								var _yDist = null;
+
+								switch (this.currentInstance.type) {
+
+										case 'center':
+
+												this.currentInstance.element.targetPosition = mouse;
+												this.currentInstance.element.targetRadius = 0;
+												this.d;
+
+												break;
+
+										case 'edge':
+
+												_dist = vec3.length(vec3.sub(vec3.create(), this.currentInstance.element.position, mouse));
+												_yDist = mouse[1] - this.currentInstance.element.position[1];
+												this.currentInstance.element.sign = Math.sign(_yDist);
+												this.currentInstance.element.targetRadius = _dist;
+
+												break;
+
+								}
+						}
+				}
+		}, {
+				key: "update",
+				value: function update() {
+
+						// Check if all is loaded.
+
+						if (!this.ready) {
+
+								if (Object.keys(this.gameElements).length == this.elementToLoad) {
+
+										this.ready = true;
+										this.resetPlayer();
+										// this.start = this.getInstanceByName ( 'goals', 'top' );
+										// this.arrival = this.getInstanceByName ( 'goals', 'bottom' );
+										this.arrivedInGame = false;
+										this.gameElements.player.instances[0].mass = 400;
+										this.resetPlayer();
+
+										// let text = this.makeTextSprite ( 'popop', {
+
+										// 	fontsize: 70,
+
+										// } );
+										// text.position.set ( 0, 0, 0 );
+										// text.scale.set ( 1.0, 0.5, 0.5 );
+										// this.mainScene.add ( text );
+
+										this.scanScreenMaterial = new THREE.ShaderMaterial({
+
+												vertexShader: _shaderHelper.shaderHelper.equipotentialLines.vertex,
+												fragmentShader: _shaderHelper.shaderHelper.equipotentialLines.fragment,
+
+												uniforms: {
+
+														numCharges: { value: 0 },
+														charges: { value: [0, 0, 0] },
+														screenDimentions: { value: [this.getWidth(), this.getHeight()] }
+
+												},
+
+												transparent: true
+
+										});
+
+										console.log(this.scanScreenMaterial);
+
+										console.log(this.getHeight());
+
+										this.scanBackground = new THREE.Mesh(this.quadGeometry, this.scanScreenMaterial);
+										this.scanBackground.scale.set(10, 10, 1.0);
+										this.scanScene.add(this.scanBackground);
+										this.scanScreenMaterial.extensions.derivatives = true;
+								} else {
+
+										return;
+								}
+						}
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "update", this).call(this);
+
+						// main player
+
+						var player = this.gameElements.player.instances[0];
+						if (this.checkEdges(player.position, 0.2) && this.arrivedInGame) this.resetPlayer();
+						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
+						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+
+						// Obstacles
+
+						var obstacles = this.gameElements.obstacles.instances;
+
+						for (var i = 0; i < obstacles.length; i++) {
+
+								var obstacle = obstacles[i];
+
+								if (this.isInBox(obstacle, player.position)) {
+
+										this.resetPlayer();
+										break;
+								}
+						}
+
+						// Compute te electric force
+						// F = k * ( q1 * q2 ) / r^2
+						// F = q * E
+						// E = k * Q / r * r
+
+						var forceResult = vec3.create();
+
+						// Fixed charges
+
+						var fixedCharges = this.gameElements.fixedCharges.instances;
+
+						for (var _i = 0; _i < fixedCharges.length; _i++) {
+
+								var charge = fixedCharges[_i];
+								var dist = vec3.length(vec3.sub(vec3.create(), charge.position, player.position));
+
+								if (dist < charge.radius) {
+
+										this.resetPlayer();
+								} else {
+
+										var force = this.computeElectricForce(charge, player);
+										vec3.add(forceResult, forceResult, force);
+								}
+						}
+
+						// Charges
+
+						var chargesUniform = [];
+						var charges = this.gameElements.charges.instances;
+
+						for (var _i2 = 0; _i2 < charges.length; _i2++) {
+
+								var _charge = charges[_i2];
+
+								var pos2d = this.get2DPos(new THREE.Vector3(_charge.position[0], _charge.position[1], _charge.position[2]));
+								chargesUniform.push(pos2d.x);
+								chargesUniform.push(pos2d.y);
+
+								// console.log(pos2d);
+
+								chargesUniform.push(_charge.charge * _charge.sign);
+
+								var _dist2 = vec3.length(vec3.sub(vec3.create(), _charge.position, player.position));
+
+								if (_dist2 < _charge.radius) {
+
+										this.resetPlayer();
+								} else {
+
+										var _force = this.computeElectricForce(_charge, player);
+										vec3.add(forceResult, forceResult, _force);
+								}
+						}
+
+						if (chargesUniform.length > 0) {
+
+								this.scanScreenMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
+								this.scanScreenMaterial.uniforms.charges.value = chargesUniform;
+						}
+
+						player.applyForce(forceResult);
+
+						var playerParticles = this.gameElements.playerParticles.instances;
+
+						for (var j = 0; j < playerParticles.length; j++) {
+
+								var particle = playerParticles[j];
+
+								var dir = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist3 = vec3.length(dir);
+
+								vec3.normalize(dir, dir);
+								vec3.scale(dir, dir, 1 / Math.pow(_dist3 + 1.0, 2) * 2);
+
+								particle.applyForce(dir);
+
+								for (var _i3 = 0; _i3 < charges.length; _i3++) {
+
+										var _charge2 = charges[_i3];
+
+										var _dir = vec3.sub(vec3.create(), _charge2.position, particle.position);
+										var minDist = _charge2.scale[0] + particle.scale[0];
+										var _dist4 = vec3.length(_dir);
+
+										if (_dist4 < minDist) {
+
+												vec3.scale(_dir, _dir, -(minDist - _dist4) * 100);
+												particle.applyForce(_dir);
+										} else {
+
+												var _force2 = this.computeElectricForce(_charge2, particle);
+												particle.applyForce(vec3.scale(_force2, _force2, 0.5));
+										}
+								}
+						}
+
+						// Update FX particles
+
+						for (var _i4 = 0; _i4 < 2; _i4++) {
+
+								var instance = this.addInstanceOf('playerParticles', {
+
+										enabled: Math.random() > 0.05 ? true : false,
+										position: vec3.clone(player.position),
+										canDye: true,
+										lifeSpan: Math.random() * 1000 + 1000,
+										drag: 0.95,
+										mass: Math.random() * 100 + 200,
+										initialRadius: Math.random() * 0.06 + 0.03,
+										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+
+								});
+
+								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
+						}
+				}
+		}, {
+				key: "checkCharges",
+				value: function checkCharges(_position) {
+
+						var charges = this.gameElements.charges.instances;
+
+						for (var i = 0; i < charges.length; i++) {
+
+								var rangeCenter = charges[i].radius * 0.5;
+								var distToCenter = vec3.length(vec3.sub(vec3.create(), charges[i].position, _position));
+
+								var rangeEdge = 0.1;
+								var distToEdge = Math.abs(distToCenter - charges[i].radius);
+
+								if (distToEdge < rangeEdge) {
+
+										var tC = charges[i];
+										this.gameElements.charges.instances.splice(i, 1);
+										this.gameElements.charges.instances.unshift(tC);
+
+										return {
+
+												element: this.gameElements.charges.instances[0],
+												type: 'edge'
+
+										};
+								} else if (distToEdge > rangeEdge && distToCenter < charges[i].radius) {
+
+										var _tC = charges[i];
+										this.gameElements.charges.instances.splice(i, 1);
+										this.gameElements.charges.instances.unshift(_tC);
+
+										return {
+
+												element: this.gameElements.charges.instances[0],
+												type: 'center'
+
+										};
+								}
+						}
+
+						return null;
+				}
+		}, {
+				key: "computeElectricForce",
+				value: function computeElectricForce(_e1, _e2) {
+
+						var k = 8.99 * Math.pow(10, 1.5); // Here we tweak a little bit the real values.
+						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+						var dist = vec3.length(dir);
+
+						vec3.normalize(dir, dir);
+						var mag = k * (_e1.charge * _e2.charge) / Math.pow(dist, 2);
+
+						return vec3.scale(dir, dir, mag);
+				}
+		}, {
+				key: "resetPlayer",
+				value: function resetPlayer() {
+
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop() * 1.03, 0);
+						this.gameElements.player.instances[0].velocity = vec3.create();
+						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 1, -5, 0]);
+				}
+		}, {
+				key: "reloadLevel",
+				value: function reloadLevel() {
+
+						var charges = this.gameElements.charges.instances;
+
+						for (var i = charges.length - 1; i >= 0; i--) {
+
+								charges[i].kill();
+						}
+				}
+		}]);
+
+		return ElectricLevel;
+}(_LevelCore2.LevelCore);
+
+},{"./LevelCore":40,"./shaderHelper":48}],35:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.ElectricParticle = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
+		_inherits(ElectricParticle, _PhysicalElement);
+
+		function ElectricParticle(_options) {
+				_classCallCheck(this, ElectricParticle);
+
+				var _this = _possibleConstructorReturn(this, (ElectricParticle.__proto__ || Object.getPrototypeOf(ElectricParticle)).call(this, _options));
+
+				_this.isKilled = false;
+
+				// Charge
+
+				_this.chargeDenominator = -3;
+				_this.sign = _options.sign || (Math.random() > 0.5 ? 1 : -1);
+				_this.minCharge = _options.minCharge || -10.0 * Math.pow(10, _this.chargeDenominator);
+				_this.maxCharge = _options.maxCharge || 10.0 * Math.pow(10, _this.chargeDenominator);
+
+				_this.charge = _options.charge || 1; // μC ( micro Coulombs );
+
+				// Scale
+
+				_this.maxRadius = _options.minRadius || 0.8;
+				_this.minRadius = _options.maxRadius || 0.25;
+				_this.rangeScale = _this.maxRadius - _this.minRadius;
+				_this.targetRadius = _options.targetRadius || 0.2;
+				_this.radius = 0;
+
+				// Position
+
+				_this.targetPosition = vec3.clone(_this.position);
+
+				// Color
+
+				_this.neutralColor = vec4.fromValues(0.7, 0.7, 0.7, 1.0);
+				_this.positiveColor = vec4.fromValues(252 / 255 + rCV(), 74 / 255 + rCV(), 50 / 255 + rCV(), 1.0);
+				_this.negativeColor = vec4.fromValues(50 / 255 + rCV(), 104 / 255 + rCV(), 252 / 255 + rCV(), 1.0);
+				_this.color = vec4.clone(_this.neutralColor);
+
+				function rCV() {
+
+						return (Math.random() - 0.5) * 0.1;
+				}
+
+				return _this;
+		}
+
+		_createClass(ElectricParticle, [{
+				key: "update",
+				value: function update() {
+
+						_get(ElectricParticle.prototype.__proto__ || Object.getPrototypeOf(ElectricParticle.prototype), "update", this).call(this);
+
+						if (this.isKilled) {
+
+								this.radius += (0.2 - this.radius) * 0.005;
+								this.scale = vec3.fromValues(this.radius, this.radius, this.radius);
+								this.color[3] = this.lifePercent;
+								return;
+						}
+
+						// Clamp scale 
+
+						if (this.targetRadius > this.maxRadius) {
+
+								this.targetRadius = this.maxRadius;
+						} else if (this.targetRadius < this.minRadius) {
+
+								this.targetRadius = this.minRadius;
+						}
+
+						// Interpolate scale changes to make a smooth animation.
+
+						this.radius += (this.targetRadius - this.radius) * 0.1;
+						this.scale = vec3.fromValues(this.radius, this.radius, this.radius);
+
+						// Change the value of the color acoording to the charge.
+
+						if (this.charge > 0.0001) {
+
+								this.color[0] += (this.positiveColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.positiveColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.positiveColor[2] - this.color[2]) * 0.05;
+						} else if (this.charge < -0.0001) {
+
+								this.color[0] += (this.negativeColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.negativeColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.negativeColor[2] - this.color[2]) * 0.05;
+						} else {
+
+								this.color[0] += (this.neutralColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.neutralColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.neutralColor[2] - this.color[2]) * 0.05;
+						}
+
+						// Update charge according to the size.
+
+						this.charge = (this.radius - this.minRadius) / this.maxRadius * this.maxCharge * this.sign;
+
+						// Update the position.
+
+						var dir = vec3.sub(vec3.create(), this.targetPosition, this.position);
+						vec3.scale(dir, dir, 0.5);
+						this.applyForce(dir);
+				}
+		}, {
+				key: "kill",
+				value: function kill() {
+
+						// this.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1 ) );
+						this.drag = 0.99;
+						this.enabled = true;
+						this.isKilled = true;
+						this.canDye = true;
+						this.lifeSpan = 300 + Math.random() * 500;
+						this.lifeLeft = this.lifeSpan;
+				}
+		}]);
+
+		return ElectricParticle;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],36:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.ElectricPlanetParticle = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var ElectricPlanetParticle = exports.ElectricPlanetParticle = function (_PhysicalElement) {
+		_inherits(ElectricPlanetParticle, _PhysicalElement);
+
+		function ElectricPlanetParticle(_options) {
+				_classCallCheck(this, ElectricPlanetParticle);
+
+				// Charge
+
+				var _this = _possibleConstructorReturn(this, (ElectricPlanetParticle.__proto__ || Object.getPrototypeOf(ElectricPlanetParticle)).call(this, _options));
+
+				_this.chargeDenominator = -3;
+				_this.sign = _options.sign || (Math.random() > 0.5 ? 1 : -1);
+				_this.minCharge = _options.minCharge || -10.0 * Math.pow(10, _this.chargeDenominator);
+				_this.maxCharge = _options.maxCharge || 10.0 * Math.pow(10, _this.chargeDenominator);
+
+				_this.charge = 0; // μC ( micro Coulombs );
+
+				// Scale
+
+				_this.maxRadius = _options.maxRadius || 20;
+				_this.minRadius = _options.minRadius || 0.0;
+				_this.rangeScale = _this.maxRadius - _this.minRadius;
+				_this.radius = _options.radius || 0.2;
+				_this.targetRadius = Math.random() * 0.1 + 0.07;
+
+				// Position
+
+				_this.targetPosition = vec3.clone(_this.position);
+
+				// Color
+
+				_this.neutralColor = vec4.fromValues(0.7, 0.7, 0.7, 1.0);
+				_this.positiveColor = vec4.fromValues(252 / 255 + rCV(), 74 / 255 + rCV(), 50 / 255 + rCV(), 1.0);
+				_this.negativeColor = vec4.fromValues(50 / 255 + rCV(), 104 / 255 + rCV(), 252 / 255 + rCV(), 1.0);
+				_this.color = vec4.clone(_this.neutralColor);
+
+				function rCV() {
+
+						return (Math.random() - 0.5) * 0.1;
+				}
+
+				return _this;
+		}
+
+		_createClass(ElectricPlanetParticle, [{
+				key: "update",
+				value: function update() {
+
+						_get(ElectricPlanetParticle.prototype.__proto__ || Object.getPrototypeOf(ElectricPlanetParticle.prototype), "update", this).call(this);
+
+						// Clamp scale 
+
+						if (this.targetRadius > this.maxRadius) {
+
+								this.targetRadius = this.maxRadius;
+						} else if (this.targetRadius < this.minRadius) {
+
+								this.targetRadius = this.minRadius;
+						}
+
+						// Interpolate scale changes to make a smooth animation.
+
+						this.radius += (this.targetRadius - this.radius) * 0.1;
+						this.scale = vec3.fromValues(this.radius, this.radius, this.radius);
+
+						// Change the value of the color acoording to the charge.
+
+						if (this.charge > 0.0001) {
+
+								this.color[0] += (this.positiveColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.positiveColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.positiveColor[2] - this.color[2]) * 0.05;
+						} else if (this.charge < -0.0001) {
+
+								this.color[0] += (this.negativeColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.negativeColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.negativeColor[2] - this.color[2]) * 0.05;
+						} else {
+
+								this.color[0] += (this.neutralColor[0] - this.color[0]) * 0.05;
+								this.color[1] += (this.neutralColor[1] - this.color[1]) * 0.05;
+								this.color[2] += (this.neutralColor[2] - this.color[2]) * 0.05;
+						}
+
+						// Update the position.
+
+						var dir = vec3.sub(vec3.create(), this.targetPosition, this.position);
+						vec3.scale(dir, dir, 1);
+						this.applyForce(dir);
+				}
+		}]);
+
+		return ElectricPlanetParticle;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],37:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var ElementCore = exports.ElementCore = function () {
+		function ElementCore(_options) {
+				_classCallCheck(this, ElementCore);
+
+				_options = _options || {};
+
+				this.type = this.constructor.name;
+				this.name = _options.name || 'gameElement';
+				this.color = _options.color || [1, 1, 1, 1];
+				this.enabled = _options.enabled;
+
+				this.canDye = _options.canDye || false;
+				this.lifeSpan = _options.lifeSpan || 10000.0;
+				this.lifeLeft = _options.lifeLeft || this.lifeSpan;
+
+				this.lastTime = performance.now();
+				this.time = this.lastTime;
+				this.deltaTime = this.time - this.lastTime;
+
+				for (var o in _options) {
+
+						if (!this[o]) this[o] = _options[o];
+				}
+		}
+
+		_createClass(ElementCore, [{
+				key: 'update',
+				value: function update() {
+
+						this.time = performance.now();
+						this.deltaTime = this.time - this.lastTime;
+						this.lastTime = this.time;
+
+						if (this.lifeLeft > 0) {
+
+								this.lifeLeft -= this.deltaTime;
+						} else {
+
+								this.lifeLeft = 0;
+						}
+				}
+		}, {
+				key: 'isDead',
+				value: function isDead() {
+
+						if (!this.canDye) return false;
+						if (this.lifeLeft > 0) return false;else return true;
+				}
+		}, {
+				key: 'lifePercent',
+				get: function get() {
+
+						return this.lifeLeft / this.lifeSpan;
+				}
+		}]);
+
+		return ElementCore;
+}();
+
+},{}],38:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
 });
 exports.GravityElectricLevel = undefined;
 
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _shaderHelper = require("./shaderHelper");
+
 var _LevelCore2 = require("./LevelCore");
+
+var _Text = require("./Text");
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -43,28 +4720,427 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) {
-	_inherits(GravityElectricLevel, _LevelCore);
+		_inherits(GravityElectricLevel, _LevelCore);
 
-	function GravityElectricLevel() {
-		_classCallCheck(this, GravityElectricLevel);
+		function GravityElectricLevel(_options) {
+				_classCallCheck(this, GravityElectricLevel);
 
-		return _possibleConstructorReturn(this, (GravityElectricLevel.__proto__ || Object.getPrototypeOf(GravityElectricLevel)).call(this));
-	}
+				try {
+						var _this = _possibleConstructorReturn(this, (GravityElectricLevel.__proto__ || Object.getPrototypeOf(GravityElectricLevel)).call(this, _options));
 
-	return GravityElectricLevel;
+						_this.build();
+				} catch (e) {
+
+						console.error(e);
+				}
+
+				_this.activePlanet = null;
+
+				return _this;
+		}
+
+		_createClass(GravityElectricLevel, [{
+				key: "build",
+				value: function build() {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "build", this).call(this);
+
+						this.scanBackgroundMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.equidistantLines.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.equidistantLines.fragment,
+
+								uniforms: {
+
+										numCharges: { value: 2 },
+										charges: { value: [1000, 1000, 300, 300] },
+										screenDimentions: { value: [this.getWidth(), this.getHeight()] }
+
+								},
+
+								transparent: true
+
+						});
+
+						this.scanBackground = new THREE.Mesh(this.quadGeometry, this.scanBackgroundMaterial);
+						this.scanBackground.scale.set(this.getWorldLeft() * 2, this.getWorldBottom() * 2, 2);
+
+						this.indicatorMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.indicator.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.indicator.fragment,
+
+								uniforms: {
+
+										alpha: { value: 1 }
+
+								},
+
+								transparent: true
+
+						});
+
+						// console.log(this.indicatorMaterial);
+
+						this.indicator = new THREE.Mesh(this.quadGeometry, this.indicatorMaterial);
+						this.indicator.position.y += 0.5;
+						this.indicatorObj = new THREE.Object3D();
+						this.indicatorObj.add(this.indicator);
+						this.indicatorAlphaTarget = 0.0;
+						this.indicatorAngleTarget = 0.0;
+						this.indicatorScaleTarget = 0.0;
+						this.mainScene.add(this.indicatorObj);
+
+						// Info text
+
+						this.text = new _Text.Text({
+
+								size: [512, 512]
+
+						});
+						this.text.canvas.style.position = 'fixed';
+						this.text.canvas.style.top = '0';
+						this.text.canvas.style.left = '0';
+						document.body.appendChild(this.text.canvas);
+				}
+		}, {
+				key: "onUp",
+				value: function onUp(_position) {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onUp", this).call(this, _position);
+						this.activePlanet = null;
+
+						this.indicatorScaleTarget = 0.0;
+						this.indicatorAlphaTarget = 0.0;
+				}
+		}, {
+				key: "onDown",
+				value: function onDown(_position) {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onDown", this).call(this, _position);
+						this.activePlanet = this.checkPlanets(this.glMouseWorld);
+
+						if (this.activePlanet) {
+
+								this.indicatorObj.position.x = this.activePlanet.position[0];
+								this.indicatorObj.position.y = this.activePlanet.position[1];
+								this.indicatorObj.position.z = this.activePlanet.position[2];
+
+								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.activePlanet.position);
+								var angle = Math.atan2(dir[1], dir[0]) - Math.PI * 0.5;
+								var dist = vec3.length(dir);
+
+								this.indicatorAlphaTarget = 1.0;
+								this.indicatorObj.rotation.z = angle;
+								this.indicatorScaleTarget = dist;
+						}
+				}
+		}, {
+				key: "onClick",
+				value: function onClick(_position) {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onClick", this).call(this, _position);
+				}
+		}, {
+				key: "onMove",
+				value: function onMove(_position) {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onMove", this).call(this, _position);
+				}
+		}, {
+				key: "onDrag",
+				value: function onDrag(_position) {
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onDrag", this).call(this, _position);
+
+						if (this.activePlanet) {
+
+								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.activePlanet.position);
+								var sign = Math.sign(dir[1]);
+								var dist = vec3.length(dir);
+								var maxDist = this.activePlanet.scale[0] * 1.2;
+
+								this.activePlanet.sign = sign;
+								this.activePlanet.charge = dist / maxDist * this.activePlanet.maxCharge;
+
+								var angle = Math.atan2(dir[1], dir[0]) - Math.PI * 0.5;
+
+								this.indicatorAlphaTarget = 1.0;
+								this.indicatorObj.rotation.z = angle;
+								this.indicatorScaleTarget = dist;
+						}
+				}
+		}, {
+				key: "update",
+				value: function update() {
+
+						// Check if all is loaded.
+
+						if (!this.ready) {
+
+								if (Object.keys(this.gameElements).length == this.elementToLoad) {
+
+										this.ready = true;
+										this.gameElements.player.instances[0].mass = 1000000;
+										this.resetPlayer();
+										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
+										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
+										this.arrivedInGame = false;
+										this.buildCharges();
+
+										console.log(this.gameElements.planets);
+								} else {
+
+										return;
+								}
+						}
+
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "update", this).call(this);
+
+						this.indicatorObj.scale.y += (this.indicatorScaleTarget - this.indicatorObj.scale.y) * 0.2;
+						// this.indicatorObj.rotation.z += ( this.indicatorAngleTarget - this.indicatorObj.rotation.z ) * 0.2;
+						this.indicatorMaterial.uniforms.alpha.value += (this.indicatorAlphaTarget - this.indicatorMaterial.uniforms.alpha.value) * 0.1;
+
+						// main player
+
+						var player = this.gameElements.player.instances[0];
+						if (this.checkEdges(player.position) && this.arrivedInGame) this.resetPlayer();
+						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
+						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+
+						// Compute the physics behind.
+						// Here we take two different équations to compute the forces.
+
+						var resultForce = vec3.create();
+
+						var planets = this.gameElements.planets.instances;
+
+						for (var i = 0; i < planets.length; i++) {
+
+								var dist = vec3.length(vec3.sub(vec3.create(), planets[i].position, player.position));
+
+								if (dist < planets[i].scale[0]) {
+
+										this.resetPlayer();
+										break;
+								}
+
+								var gravityForce = this.computeGravityForce(planets[i], player);
+								vec3.add(resultForce, resultForce, gravityForce);
+								var electricForce = this.computeElectricForce(planets[i], player);
+								vec3.add(resultForce, resultForce, electricForce);
+
+								// Update the charges inside it.
+
+								var charges = planets[i].charges;
+
+								for (var j = 0; j < charges.length; j++) {
+
+										for (var k = 0; k < charges.length; k++) {
+
+												if (j != k) {
+
+														var dir = vec3.sub(vec3.create(), charges[k].position, charges[j].position);
+														var _dist = vec3.length(dir);
+														vec3.normalize(dir, dir);
+
+														var offset = 0.06;
+														var minDist = charges[k].scale[0] + charges[j].scale[0] + offset;
+
+														if (_dist < minDist) {
+
+																vec3.scale(dir, dir, -(minDist - _dist) * 120);
+																charges[j].applyForce(dir);
+														} else {
+
+																vec3.scale(dir, dir, 1.0 / Math.pow(_dist + 1.0, 2) * 0.1);
+																charges[j].applyForce(dir);
+														}
+												}
+										}
+								}
+						}
+
+						player.applyForce(resultForce);
+
+						var playerParticles = this.gameElements.playerParticles.instances;
+
+						for (var _j = 0; _j < playerParticles.length; _j++) {
+
+								var particle = playerParticles[_j];
+
+								var _dir = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist2 = vec3.length(_dir);
+
+								vec3.normalize(_dir, _dir);
+								vec3.scale(_dir, _dir, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
+
+								particle.applyForce(_dir);
+						}
+
+						// Update FX particles
+
+						for (var _i = 0; _i < 2; _i++) {
+
+								var instance = this.addInstanceOf('playerParticles', {
+
+										enabled: Math.random() > 0.05 ? true : false,
+										position: vec3.clone(player.position),
+										canDye: true,
+										lifeSpan: Math.random() * 1000 + 1000,
+										drag: 0.95,
+										mass: Math.random() * 100 + 200,
+										initialRadius: Math.random() * 0.06 + 0.03,
+										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+
+								});
+
+								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
+						}
+				}
+
+				// Build the charges contained in the planets.
+
+		}, {
+				key: "buildCharges",
+				value: function buildCharges() {
+
+						var planets = this.gameElements.planets.instances;
+
+						for (var i = 0; i < planets.length; i++) {
+
+								var planet = planets[i];
+								var layers = [1, 5, 10, 20, 20];
+
+								for (var j = 0; j < layers.length; j++) {
+
+										for (var k = 0; k < layers[j]; k++) {
+
+												var step = Math.PI * 2.0 / layers[j];
+												var angle = step * k; // + ( Math.random() - 0.5 ) * 0.2;
+												var dist = planet.scale[0] * 0.50 / (layers.length - 1) * j;
+
+												var rSize = Math.random() * 0.05 + 0.12;
+
+												var color = null;
+
+												if (Math.random() > 0.5) {
+
+														color = vec4.fromValues(50 / 255, 104 / 255, 252 / 255, 1.0);
+												} else {
+
+														color = vec4.fromValues(252 / 255, 74 / 255, 50 / 255, 1.0);
+												}
+
+												// Store the charges in the planet to have an easy access.
+
+												planets[i].charges.push(this.addInstanceOf('charges', {
+
+														name: 'charge',
+														position: vec3.fromValues(planet.position[0] + Math.cos(angle) * dist, planet.position[1] + Math.sin(angle) * dist, 0.0),
+														minRadius: 0.1,
+														maxRadius: 0.5,
+														radius: j == 0 ? 0.2 : 0.05,
+														targetRadius: j == 0 ? 0.2 : Math.random() * 0.1 + 0.1,
+														mass: 400,
+														drag: 0.9,
+														enabled: j == 0 ? false : true // disable the first instance to keep it in the center.
+
+												}));
+										}
+								}
+						}
+				}
+
+				// Compute natural forces according to some basic equations.
+
+		}, {
+				key: "computeElectricForce",
+				value: function computeElectricForce(_e1, _e2) {
+
+						var k = 8.99 * Math.pow(10, 1.5); // Here we tweak a little bit the real values.
+						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+						var dist = vec3.length(dir);
+
+						vec3.normalize(dir, dir);
+						var mag = k * (_e1.charge * _e1.sign * _e2.charge * _e2.sign) / Math.pow(dist, 2);
+
+						return vec3.scale(dir, dir, mag);
+				}
+		}, {
+				key: "computeGravityForce",
+				value: function computeGravityForce(_e1, _e2) {
+
+						var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
+						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+						var dist = vec3.length(dir);
+
+						vec3.normalize(dir, dir);
+						var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
+
+						return vec3.scale(dir, dir, mag);
+				}
+
+				// Interactions
+
+		}, {
+				key: "checkPlanets",
+				value: function checkPlanets(_vector) {
+
+						var planets = this.gameElements.planets.instances;
+
+						for (var i = 0; i < planets.length; i++) {
+
+								var dist = vec3.length(vec3.sub(vec3.create(), planets[i].position, _vector));
+
+								if (dist < planets[i].scale[0]) {
+
+										return planets[i];
+								}
+						}
+
+						return null;
+				}
+		}, {
+				key: "resetPlayer",
+				value: function resetPlayer() {
+
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom() - 0.1, 0);
+						this.gameElements.player.instances[0].velocity = vec3.create();
+						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 2, 30, 0]);
+				}
+		}, {
+				key: "reloadLevel",
+				value: function reloadLevel() {
+
+						this.resetPlayer();
+						var planets = this.gameElements.planets.instances;
+
+						for (var i = 0; i < planets.length; i++) {
+
+								planets[i].charge = 0;
+						}
+				}
+		}]);
+
+		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":4}],3:[function(require,module,exports){
+},{"./LevelCore":40,"./Text":46,"./shaderHelper":48}],39:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-	value: true
+		value: true
 });
 exports.GravityLevel = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement = require("./PhysicalElement");
+
+var _shaderHelper = require("./shaderHelper");
 
 var _LevelCore2 = require("./LevelCore");
 
@@ -75,47 +5151,333 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 var GravityLevel = exports.GravityLevel = function (_LevelCore) {
-	_inherits(GravityLevel, _LevelCore);
+		_inherits(GravityLevel, _LevelCore);
 
-	function GravityLevel(_options) {
-		_classCallCheck(this, GravityLevel);
+		function GravityLevel(_options) {
+				_classCallCheck(this, GravityLevel);
 
-		try {
-			var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
+				try {
+						var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
 
-			_this.build();
-		} catch (e) {
+						_this.build();
+				} catch (e) {
 
-			console.error(e);
+						console.error(e);
+				}
+
+				_this.ready = false;
+
+				// build a grid
+
+				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 100, 100);
+				_this.gridMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.grid.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
+						transparent: true,
+
+						uniforms: {
+
+								gridSubdivisions: { value: 50 },
+								mouse: { value: [0, 0] },
+								numMasses: { value: 0 },
+								masses: { value: [0, 0, 0] }
+
+						}
+
+				});
+
+				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
+				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
+				_this.grid.scale.set(maxScale, maxScale, 1);
+				_this.scanScene.add(_this.grid);
+				_this.gridMaterial.extensions.derivatives = true;
+
+				// Blackmatter
+
+				_this.canDraw = true;
+
+				return _this;
 		}
 
-		return _this;
-	}
+		_createClass(GravityLevel, [{
+				key: "build",
+				value: function build() {
 
-	_createClass(GravityLevel, [{
-		key: "build",
-		value: function build() {
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
+				}
+		}, {
+				key: "onUp",
+				value: function onUp(_position) {
 
-			_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
-		}
-	}, {
-		key: "update",
-		value: function update() {
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onUp", this).call(this, _position);
+				}
+		}, {
+				key: "onDown",
+				value: function onDown(_position) {
 
-			_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this);
-		}
-	}, {
-		key: "render",
-		value: function render() {
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDown", this).call(this, _position);
+				}
+		}, {
+				key: "onClick",
+				value: function onClick(_position) {
 
-			_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
-		}
-	}]);
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onClick", this).call(this, _position);
+				}
+		}, {
+				key: "onMove",
+				value: function onMove(_position) {
 
-	return GravityLevel;
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onMove", this).call(this, _position);
+				}
+		}, {
+				key: "onDrag",
+				value: function onDrag(_position) {
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
+
+						if (!this.activeScreen && this.canDraw) {
+
+								var r = rc();
+								var s = Math.random() * 0.2 + 0.1;
+
+								this.addInstanceOf('blackMatter', {
+
+										position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
+										scale: [s, s, s],
+										color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
+										rotation: [0, 0, Math.random() * Math.PI * 2],
+										mass: 1500,
+										drag: 0.95,
+										lifeSpan: Math.random() * 4000 + 6000,
+										canDye: true
+
+								});
+						}
+
+						if (this.canDraw) {
+
+								this.canDraw = false;
+
+								setTimeout(function () {
+
+										this.canDraw = true;
+								}.bind(this), 40);
+						}
+
+						function rc() {
+
+								return (Math.random() - 0.5) * 0.07;
+						}
+				}
+		}, {
+				key: "onResize",
+				value: function onResize() {
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
+
+						var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
+						this.grid.scale.set(maxScale, maxScale, 1.0);
+				}
+		}, {
+				key: "update",
+				value: function update() {
+
+						// Check if all is loaded.
+
+						if (!this.ready) {
+
+								if (Object.keys(this.gameElements).length == this.elementToLoad) {
+
+										this.ready = true;
+										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
+										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
+										this.arrivedInGame = false;
+										this.resetPlayer();
+										console.log(this.gameElements);
+
+										this.lineGeometry = new THREE.BufferGeometry();
+										this.lineGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+										var lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+										this.lines = new THREE.Line(this.lineGeometry, lineMaterial);
+										this.mainScene.add(this.lines);
+								} else {
+
+										return;
+								}
+						}
+
+						// Here all the objects's geometries are updated.
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this);
+
+						// main player
+
+						var player = this.gameElements.player.instances[0];
+						if (this.checkEdges(player.position) && this.arrivedInGame) this.resetPlayer();
+						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
+						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+
+						// Compute the gravitational field.
+						//
+						// G = 6.674 * 10-11 ( m3 kg-1 s-2 )
+						//
+						// F = G * ( m1 * m2 ) / r^2
+						//
+
+						var forceResult = vec3.create();
+
+						// Black matter
+
+						var massesUniforms = [];
+						var blackMatterInstances = this.gameElements.blackMatter.instances;
+
+						for (var i = 0; i < blackMatterInstances.length; i++) {
+
+								var bC = blackMatterInstances[i];
+								var dir = vec3.sub(vec3.create(), bC.position, player.position);
+								var dist = vec3.length(dir);
+
+								massesUniforms.push(bC.position[0]);
+								massesUniforms.push(bC.position[1]);
+								massesUniforms.push(bC.mass);
+
+								if (dist > bC.scale[0]) {
+
+										var force = this.computeGravityAttraction(bC, player);
+										vec3.add(forceResult, forceResult, force);
+								} else {
+
+										this.resetPlayer();
+								}
+						}
+
+						// Planets & particles
+
+						var playerParticles = this.gameElements.playerParticles.instances;
+						var planetsInstances = this.gameElements.planets.instances;
+
+						for (var _i = 0; _i < planetsInstances.length; _i++) {
+
+								var planet = planetsInstances[_i];
+								var _dir = vec3.sub(vec3.create(), planet.position, player.position);
+								var _dist = vec3.length(_dir);
+
+								massesUniforms.push(planet.position[0]);
+								massesUniforms.push(planet.position[1]);
+								massesUniforms.push(planet.mass);
+
+								if (_dist > planet.scale[0]) {
+
+										var _force = this.computeGravityAttraction(planet, player);
+										vec3.add(forceResult, forceResult, _force);
+								} else {
+
+										this.resetPlayer();
+								}
+
+								for (var j = 0; j < playerParticles.length; j++) {
+
+										var particle = playerParticles[j];
+
+										var dirToPlanet = vec3.sub(vec3.create(), planet.position, particle.position);
+										var distToPlanet = vec3.length(dirToPlanet);
+										var minDistToPlanet = planet.scale[0] + particle.scale[0] - 0.01;
+										var _force2 = null;
+
+										if (distToPlanet < minDistToPlanet) {
+
+												var mag = (minDistToPlanet - distToPlanet) * 50;
+												vec3.normalize(distToPlanet, distToPlanet);
+												_force2 = vec3.scale(dirToPlanet, dirToPlanet, -mag);
+										} else {
+
+												_force2 = this.computeGravityAttraction(planet, particle);
+
+												if (vec3.length(_force2) > 1) {
+
+														vec3.normalize(_force2, _force2);
+														vec3.scale(_force2, _force2, 1);
+												}
+										}
+
+										particle.applyForce(_force2);
+								}
+						}
+
+						// Update the grid in the scan scene.
+
+						this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+						this.gridMaterial.uniforms.masses.value = massesUniforms;
+
+						for (var _j = 0; _j < playerParticles.length; _j++) {
+
+								var _particle = playerParticles[_j];
+
+								var _dir2 = vec3.sub(vec3.create(), player.position, _particle.position);
+								var _dist2 = vec3.length(_dir2);
+
+								vec3.normalize(_dir2, _dir2);
+								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
+
+								_particle.applyForce(_dir2);
+						}
+
+						player.applyForce(forceResult);
+
+						// Update FX particles
+
+						for (var _i2 = 0; _i2 < 2; _i2++) {
+
+								var instance = this.addInstanceOf('playerParticles', {
+
+										enabled: Math.random() > 0.05 ? true : false,
+										position: vec3.clone(player.position),
+										canDye: true,
+										lifeSpan: Math.random() * 1000 + 1000,
+										drag: 0.95,
+										mass: Math.random() * 100 + 200,
+										initialRadius: Math.random() * 0.06 + 0.03,
+										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+
+								});
+
+								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
+						}
+				}
+		}, {
+				key: "computeGravityAttraction",
+				value: function computeGravityAttraction(_e1, _e2) {
+
+						var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
+						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+						var dist = vec3.length(dir);
+
+						vec3.normalize(dir, dir);
+						var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
+
+						return vec3.scale(dir, dir, mag);
+				}
+		}, {
+				key: "resetPlayer",
+				value: function resetPlayer() {
+
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
+						this.gameElements.player.instances[0].velocity = vec3.create();
+						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 500, 1000, 0]);
+				}
+		}, {
+				key: "render",
+				value: function render() {
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
+				}
+		}]);
+
+		return GravityLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":4}],4:[function(require,module,exports){
+},{"./LevelCore":40,"./PhysicalElement":43,"./shaderHelper":48}],40:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -129,7 +5491,12 @@ var _utils = require('../utils');
 
 var _shaderHelper = require('./shaderHelper');
 
+var _library = require('./library');
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var bmfont = require('three-bmfont-text');
+var bmfontLoader = require('load-bmfont');
 
 var LevelCore = exports.LevelCore = function () {
 		function LevelCore(_options) {
@@ -147,28 +5514,84 @@ var LevelCore = exports.LevelCore = function () {
 
 				// Core elements
 
+				this.levelIsReady = false;
+				this.elementToLoad = 0;
 				this.levelFile = _options.levelFile;
 				this.renderer = _options.renderer;
+				this.renderer.autoClear = false;
+				this.onWinCallback = function () {
+						console.log('you won');
+				};
 
+				this.glMouse = vec3.create();
+				this.glMouseWorld = vec3.create();
 				this.mouse = new THREE.Vector2();
 				this.mouseWorld = new THREE.Vector3();
 				this.raycaster = new THREE.Raycaster();
 
 				// Level elements
 
-				this.mainCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+				this.mainCamera = new THREE.PerspectiveCamera(75, this.getWidth() / this.getHeight(), 0.1, 1000);
 				this.mainCamera.position.z = 5;
 
 				this.mainScene = new THREE.Scene();
 				this.mainScene.background = new THREE.Color(0xEFEFEF);
 
+				this.genericQuad = this.getQuad([0, 0, 0], [0, 0, 0], [1, 1, 1]);
+				this.quadGeometry = new THREE.PlaneGeometry(1, 1);
+				this.screensScene = new THREE.Scene();
+				this.activeScreen = null;
+				this.screenMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.screen.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.screen.fragment,
+						uniforms: {
+
+								texture: { value: null },
+								screenDimentions: { value: [this.getWidth(), this.getHeight()] }
+
+						},
+						transparent: true,
+						depthWrite: false,
+						depthTest: false
+
+				});
+
 				this.scanScene = new THREE.Scene();
-				this.scanSceneRenderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { depthBuffer: false, stencilBuffer: false });
 				this.scanScene.background = new THREE.Color(0x000000);
+				this.scanSceneRenderTarget = new THREE.WebGLRenderTarget(this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false });
+
+				this.scanScreenTargetPosition = new THREE.Vector3(0, 0, 0);
+				this.scanScreen = new THREE.Mesh(this.quadGeometry, this.screenMaterial.clone());
+				this.scanScreen.material.uniforms.texture.value = this.scanSceneRenderTarget.texture;
+
+				this.scanScreenButtonMaterial = this.scanScreen.material.clone();
+				this.scanScreenButtonMaterial.vertexShader = _shaderHelper.shaderHelper.screenButton.vertex;
+				this.scanScreenButtonMaterial.fragmentShader = _shaderHelper.shaderHelper.screenButton.fragment;
+				this.scanScreenButtonMaterial.uniforms.texture.value = this.scanSceneRenderTarget.texture;
+				this.scanScreenButton = new THREE.Mesh(this.quadGeometry, this.scanScreenButtonMaterial);
+				this.scanScreenButton.scale.set(0.5, 0.5, 0.5);
+
+				this.screensScene.add(this.scanScreen);
+				this.screensScene.add(this.scanScreenButton);
 
 				this.infoScene = new THREE.Scene();
-				this.infoSceneRenderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { depthBuffer: false, stencilBuffer: false });
 				this.infoScene.background = new THREE.Color(0x808080);
+				this.infoSceneRenderTarget = new THREE.WebGLRenderTarget(this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false });
+
+				this.infoScreenTargetPosition = new THREE.Vector3(0, 0, 0);
+				this.infoScreen = new THREE.Mesh(this.quadGeometry, this.screenMaterial.clone());
+				this.infoScreen.material.uniforms.texture.value = this.infoSceneRenderTarget.texture;
+
+				this.infoScreenButtonMaterial = this.infoScreen.material.clone();
+				this.infoScreenButtonMaterial.vertexShader = _shaderHelper.shaderHelper.screenButton.vertex;
+				this.infoScreenButtonMaterial.fragmentShader = _shaderHelper.shaderHelper.screenButton.fragment;
+				this.infoScreenButtonMaterial.uniforms.texture.value = this.infoSceneRenderTarget.texture;
+				this.infoScreenButton = new THREE.Mesh(this.quadGeometry, this.infoScreenButtonMaterial);
+				this.infoScreenButton.scale.set(0.5, 0.5, 0.5);
+
+				this.screensScene.add(this.infoScreen);
+				this.screensScene.add(this.infoScreenButton);
 
 				// Render all scenes once the get right matrices.
 
@@ -176,8 +5599,26 @@ var LevelCore = exports.LevelCore = function () {
 				this.renderer.render(this.scanScene, this.mainCamera);
 				this.renderer.render(this.infoScene, this.mainCamera);
 
+				// test
+
+				this.testDerivative = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.testDerivative.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.testDerivative.fragment,
+						transparent: true
+
+				}));
+
+				this.testDerivative.position.set(0.0, 0.0, 1);
+				this.testDerivative.scale.set(3.0, 3.0, 0.1);
+				this.testDerivative.material.extensions.derivatives = true;
+				// this.mainScene.add ( this.testDerivative );
+
+				// console.log(this.testDerivative);
+
 				// Objects
 
+				this.player = new THREE.Object3D();
 				this.gameElements = {};
 		}
 
@@ -185,8 +5626,10 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'onMove',
 				value: function onMove(_position) {
 
-						this.mouse.x = _position[0];
-						this.mouse.y = _position[1];
+						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
+						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+
+						this.glMouse = vec2.clone(_position);
 
 						this.updateMouseWorld(this.mouse);
 				}
@@ -194,21 +5637,115 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'onClick',
 				value: function onClick(_position) {
 
-						this.mouse.x = _position[0];
-						this.mouse.y = _position[1];
+						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
+						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+
+						this.glMouse = vec2.clone(_position);
 
 						this.updateMouseWorld(this.mouse);
+				}
+		}, {
+				key: 'onDrag',
+				value: function onDrag(_position) {
+
+						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
+						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+
+						this.glMouse = vec2.clone(_position);
+
+						this.updateMouseWorld(this.mouse);
+
+						if (this.activeScreen == this.scanScreen) {
+
+								this.scanScreenTargetPosition.x = this.mouseWorld.x + this.getWorldRight();
+						} else if (this.activeScreen == this.infoScreen) {
+
+								this.infoScreenTargetPosition.x = this.mouseWorld.x - this.getWorldRight();
+						}
+				}
+		}, {
+				key: 'onDown',
+				value: function onDown(_position) {
+
+						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
+						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+
+						this.glMouse = vec2.clone(_position);
+
+						this.updateMouseWorld(this.mouse);
+
+						this.activeScreen = this.checkButtons();
+				}
+		}, {
+				key: 'onUp',
+				value: function onUp(_position) {
+
+						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
+						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+						this.glMouse = vec2.clone(_position);
+
+						this.updateMouseWorld(this.mouse);
+
+						this.activeScreen = null;
+
+						// Check screens limits.
+
+						if (this.scanScreenButton.position.x > this.getWorldRight() * 0.7) {
+
+								this.scanScreenTargetPosition.x = this.getWorldRight() * 2.0;
+						}
+
+						if (this.scanScreenButton.position.x < this.getWorldLeft() * 0.7) {
+
+								this.scanScreenTargetPosition.x = 0.0;
+						}
+
+						if (this.infoScreenButton.position.x < this.getWorldLeft() * 0.7) {
+
+								this.infoScreenTargetPosition.x = this.getWorldLeft() * 2.0;
+						}
+
+						if (this.infoScreenButton.position.x > this.getWorldRight() * 0.7) {
+
+								this.infoScreenTargetPosition.x = 0.0;
+						}
+				}
+		}, {
+				key: 'onResize',
+				value: function onResize() {
+
+						this.mainCamera.aspect = window.innerWidth / window.innerHeight;
+						this.mainCamera.updateProjectionMatrix();
+
+						this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+						this.scanScreen.material.uniforms.screenDimentions.value = [this.getWidth(), this.getHeight()];
+						this.scanScreenButton.material.uniforms.screenDimentions.value = [this.getWidth(), this.getHeight()];
+						this.scanScreenTargetPosition.x = this.getWorldRight() * 2;
+						this.scanScreen.scale.x = this.getWorldRight() * 2;
+
+						this.infoScreen.material.uniforms.screenDimentions.value = [this.getWidth(), this.getHeight()];
+						this.infoScreenButton.material.uniforms.screenDimentions.value = [this.getWidth(), this.getHeight()];
+						this.infoScreenTargetPosition.x = this.getWorldLeft() * 2;
+						this.infoScreen.scale.x = this.getWorldRight() * 2;
 				}
 		}, {
 				key: 'build',
 				value: function build() {
 
-						// Declare some useful variables
+						// Update screns size & position.
 
-						this.worldTop = this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).y;
-						this.worldBottom = this.get3DPointOnBasePlane(new THREE.Vector2(0, window.innerHeight)).y;
-						this.worldLeft = this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).x;
-						this.worldRight = this.get3DPointOnBasePlane(new THREE.Vector2(window.innerWidth, 0)).x;
+						this.scanScreenTargetPosition.set(this.getWorldRight() * 2.0, 0.0, 0.0);
+						this.scanScreen.position.set(this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z);
+
+						this.scanScreen.scale.x = this.getWorldRight() * 2.0;
+						this.scanScreen.scale.y = this.getWorldTop() * 2.0;
+
+						this.infoScreenTargetPosition.set(this.getWorldLeft() * 2.0, 0.0, 0.0);
+						this.infoScreen.position.set(this.infoScreenTargetPosition.x, this.infoScreenTargetPosition.y, this.infoScreenTargetPosition.z);
+
+						this.infoScreen.scale.x = this.getWorldRight() * 2.0;
+						this.infoScreen.scale.y = this.getWorldTop() * 2.0;
 
 						// Add base elements.
 						// Add the scale square in the background.
@@ -217,6 +5754,7 @@ var LevelCore = exports.LevelCore = function () {
 
 								static: true,
 								manualMode: false,
+								renderOrder: 1000,
 
 								shaders: {
 
@@ -225,7 +5763,6 @@ var LevelCore = exports.LevelCore = function () {
 										normal: {
 
 												name: 'solidQuad',
-												// textureUrl: './resources/textures/generic_circle_sdf.png',
 												uniforms: {
 
 														solidColor: { value: [0.9, 0.9, 0.9, 1.0] }
@@ -237,16 +5774,21 @@ var LevelCore = exports.LevelCore = function () {
 										scan: {
 
 												name: 'simpleTexture',
-												textureUrl: './resources/textures/generic_circle_sdf.png',
-												uniforms: {}
+												transparent: true,
+												textureUrl: './resources/textures/scale_square.png'
 
 										},
 
 										infos: {
 
-												name: 'simpleTexture',
-												textureUrl: './resources/textures/generic_circle_sdf.png',
-												uniforms: {}
+												name: 'coloredTexture',
+												transparent: true,
+												textureUrl: './resources/textures/scale_square.png',
+												uniforms: {
+
+														solidColor: { value: [0.0, 0.0, 0.0, 1.0] }
+
+												}
 
 										}
 
@@ -257,10 +5799,9 @@ var LevelCore = exports.LevelCore = function () {
 										0: {
 
 												enabled: true,
-												position: vec3.fromValues(0, 0, 0),
+												position: vec3.fromValues(0, 0, -0.1),
 												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(2.0, 2.0, 1.0),
-												velocity: { x: 0, y: 0, z: 0 }
+												scale: vec3.fromValues(2.0, 2.0, 1.0)
 
 										}
 
@@ -270,7 +5811,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Add the goals elements.
 
-						this.addElement('goals', {
+						this.addElement('arrival', {
 
 								static: true,
 								manualMode: false,
@@ -281,12 +5822,15 @@ var LevelCore = exports.LevelCore = function () {
 
 										normal: {
 
-												name: 'solidQuad',
+												name: 'arrival',
+												blending: 'NormalBlending',
 												uniforms: {
 
-														solidColor: { value: [0.7, 0.7, 0.7, 1.0] }
+														solidColor: { value: [0.8, 0.8, 0.8, 1.0] }
 
-												}
+												},
+
+												transparent: true
 
 										},
 
@@ -300,20 +5844,54 @@ var LevelCore = exports.LevelCore = function () {
 										0: {
 
 												enabled: true,
-												position: vec3.fromValues(0, this.worldTop, 0),
+												name: 'top',
+												position: vec3.fromValues(0, this.getWorldTop(), 0),
 												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(1.0, 0.2, 0.5),
-												velocity: { x: 0, y: 0, z: 0 }
+												scale: vec3.fromValues(1.0, 1.0, 0.5)
+
+										}
+
+								}
+
+						});
+
+						this.addElement('departure', {
+
+								static: true,
+								manualMode: false,
+
+								shaders: {
+
+										main: null,
+
+										normal: {
+
+												name: 'departure',
+												blending: 'NormalBlending',
+												uniforms: {
+
+														solidColor: { value: [0.8, 0.8, 0.8, 1.0] }
+
+												},
+
+												transparent: true
 
 										},
 
-										1: {
+										scan: null,
+										infos: null
+
+								},
+
+								instances: {
+
+										0: {
 
 												enabled: true,
-												position: vec3.fromValues(0, this.worldBottom, 0),
+												name: 'bottom',
+												position: vec3.fromValues(0, this.getWorldBottom(), 0),
 												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(1.0, 0.2, 0.5),
-												velocity: { x: 0, y: 0, z: 0 }
+												scale: vec3.fromValues(1.0, 1.0, 0.5)
 
 										}
 
@@ -333,16 +5911,114 @@ var LevelCore = exports.LevelCore = function () {
 										this.addElement(elementName, element);
 								}
 						}
+
+						this.addElement('playerParticles', {
+
+								elementType: 'Particle',
+								static: false,
+								individual: false,
+								manualMode: false,
+								renderingOrder: 10,
+								maxInstancesNum: 200,
+
+								shaders: {
+
+										main: null,
+
+										normal: {
+
+												name: 'playerParticles',
+												transparent: true,
+												blending: 'MultiplyBlending',
+												textureUrl: './resources/textures/generic_circle_sdf.png',
+												uniforms: {}
+
+										},
+
+										scan: null,
+										infos: null
+
+								},
+
+								instances: {}
+
+						});
+
+						this.addElement('player', {
+
+								elementType: 'Player',
+								isMainPlayer: true,
+								static: false,
+								individual: true,
+								manualMode: false,
+								renderingOrder: 10,
+
+								shaders: {
+
+										main: null,
+
+										normal: {
+
+												name: 'player',
+												transparent: true,
+												blending: 'MultiplyBlending',
+												textureUrl: './resources/textures/generic_circle_sdf.png',
+												uniforms: {}
+
+										},
+
+										scan: {
+
+												name: 'player',
+												transparent: true,
+												textureUrl: './resources/textures/generic_circle_sdf.png',
+												uniforms: {}
+
+										},
+
+										infos: {
+
+												name: 'player',
+												transparent: true,
+												textureUrl: './resources/textures/generic_circle_sdf.png',
+												uniforms: {}
+
+										}
+
+								},
+
+								instances: {
+
+										0: {
+
+												enabled: true,
+												position: vec3.fromValues(0, 0, 0),
+												rotation: vec3.fromValues(0.0, 0.0, 0.0),
+												scale: vec3.fromValues(0.12, 0.12, 1.0),
+												velocity: vec3.create(),
+												mass: 30000,
+												drag: 0.999999
+
+										}
+
+								}
+
+						});
 				}
 		}, {
 				key: 'addElement',
 				value: function addElement(_name, _element) {
+						var _this = this;
 
-						this.gameElements[_name] = {};
+						this.elementToLoad++;
 
 						var textureUrl = _element.texture;
 						var shaders = _element.shaders;
 						var instances = _element.instances;
+
+						var gameObjectInstances = [];
+
+						// For static objects just pack all the objects in a single buffer geometry to optimize rendering.
 
 						if (_element.static) {
 
@@ -353,9 +6029,23 @@ var LevelCore = exports.LevelCore = function () {
 								var uvs = [];
 								var indices = [];
 
+								// Check all instances of this object and fill the single buffer geometry with data.
+
 								for (var instanceIndex in instances) {
 
 										var instance = instances[instanceIndex];
+
+										// Create a game element to keep track of the three elements.
+
+										if (_element.elementType) {
+
+												var gameElement = new _library.library[_element.elementType](instance);
+												gameObjectInstances.push(gameElement);
+										} else {
+
+												var _gameElement = new _library.library.PhysicalElement(instance);
+												gameObjectInstances.push(_gameElement);
+										}
 
 										// Set default variables if missing.
 
@@ -406,36 +6096,285 @@ var LevelCore = exports.LevelCore = function () {
 								geometry.addAttribute('rgbaColor', new THREE.BufferAttribute(new Float32Array(colors), 4));
 								geometry.addAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
 
-								this.getElementMaterial(_element, function (materials) {
+								var mainMesh = new THREE.Mesh(geometry);
+								var normalMesh = new THREE.Mesh(geometry);
+								var scanMesh = new THREE.Mesh(geometry);
+								var infoMesh = new THREE.Mesh(geometry);
 
-										if (materials.main) {
+								// Encapsulate the final step of the object creation in order to keep track of all elements.
+								// As the getElementMaterial is asyncronous we must be sure that all values remains the same.
 
-												var mainMesh = new THREE.Mesh(geometry, materials.main);
-												this.mainScene.add(mainMesh);
-												this.scanScene.add(mainMesh);
-												this.infoScene.add(mainMesh);
-										} else {
+								(function (_name, _element, _gameObjectInstances) {
 
-												if (materials.normal) {
+										this.getElementMaterial(_element, function (materials) {
 
-														var normalMesh = new THREE.Mesh(geometry, materials.normal);
-														this.mainScene.add(normalMesh);
+												this.addMeshes(_element, {
+
+														mainMesh: mainMesh,
+														normalMesh: normalMesh,
+														scanMesh: scanMesh,
+														infoMesh: infoMesh
+
+												}, materials);
+
+												this.gameElements[_name] = {};
+												for (var property in _element) {
+
+														this.gameElements[_name][property] = _element[property];
 												}
 
-												if (materials.scan) {
+												// Override instances with newly created game objects
 
-														var scanMesh = new THREE.Mesh(geometry, materials.scan);
-														this.scanScene.add(scanMesh);
+												this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
+												this.gameElements[_name].instances = _gameObjectInstances;
+										}.bind(this));
+								}).bind(this)(_name, _element, gameObjectInstances);
+						} else {
+
+								// If individual
+								// Just add a quad with the texture mapped on it.
+
+								if (_element.individual) {
+
+										var _instances2 = _element.instances;
+
+										_element.instances = [];
+
+										var _loop = function _loop(_instanceIndex) {
+
+												var instance = _instances2[_instanceIndex];
+
+												// Create a game element.
+
+												if (_element.elementType) {
+
+														var _gameElement2 = new _library.library[_element.elementType](instance);
+														gameObjectInstances.push(_gameElement2);
+												} else {
+
+														var _gameElement3 = new _library.library.PhysicalElement(instance);
+														gameObjectInstances.push(_gameElement3);
 												}
 
-												if (materials.info) {
+												// Create a mesh to display the object.
 
-														var infoMesh = new THREE.Mesh(geometry, materials.info);
-														this.infoScene.add(infoMesh);
-												}
+												var planeGeometry = new THREE.PlaneGeometry(1, 1);
+
+												var mainMesh = new THREE.Mesh(planeGeometry);
+												var normalMesh = new THREE.Mesh(planeGeometry);
+												var scanMesh = new THREE.Mesh(planeGeometry);
+												var infoMesh = new THREE.Mesh(planeGeometry);
+
+												mainMesh.position.set(instance.position[0], instance.position[1], instance.position[2]);
+												normalMesh.position.set(instance.position[0], instance.position[1], instance.position[2]);
+												scanMesh.position.set(instance.position[0], instance.position[1], instance.position[2]);
+												infoMesh.position.set(instance.position[0], instance.position[1], instance.position[2]);
+
+												mainMesh.rotation.set(instance.rotation[0], instance.rotation[1], instance.rotation[2]);
+												normalMesh.rotation.set(instance.rotation[0], instance.rotation[1], instance.rotation[2]);
+												scanMesh.rotation.set(instance.rotation[0], instance.rotation[1], instance.rotation[2]);
+												infoMesh.rotation.set(instance.rotation[0], instance.rotation[1], instance.rotation[2]);
+
+												mainMesh.scale.set(instance.scale[0], instance.scale[1], instance.scale[2]);
+												normalMesh.scale.set(instance.scale[0], instance.scale[1], instance.scale[2]);
+												scanMesh.scale.set(instance.scale[0], instance.scale[1], instance.scale[2]);
+												infoMesh.scale.set(instance.scale[0], instance.scale[1], instance.scale[2]);
+
+												// Encapsulate the final step of the object creation in order to keep track of all elements.
+												// As the getElementMaterial is asyncronous we must be sure that all values remains the same.
+
+												(function (_name, _element, _gameObjectInstances) {
+
+														this.getElementMaterial(_element, function (materials) {
+
+																this.addMeshes(_element, {
+
+																		mainMesh: mainMesh,
+																		normalMesh: normalMesh,
+																		scanMesh: scanMesh,
+																		infoMesh: infoMesh
+
+																}, materials);
+
+																this.gameElements[_name] = {};
+																for (var property in _element) {
+
+																		this.gameElements[_name][property] = _element[property];
+																}
+
+																// Override instances with newly created game objects
+
+																this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
+																this.gameElements[_name].instances = _gameObjectInstances;
+														}.bind(this));
+												}).bind(_this)(_name, _element, gameObjectInstances);
+										};
+
+										for (var _instanceIndex in _instances2) {
+												_loop(_instanceIndex);
 										}
-								}.bind(this));
-						} else {}
+								}
+
+								// Here we pack multiple dynamic instances in one buffer and we will update them at runtime.
+
+								else {
+
+												// Create a geometry that will hold all the instances.
+												// The transform will happen on the gpu to optimize the render loop.
+
+												var maxInstancesNum = _element.maxInstancesNum;
+												var geometryData = this.getDataGeometryFromNum(maxInstancesNum);
+
+												var _geometry = new THREE.BufferGeometry();
+
+												var indexAttrib = new THREE.BufferAttribute(new Uint32Array(geometryData.indices), 1);
+												var positionAttrib = new THREE.BufferAttribute(new Float32Array(geometryData.vertices), 3);
+												var colorAttrib = new THREE.BufferAttribute(new Float32Array(geometryData.colors), 4);
+												colorAttrib.dynamic = true;
+												var uvAttrib = new THREE.BufferAttribute(new Float32Array(geometryData.uvs), 2);
+
+												// Here we pass transform informations to the shader
+												// x: pos.x
+												// y: pos.y
+												// z: radius
+												// w: rotation.z
+
+												var transformAttrib = new THREE.BufferAttribute(new Float32Array(geometryData.transform), 4);
+												transformAttrib.dynamic = true;
+
+												_geometry.setIndex(indexAttrib);
+												_geometry.addAttribute('position', positionAttrib);
+												_geometry.addAttribute('rgbaColor', colorAttrib);
+												_geometry.addAttribute('uv', uvAttrib);
+												_geometry.addAttribute('transform', transformAttrib);
+
+												var _mainMesh = new THREE.Mesh(_geometry);
+												var _normalMesh = new THREE.Mesh(_geometry);
+												var _scanMesh = new THREE.Mesh(_geometry);
+												var _infoMesh = new THREE.Mesh(_geometry);
+
+												var _instances3 = _element.instances;
+
+												for (var _instanceIndex2 in _instances3) {
+
+														var _instance2 = _instances3[_instanceIndex2];
+
+														// Create a game element.
+
+														if (_element.elementType) {
+
+																var _gameElement4 = new _library.library[_element.elementType](_instance2);
+																gameObjectInstances.push(_gameElement4);
+														} else {
+
+																var _gameElement5 = new _library.library.PhysicalElement(_instance2);
+																gameObjectInstances.push(_gameElement5);
+														}
+												}
+
+												// Encapsulate the final step of the object creation in order to keep track of all elements.
+												// As the getElementMaterial is asyncronous we must be sure that all values remains the same.
+
+												(function (_name, _element, _gameObjectInstances) {
+
+														this.getElementMaterial(_element, function (materials) {
+
+																this.addMeshes(_element, {
+
+																		mainMesh: _mainMesh,
+																		normalMesh: _normalMesh,
+																		scanMesh: _scanMesh,
+																		infoMesh: _infoMesh
+
+																}, materials);
+
+																this.gameElements[_name] = {};
+																for (var property in _element) {
+
+																		this.gameElements[_name][property] = _element[property];
+																}
+
+																// Override instances with newly created game objects
+
+																this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
+																this.gameElements[_name].instances = _gameObjectInstances;
+														}.bind(this));
+												}).bind(this)(_name, _element, gameObjectInstances);
+										}
+						}
+				}
+		}, {
+				key: 'addInstanceOf',
+				value: function addInstanceOf(_name, _instance) {
+
+						var gameElement = this.gameElements[_name];
+						var newInstance = new _library.library[gameElement.elementType](_instance);
+
+						if (gameElement.instances.length < gameElement.maxInstancesNum) {
+
+								gameElement.instances.push(newInstance);
+						}
+
+						return newInstance;
+				}
+		}, {
+				key: 'getInstanceByName',
+				value: function getInstanceByName(_nameElement, _nameInstance) {
+
+						for (var i = 0; i < this.gameElements[_nameElement].instances.length; i++) {
+
+								if (this.gameElements[_nameElement].instances[i].name == _nameInstance) {
+
+										return this.gameElements[_nameElement].instances[i];
+								}
+						}
+				}
+
+				// This function adds meshes to all of the layers.
+
+		}, {
+				key: 'addMeshes',
+				value: function addMeshes(_element, _meshes, _materials) {
+
+						if (_element) _element.meshes = [];
+
+						if (_materials.main) {
+
+								_meshes.mainMesh.material = _materials.main;
+								this.mainScene.add(_meshes.mainMesh);
+								this.scanScene.add(_meshes.mainMesh);
+								this.infoScene.add(_meshes.mainMesh);
+
+								if (_element) _element.meshes.push(_meshes.mainMesh);
+						} else {
+
+								if (_materials.normal) {
+
+										_meshes.normalMesh.material = _materials.normal;
+										_meshes.normalMesh.renderOrder = _element.renderOrder || 0;
+										this.mainScene.add(_meshes.normalMesh);
+
+										if (_element) _element.meshes.push(_meshes.normalMesh);
+								}
+
+								if (_materials.scan) {
+
+										_meshes.scanMesh.material = _materials.scan;
+										_meshes.scanMesh.renderOrder = _element.renderOrder || 0;
+										this.scanScene.add(_meshes.scanMesh);
+
+										if (_element) _element.meshes.push(_meshes.scanMesh);
+								}
+
+								if (_materials.infos) {
+
+										_meshes.infoMesh.material = _materials.infos;
+										_meshes.infoMesh.renderOrder = _element.renderOrder || 0;
+										this.infoScene.add(_meshes.infoMesh);
+
+										if (_element) _element.meshes.push(_meshes.infoMesh);
+								}
+						}
 				}
 		}, {
 				key: 'getQuad',
@@ -451,10 +6390,10 @@ var LevelCore = exports.LevelCore = function () {
 
 						var modelMatrix = mat4.create();
 						mat4.translate(modelMatrix, modelMatrix, position);
-						mat4.scale(modelMatrix, modelMatrix, scale);
 						mat4.rotateX(modelMatrix, modelMatrix, rotation[0], [1, 0, 0]);
 						mat4.rotateY(modelMatrix, modelMatrix, rotation[1], [0, 1, 0]);
 						mat4.rotateZ(modelMatrix, modelMatrix, rotation[2], [0, 0, 1]);
+						mat4.scale(modelMatrix, modelMatrix, scale);
 
 						for (var i = 0; i < 4; i++) {
 
@@ -474,6 +6413,128 @@ var LevelCore = exports.LevelCore = function () {
 						};
 				}
 		}, {
+				key: 'getDataGeometryFromNum',
+				value: function getDataGeometryFromNum(_num) {
+
+						var indices = [];
+						var vertices = [];
+						var colors = [];
+						var uvs = [];
+						var transform = [];
+
+						for (var i = _num - 1; i >= 0; i--) {
+
+								// Update the indices
+
+								for (var j = 0; j < this.genericQuad.indices.length; j++) {
+
+										indices.push(this.genericQuad.indices[j] + vertices.length / 3);
+								}
+
+								// Update vertices
+
+								for (var _j = 0; _j < this.genericQuad.vertices.length; _j += 3) {
+
+										vertices.push(this.genericQuad.vertices[_j + 0]);
+										vertices.push(this.genericQuad.vertices[_j + 1]);
+										vertices.push(this.genericQuad.vertices[_j + 2]); // Hack pass the y scale
+								}
+
+								// Update uvs
+
+								for (var _j2 = 0; _j2 < this.genericQuad.uvs.length; _j2++) {
+
+										uvs.push(this.genericQuad.uvs[_j2]);
+								}
+
+								// Update colors
+
+								for (var _j3 = 0; _j3 < 4; _j3++) {
+
+										colors.push(1.0);
+										colors.push(1.0);
+										colors.push(1.0);
+										colors.push(1.0);
+
+										transform.push(0.0);
+										transform.push(0.0);
+										transform.push(0.0);
+										transform.push(0.0);
+								}
+						}
+
+						return {
+
+								indices: indices,
+								vertices: vertices,
+								colors: colors,
+								uvs: uvs,
+								transform: transform
+
+						};
+				}
+		}, {
+				key: 'getDataGeometryFromInstances',
+				value: function getDataGeometryFromInstances(_instances) {
+
+						var indices = [];
+						var vertices = [];
+						var colors = [];
+						var uvs = [];
+						var transform = [];
+
+						for (var i = _instances.length - 1; i >= 0; i--) {
+
+								// Update the indices
+
+								for (var j = this.genericQuad.indices.length - 1; j >= 0; j--) {
+
+										indices.push(this.genericQuad.indices[j] + vertices.length / 3);
+								}
+
+								// Update vertices
+
+								for (var _j4 = this.genericQuad.vertices.length - 1; _j4 >= 0; _j4 -= 3) {
+
+										vertices.push(this.genericQuad.vertices[_j4 - 0]);
+										vertices.push(this.genericQuad.vertices[_j4 - 1]);
+										vertices.push(_instances[i].scale[1]); // Hack pass scale y
+								}
+
+								// Update uvs
+
+								for (var _j5 = this.genericQuad.uvs.length - 1; _j5 >= 0; _j5--) {
+
+										uvs.push(this.genericQuad.uvs[_j5]);
+								}
+
+								// Update colors
+
+								for (var _j6 = 3; _j6 >= 0; _j6--) {
+
+										colors.push(_instances[i].color[0]);
+										colors.push(_instances[i].color[1]);
+										colors.push(_instances[i].color[2]);
+										colors.push(_instances[i].color[3]);
+
+										transform.push(_instances[i].position[0]);
+										transform.push(_instances[i].position[1]);
+										transform.push(_instances[i].scale[0]);
+										transform.push(_instances[i].rotation[2]);
+								}
+						}
+
+						return {
+
+								indices: indices,
+								vertices: vertices,
+								colors: colors,
+								uvs: uvs,
+								transform: transform
+
+						};
+				}
+		}, {
 				key: 'getElementMaterial',
 				value: function getElementMaterial(_element, _onLoad) {
 
@@ -481,7 +6542,7 @@ var LevelCore = exports.LevelCore = function () {
 						var materials = {};
 						var numShaders = Object.keys(shaders).length;
 
-						var _loop = function _loop(type) {
+						var _loop2 = function _loop2(type) {
 
 								var shader = shaders[type];
 
@@ -493,18 +6554,26 @@ var LevelCore = exports.LevelCore = function () {
 
 														var texture = new THREE.TextureLoader().load(shader.textureUrl, function (texture) {
 
-																var uniforms = shader.uniforms;
+																var uniforms = shader.uniforms || {};
 																uniforms.texture = { value: texture };
 
 																materials[type] = new THREE.ShaderMaterial({
 
 																		vertexShader: _shaderHelper.shaderHelper[shader.name].vertex,
 																		fragmentShader: _shaderHelper.shaderHelper[shader.name].fragment,
-																		uniforms: uniforms
+																		uniforms: uniforms,
+
+																		transparent: shader.transparent || false,
+																		depthWrite: _element.depthWrite || false,
+																		depthTest: _element.depthTest || false,
+
+																		blending: THREE[shader.blending] || THREE.NormalBlending
 
 																});
 
-																materials[type].transparent = true;
+																// Activate OES_standard_derivatives
+
+																materials[type].extensions.derivatives = true;
 
 																numShaders--;
 																checkLoad();
@@ -516,11 +6585,19 @@ var LevelCore = exports.LevelCore = function () {
 
 														vertexShader: _shaderHelper.shaderHelper[shader.name].vertex,
 														fragmentShader: _shaderHelper.shaderHelper[shader.name].fragment,
-														uniforms: shader.uniforms
+														uniforms: shader.uniforms,
+
+														blending: THREE[shader.blending] || THREE.NormalBlending,
+
+														transparent: shader.transparent || false,
+														depthWrite: _element.depthWrite || false,
+														depthTest: _element.depthTest || false
 
 												});
 
-												materials[type].transparent = true;
+												// Activate OES_standard_derivatives
+
+												materials[type].extensions.derivatives = true;
 
 												numShaders--;
 												checkLoad();
@@ -534,7 +6611,7 @@ var LevelCore = exports.LevelCore = function () {
 						};
 
 						for (var type in shaders) {
-								_loop(type);
+								_loop2(type);
 						}
 
 						function checkLoad() {
@@ -546,17 +6623,160 @@ var LevelCore = exports.LevelCore = function () {
 						}
 				}
 		}, {
+				key: 'initPlayer',
+				value: function initPlayer(_numInstances, _options) {
+
+						this.resetPlayer(_numInstances, _options);
+				}
+		}, {
+				key: 'resetPlayer',
+				value: function resetPlayer(_numInstances, _options) {}
+		}, {
+				key: 'makeTextSprite',
+				value: function makeTextSprite(message, parameters) {
+
+						function roundRect(ctx, x, y, w, h, r) {
+								ctx.beginPath();ctx.moveTo(x + r, y);ctx.lineTo(x + w - r, y);ctx.quadraticCurveTo(x + w, y, x + w, y + r);ctx.lineTo(x + w, y + h - r);ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);ctx.lineTo(x + r, y + h);ctx.quadraticCurveTo(x, y + h, x, y + h - r);ctx.lineTo(x, y + r);ctx.quadraticCurveTo(x, y, x + r, y);ctx.closePath();ctx.fill();ctx.stroke();
+						}
+
+						if (parameters === undefined) parameters = {};
+						var fontface = parameters.hasOwnProperty("fontface") ? parameters["fontface"] : "Arial";
+						var fontsize = parameters.hasOwnProperty("fontsize") ? parameters["fontsize"] : 18;
+						var borderThickness = parameters.hasOwnProperty("borderThickness") ? parameters["borderThickness"] : 4;
+						var borderColor = parameters.hasOwnProperty("borderColor") ? parameters["borderColor"] : { r: 0, g: 0, b: 0, a: 1.0 };
+						var backgroundColor = parameters.hasOwnProperty("backgroundColor") ? parameters["backgroundColor"] : { r: 255, g: 255, b: 255, a: 1.0 };
+						var textColor = parameters.hasOwnProperty("textColor") ? parameters["textColor"] : { r: 0, g: 0, b: 0, a: 1.0 };
+
+						var canvas = document.createElement('canvas');
+						var context = canvas.getContext('2d');
+						context.font = "Bold " + fontsize + "px " + fontface;
+						var metrics = context.measureText(message);
+						var textWidth = metrics.width;
+
+						context.fillStyle = "rgba(" + backgroundColor.r + "," + backgroundColor.g + "," + backgroundColor.b + "," + backgroundColor.a + ")";
+						context.strokeStyle = "rgba(" + borderColor.r + "," + borderColor.g + "," + borderColor.b + "," + borderColor.a + ")";
+
+						context.lineWidth = borderThickness;
+						roundRect(context, borderThickness / 2, borderThickness / 2, (textWidth + borderThickness) * 1.1, fontsize * 1.4 + borderThickness, 8);
+
+						context.fillStyle = "rgba(" + textColor.r + ", " + textColor.g + ", " + textColor.b + ", 1.0)";
+						context.fillText(message, borderThickness, fontsize + borderThickness);
+
+						var texture = new THREE.Texture(canvas);
+						texture.needsUpdate = true;
+
+						var spriteMaterial = new THREE.SpriteMaterial({ map: texture, useScreenCoordinates: false });
+						var sprite = new THREE.Sprite(spriteMaterial);
+						sprite.scale.set(0.5 * fontsize, 0.25 * fontsize, 0.75 * fontsize);
+						return sprite;
+				}
+		}, {
+				key: 'sign',
+				value: function sign(p1, p2, p3) {
+
+						return (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1]);
+				}
+		}, {
+				key: 'isInBox',
+				value: function isInBox(_instance, _pt) {
+
+						var v = [];
+
+						v.push(vec3.fromValues(-1.0, -1.0, 0.0));
+						v.push(vec3.fromValues(1.0, -1.0, 0.0));
+						v.push(vec3.fromValues(1.0, 1.0, 0.0));
+						v.push(vec3.fromValues(-1.0, 1.0, 0.0));
+
+						var modelMatrix = mat4.create();
+						mat4.translate(modelMatrix, modelMatrix, _instance.position);
+						mat4.rotateX(modelMatrix, modelMatrix, _instance.rotation[0]);
+						mat4.rotateY(modelMatrix, modelMatrix, _instance.rotation[1]);
+						mat4.rotateZ(modelMatrix, modelMatrix, _instance.rotation[2]);
+						mat4.scale(modelMatrix, modelMatrix, _instance.scale);
+
+						for (var i = 0; i < 4; i++) {
+
+								vec3.transformMat4(v[i], v[i], modelMatrix);
+						}
+
+						var b1 = void 0,
+						    b2 = void 0,
+						    b3 = void 0;
+
+						b1 = this.sign(_pt, v[0], v[1]) < 0.0;
+						b2 = this.sign(_pt, v[1], v[2]) < 0.0;
+						b3 = this.sign(_pt, v[2], v[0]) < 0.0;
+
+						if (b1 == b2 && b2 == b3) {
+
+								return true;
+						} else {
+
+								b1 = this.sign(_pt, v[0], v[2]) < 0.0;
+								b2 = this.sign(_pt, v[2], v[3]) < 0.0;
+								b3 = this.sign(_pt, v[3], v[0]) < 0.0;
+						}
+
+						return b1 == b2 && b2 == b3;
+				}
+		}, {
+				key: 'getWidth',
+				value: function getWidth() {
+
+						return this.renderer.domElement.offsetWidth * this.renderer.getPixelRatio();
+				}
+		}, {
+				key: 'getHeight',
+				value: function getHeight() {
+
+						return this.renderer.domElement.offsetHeight * this.renderer.getPixelRatio();
+				}
+		}, {
+				key: 'getWorldTop',
+				value: function getWorldTop() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).y;
+				}
+		}, {
+				key: 'getWorldBottom',
+				value: function getWorldBottom() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, this.getHeight())).y;
+				}
+		}, {
+				key: 'getWorldLeft',
+				value: function getWorldLeft() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).x;
+				}
+		}, {
+				key: 'getWorldRight',
+				value: function getWorldRight() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(this.getWidth(), 0)).x;
+				}
+		}, {
+				key: 'checkEdges',
+				value: function checkEdges(_vector, _offset) {
+
+						_offset = _offset || 0;
+
+						if (_vector[0] > this.getWorldRight() + _offset || _vector[0] < this.getWorldLeft() - _offset || _vector[1] > this.getWorldTop() + _offset || _vector[1] < this.getWorldBottom() - _offset) return true;
+						return false;
+				}
+		}, {
 				key: 'updateMouseWorld',
 				value: function updateMouseWorld(_mouse) {
 
 						this.mouseWorld = this.get3DPointOnBasePlane(_mouse);
+						this.glMouseWorld = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
 				}
 		}, {
 				key: 'get3DPointOnBasePlane',
 				value: function get3DPointOnBasePlane(_vector) {
 
 						var vector = new THREE.Vector3();
-						vector.set(_vector.x / window.innerWidth * 2 - 1, -(_vector.y / window.innerHeight) * 2 + 1, 0.5);
+						vector.set(_vector.x / this.getWidth() * 2 - 1, -(_vector.y / this.getHeight()) * 2 + 1, 0.5);
 						vector.unproject(this.mainCamera);
 						var dir = vector.sub(this.mainCamera.position).normalize();
 						var distance = -this.mainCamera.position.z / dir.z;
@@ -564,13 +6784,243 @@ var LevelCore = exports.LevelCore = function () {
 						return this.mainCamera.position.clone().add(dir.multiplyScalar(distance));
 				}
 		}, {
+				key: 'get2DPos',
+				value: function get2DPos(_vector) {
+
+						var width = this.getWidth(),
+						    height = this.getHeight();
+						var widthHalf = width / 2,
+						    heightHalf = height / 2;
+
+						var pos = _vector.clone();
+						pos.project(this.mainCamera);
+						pos.x = pos.x * widthHalf + widthHalf;
+						pos.y = -(pos.y * heightHalf) + heightHalf;
+
+						return pos;
+				}
+		}, {
+				key: 'checkButtons',
+				value: function checkButtons() {
+
+						var distToScanButton = this.mouseWorld.distanceTo(this.scanScreenButton.position);
+						var onScan = false;
+
+						if (distToScanButton < this.scanScreenButton.scale.x * 0.5) {
+
+								onScan = true;
+						}
+
+						var distToInfoButton = this.mouseWorld.distanceTo(this.infoScreenButton.position);
+						var onInfo = false;
+
+						if (distToInfoButton < this.infoScreenButton.scale.x * 0.5) {
+
+								onInfo = true;
+						}
+
+						// Check where the screens are to make an intuitive interaction when they are overlapping.
+
+						if (this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x != 0.0) {
+
+								if (onScan) return this.scanScreen;
+								if (onInfo) return this.infoScreen;
+						} else if (this.scanScreenTargetPosition.x == 0.0 && this.infoScreenTargetPosition.x != 0.0) {
+
+								if (onScan) return this.scanScreen;
+								if (onScan) return this.infoScreen;
+						} else if (this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x == 0.0) {
+
+								if (onInfo) return this.infoScreen;
+								if (onScan) return this.scanScreen;
+						}
+				}
+		}, {
 				key: 'update',
-				value: function update() {}
+				value: function update() {
+
+						// Update the screens.
+
+						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.2;
+						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.2;
+						this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight();
+						this.scanScreenButton.position.y = this.scanScreen.position.y;
+
+						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.2;
+						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.2;
+						this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight();
+						this.infoScreenButton.position.y = this.infoScreen.position.y;
+
+						// Update the game elements.
+
+						for (var elementName in this.gameElements) {
+
+								var element = this.gameElements[elementName];
+
+								if (!element.static && !element.manualMode) {
+
+										if (element.individual) {
+
+												var instances = this.gameElements[elementName].instances;
+
+												for (var i = 0; i < instances.length; i++) {
+
+														var instance = instances[i];
+
+														if (!instance.isDead()) {
+
+																instance.update();
+
+																for (var j = 0; j < element.meshes.length; j++) {
+
+																		element.meshes[j].position.set(instance.position[0], instance.position[1], instance.position[2]);
+																		element.meshes[j].rotation.set(instance.rotation[0], instance.rotation[1], instance.rotation[2]);
+																		element.meshes[j].scale.set(instance.scale[0], instance.scale[1], instance.scale[2]);
+																}
+														} else {
+
+																this.gameElements[elementName].instances.splice(i, 1);
+														}
+												}
+										} else {
+
+												var maxInstancesNum = this.gameElements[elementName].maxInstancesNum;
+												var _instances4 = this.gameElements[elementName].instances;
+
+												var geometry = element.mainGeometry;
+
+												for (var _i4 = maxInstancesNum; _i4 >= 0; _i4--) {
+
+														if (_i4 < _instances4.length) {
+
+																if (!_instances4[_i4].isDead()) {
+
+																		_instances4[_i4].update();
+
+																		for (var _j7 = 0; _j7 < 4; _j7++) {
+
+																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 0] = _instances4[_i4].position[0];
+																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 1] = _instances4[_i4].position[1];
+																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 2] = _instances4[_i4].scale[0];
+																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 3] = _instances4[_i4].rotation[2];
+
+																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 0] = _instances4[_i4].color[0];
+																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 1] = _instances4[_i4].color[1];
+																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 2] = _instances4[_i4].color[2];
+																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 3] = _instances4[_i4].color[3];
+																		}
+																} else {
+
+																		_instances4.splice(_i4, 1);
+																}
+														} else {
+
+																for (var _j8 = 0; _j8 < 4; _j8++) {
+
+																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 0] = 0;
+																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 1] = 0;
+																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 2] = 0;
+																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 3] = 0;
+
+																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 0] = 0;
+																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 1] = 0;
+																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 2] = 0;
+																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 3] = 0;
+																}
+														}
+												}
+
+												if (_instances4.length > 0) {
+
+														geometry.attributes.transform.needsUpdate = true;
+														geometry.attributes.rgbaColor.needsUpdate = true;
+												}
+										}
+								} else if (element.static && !element.manualMode) {
+
+										var _instances5 = this.gameElements[elementName].instances;
+
+										for (var _i5 = 0; _i5 < _instances5.length; _i5++) {
+
+												_instances5[_i5].update();
+										}
+								}
+						}
+				}
+		}, {
+				key: 'reloadLevel',
+				value: function reloadLevel() {}
+		}, {
+				key: 'clearLevel',
+				value: function clearLevel(_onClear) {
+
+						while (this.mainScene.children.length > 0) {
+
+								// this.removeObj ( this.mainScene.children[ 0 ], this.mainScene );
+								this.mainScene.remove(this.mainScene.children[0]);
+						}
+
+						while (this.scanScene.children.length > 0) {
+
+								// this.removeObj ( this.mainScene.children[ 0 ] );
+								this.scanScene.remove(this.scanScene.children[0]);
+						}
+
+						while (this.infoScene.children.length > 0) {
+
+								this.infoScene.remove(this.infoScene.children[0]);
+						}
+
+						if (_onClear) _onClear();
+				}
+		}, {
+				key: 'removeObj',
+				value: function removeObj(obj, scene) {
+
+						if (obj instanceof THREE.Mesh) {
+
+								obj.geometry.dispose();
+								obj.geometry = null;
+								obj.material.dispose();
+								obj.material = null;
+								obj.dispose(); // required in r69dev to remove references from the renderer.
+								obj = null;
+						} else {
+
+								if (obj.children !== undefined) {
+
+										while (obj.children.length > 0) {
+
+												scene(obj.children[0]);
+												obj.remove(obj.children[0]);
+										}
+								}
+						}
+				}
+		}, {
+				key: 'onWin',
+				value: function onWin(_callback) {
+
+						this.onWinCallback = _callback;
+				}
 		}, {
 				key: 'render',
 				value: function render() {
 
+						this.renderer.clearDepth();
+						this.renderer.clear();
 						this.renderer.render(this.mainScene, this.mainCamera);
+
+						// Render to scan target
+
+						this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+
+						// Render to info target
+
+						this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
+
+						this.renderer.clearDepth();
+						this.renderer.render(this.screensScene, this.mainCamera);
 				}
 		}, {
 				key: 'log',
@@ -605,7 +7055,432 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":10,"./shaderHelper":5}],5:[function(require,module,exports){
+},{"../utils":53,"./library":47,"./shaderHelper":48,"load-bmfont":15,"three-bmfont-text":24}],41:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports.Obstacle = undefined;
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Obstacle = exports.Obstacle = function (_PhysicalElement) {
+	_inherits(Obstacle, _PhysicalElement);
+
+	function Obstacle(_options) {
+		_classCallCheck(this, Obstacle);
+
+		return _possibleConstructorReturn(this, (Obstacle.__proto__ || Object.getPrototypeOf(Obstacle)).call(this, _options));
+	}
+
+	return Obstacle;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],42:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.Particle = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Particle = exports.Particle = function (_PhysicalElement) {
+		_inherits(Particle, _PhysicalElement);
+
+		function Particle(_options) {
+				_classCallCheck(this, Particle);
+
+				var _this = _possibleConstructorReturn(this, (Particle.__proto__ || Object.getPrototypeOf(Particle)).call(this, _options));
+
+				_this.radius = 0;
+				_this.charge = 1;
+
+				return _this;
+		}
+
+		_createClass(Particle, [{
+				key: "update",
+				value: function update() {
+
+						_get(Particle.prototype.__proto__ || Object.getPrototypeOf(Particle.prototype), "update", this).call(this);
+
+						this.color[3] = this.lifePercent;
+
+						this.radius += (this.initialRadius - this.radius) * 0.08;
+
+						this.scale = vec3.fromValues(this.lifePercent * this.radius, this.lifePercent * this.radius, this.lifePercent * this.radius);
+				}
+		}]);
+
+		return Particle;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],43:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports.PhysicalElement = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _ElementCore2 = require("./ElementCore");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
+	_inherits(PhysicalElement, _ElementCore);
+
+	function PhysicalElement(_options) {
+		_classCallCheck(this, PhysicalElement);
+
+		var _this = _possibleConstructorReturn(this, (PhysicalElement.__proto__ || Object.getPrototypeOf(PhysicalElement)).call(this, _options));
+
+		_options = _options || {};
+
+		_this.position = _options.position ? [_options.position[0], _options.position[1], _options.position[2]] : [0, 0, 0];
+		_this.rotation = _options.rotation ? [_options.rotation[0], _options.rotation[1], _options.rotation[2]] : [0, 0, 0];
+		_this.scale = _options.scale ? [_options.scale[0], _options.scale[1], _options.scale[2]] : [0, 0, 0];
+
+		_this.velocity = _options.velocity ? [_options.velocity[0], _options.velocity[1], _options.velocity[2]] : [0, 0, 0];
+		_this.acceleration = _options.acceleration ? [_options.acceleration[0], _options.acceleration[1], _options.acceleration[2]] : [0, 0, 0];
+
+		_this.mass = _options.mass || 2.0;
+		_this.drag = _options.drag || 0.7;
+		_this.maxSpeed = _options.maxSpeed || 0.5;
+
+		return _this;
+	}
+
+	_createClass(PhysicalElement, [{
+		key: "applyForce",
+		value: function applyForce(_force) {
+
+			var newForce = this.divScal(_force, this.mass);
+			this.acceleration = this.add(this.acceleration, newForce);
+		}
+	}, {
+		key: "update",
+		value: function update() {
+
+			_get(PhysicalElement.prototype.__proto__ || Object.getPrototypeOf(PhysicalElement.prototype), "update", this).call(this);
+
+			if (!this.enabled) return;
+
+			this.acceleration = this.mulScal(this.acceleration, this.deltaTime / 16);
+			this.velocity = this.add(this.velocity, this.acceleration);
+			this.velocity = this.mulScal(this.velocity, this.drag);
+
+			if (this.len(this.velocity) > this.maxSpeed) {
+
+				this.velocity = this.norm(this.velocity);
+				this.velocity = this.mulScal(this.velocity, this.maxSpeed);
+			}
+
+			this.position = this.add(this.position, this.velocity);
+			this.acceleration = this.mulScal(this.acceleration, 0);
+		}
+	}, {
+		key: "add",
+		value: function add(_v0, _v1) {
+
+			return [_v0[0] + _v1[0], _v0[1] + _v1[1], _v0[2] + _v1[2]];
+		}
+	}, {
+		key: "sub",
+		value: function sub(_v0, _v1) {
+
+			return [_v0[0] - _v1[0], _v0[1] - _v1[1], _v0[2] - _v1[2]];
+		}
+	}, {
+		key: "mul",
+		value: function mul(_v0, _v1) {
+
+			return [_v0[0] * _v1[0], _v0[1] * _v1[1], _v0[2] * _v1[2]];
+		}
+	}, {
+		key: "mulScal",
+		value: function mulScal(_v0, _s) {
+
+			return [_v0[0] * _s, _v0[1] * _s, _v0[2] * _s];
+		}
+	}, {
+		key: "div",
+		value: function div(_v0, _v1) {
+
+			return [_v0[0] / _v1[0], _v0[1] / _v1[1], _v0[2] / _v1[2]];
+		}
+	}, {
+		key: "divScal",
+		value: function divScal(_v0, _s) {
+
+			return [_v0[0] / _s, _v0[1] / _s, _v0[2] / _s];
+		}
+	}, {
+		key: "len",
+		value: function len(_v) {
+
+			return Math.sqrt(Math.pow(_v[0], 2) + Math.pow(_v[1], 2) + Math.pow(_v[2], 2));
+		}
+	}, {
+		key: "norm",
+		value: function norm(_v) {
+
+			var l = this.len(_v);
+			return [_v[0] / l, _v[1] / l, _v[2] / l];
+		}
+	}]);
+
+	return PhysicalElement;
+}(_ElementCore2.ElementCore);
+
+},{"./ElementCore":37}],44:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.Planet = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _utils = require("../utils");
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Planet = exports.Planet = function (_PhysicalElement) {
+		_inherits(Planet, _PhysicalElement);
+
+		function Planet(_options) {
+				_classCallCheck(this, Planet);
+
+				var _this = _possibleConstructorReturn(this, (Planet.__proto__ || Object.getPrototypeOf(Planet)).call(this, _options));
+
+				_this.sign = 1;
+				_this.maxCharge = _options.maxCharge || 50;
+				_this.minCharge = _options.minCharge || -50;
+				_this.charge = _options.charge || 0;
+
+				_this.charges = [];
+
+				return _this;
+		}
+
+		_createClass(Planet, [{
+				key: "update",
+				value: function update() {
+
+						_get(Planet.prototype.__proto__ || Object.getPrototypeOf(Planet.prototype), "update", this).call(this);
+
+						this.charge = (0, _utils.clamp)(this.charge, this.minCharge, this.maxCharge);
+
+						var stepCharge = this.charges.length / this.maxCharge;
+
+						var maxIndex = Math.floor(Math.abs(this.charge / this.maxCharge) * this.charges.length);
+
+						for (var i = 0; i < this.charges.length; i++) {
+
+								if (i <= maxIndex) this.charges[i].charge = this.sign;else this.charges[i].charge = 0;
+						}
+				}
+		}]);
+
+		return Planet;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"../utils":53,"./PhysicalElement":43}],45:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.Player = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
+
+var _PhysicalElement2 = require("./PhysicalElement");
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Player = exports.Player = function (_PhysicalElement) {
+		_inherits(Player, _PhysicalElement);
+
+		function Player(_options) {
+				_classCallCheck(this, Player);
+
+				var _this = _possibleConstructorReturn(this, (Player.__proto__ || Object.getPrototypeOf(Player)).call(this, _options));
+
+				_this.length = _this.scale[1];
+				_this.sign = 1;
+				_this.charge = 1;
+
+				return _this;
+		}
+
+		_createClass(Player, [{
+				key: "update",
+				value: function update() {
+
+						_get(Player.prototype.__proto__ || Object.getPrototypeOf(Player.prototype), "update", this).call(this);
+
+						// console.log(obj);
+
+
+						this.scale[1] = this.length + vec3.length(this.velocity) * 1;
+						this.rotation[2] = Math.atan2(this.velocity[1], this.velocity[0]) - Math.PI * 0.5;
+				}
+		}]);
+
+		return Player;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],46:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.Text = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _PhysicalElement2 = require('./PhysicalElement');
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Text = exports.Text = function (_PhysicalElement) {
+		_inherits(Text, _PhysicalElement);
+
+		function Text(_options) {
+				_classCallCheck(this, Text);
+
+				var _this = _possibleConstructorReturn(this, (Text.__proto__ || Object.getPrototypeOf(Text)).call(this, _options));
+
+				_options = _options || {};
+
+				_this.font = _options.font || 'Helvetica';
+				_this.fontSize = (_options.fontSize || 20) + 'px';
+				_this.size = _options.size || [512, 512];
+				_this.canvas = document.createElement('canvas');
+				_this.canvas.width = _this.size[0];
+				_this.canvas.height = _this.size[1];
+				_this.ctx = _this.canvas.getContext('2d');
+
+				_this.lines = [];
+				_this.content = '';
+				_this.boundingBox = [0, 0];
+
+				_this.geometry = new THREE.PlaneGeometry(1, 1);
+				_this.material = new THREE.MeshBasicMaterial({ map: _this.ctx });
+				_this.mesh = new THREE.Mesh(_this.geometry, _this.material);
+
+				console.log(_this.fontSize, _this.font);
+
+				_this.ctx.fillStyle = '#030303';
+				_this.ctx.font = _this.fontSize + ' ' + _this.font;
+				_this.ctx.fillText('sldkjllésddsadldkjhlsakjhflsakjdhflkjsadhlfkjsahlkfjhasldjhflasjdhklkjs', 0, 100);
+
+				return _this;
+		}
+
+		_createClass(Text, [{
+				key: 'write',
+				value: function write(_string) {
+
+						this.content += _string;
+				}
+		}, {
+				key: 'build',
+				value: function build() {}
+		}]);
+
+		return Text;
+}(_PhysicalElement2.PhysicalElement);
+
+},{"./PhysicalElement":43}],47:[function(require,module,exports){
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+	value: true
+});
+exports.library = undefined;
+
+var _PhysicalElement = require("./PhysicalElement");
+
+var _BlackMatter = require("./BlackMatter");
+
+var _ElectricParticle = require("./ElectricParticle");
+
+var _ElectricPlanetParticle = require("./ElectricPlanetParticle");
+
+var _Particle = require("./Particle");
+
+var _Planet = require("./Planet");
+
+var _Obstacle = require("./Obstacle");
+
+var _Player = require("./Player");
+
+var library = {
+
+	PhysicalElement: _PhysicalElement.PhysicalElement,
+	BlackMatter: _BlackMatter.BlackMatter,
+	ElectricParticle: _ElectricParticle.ElectricParticle,
+	ElectricPlanetParticle: _ElectricPlanetParticle.ElectricPlanetParticle,
+	Particle: _Particle.Particle,
+	Obstacle: _Obstacle.Obstacle,
+	Planet: _Planet.Planet,
+	Player: _Player.Player
+
+};
+
+exports.library = library;
+
+},{"./BlackMatter":33,"./ElectricParticle":35,"./ElectricPlanetParticle":36,"./Obstacle":41,"./Particle":42,"./PhysicalElement":43,"./Planet":44,"./Player":45}],48:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -615,9 +7490,17 @@ var shaderHelper = {
 
 			test: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			blackMatter: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -637,11 +7520,35 @@ var shaderHelper = {
 
 			},
 
+			coloredTexture: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * solidColor;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
 			player: {
 
-						vertex: "\n\t\t\tvoid main () {\n\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvoid main () {\n\n\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			playerInfo: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 0.35;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.1, abs ( sdfDist - t ) );\n\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			playerParticles: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.92, 0.92, 0.92, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.4, 1.0, sdfDist ) * 0.08;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -649,23 +7556,131 @@ var shaderHelper = {
 
 						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * f_Color;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			scanPlanet: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = 0.94;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			infoPlanet: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = 0.94;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
 			smoke: {
 
-						vertex: "\n\t\t\tvoid main () {\n\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\t\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.0, cDist );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
 
+			},
+
+			screen: {
+
+						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+			},
+
+			screenButton: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			testDerivative: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\n\n\t\t\t\tfloat val = abs ( fract ( ( 1.0 - cDist ) * 20.0 ) - 0.5 ) * 2.0;\n\n\n\t\t\t\tfloat f = fwidth ( val );\n\n\t\t\t\tgl_FragColor.rgb *= smoothstep ( 0.99 * f * 1.5, 0.85 * f * 1.5, val );\n\n\n\t\t\t\t// gl_FragColor = vec4 ( f_Uv.x, f_Uv.y, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricCharge: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * f_Color.a;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricChargeScan: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.04 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( sdfDist - t ) );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricChargeInfo: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.043 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( sdfDist - t ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( maxTargetCenter, maxTargetCenter - 0.05, cDist );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricPlanet: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			equipotentialLines: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges [ MAX_CHARGES ];\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tfloat strength = 0.0;\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 cPos = vec2 ( charges[ i ].x, screenDimentions.y - charges[ i ].y );\n\t\t\t\t\tfloat dist = length ( cPos - gl_FragCoord.xy ) * 0.001;\n\t\t\t\t\tstrength += charges[ i ].z / ( dist * dist );\n\n\t\t\t\t}\n\n\t\t\t\t// float f = abs ( fract ( strength ) - 0.5 );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 1.2;\n\n\t\t\t\tfloat P = strength;\n\t\t\t\tfloat gsize = 150.5;\n\t\t\t\tfloat gwidth = 3.0;\n\t\t\t\tfloat f  = abs(fract (P * gsize)-0.5);\n\n\t\t\t\tfloat df = fwidth(P * gsize);\n\t\t\t\tfloat g = smoothstep(-gwidth*df,gwidth*df , f);\n\t\t\t\tfloat c = g; \n\t\t\t\tgl_FragColor = vec4( ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), 1.0 );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.1 - abs ( P ) * 4.0;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+			},
+
+			indicator: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
+			arrival: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( 0.79, 0.8, cDist ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
+			departure: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;\n\t\t\t\t// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
+			grid: {
+
+						vertex: "\n\t\t\tconst int MAX_MASSES = 500;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses [ MAX_MASSES ];\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\n\t\t\t\tvec4 vPos = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec4 rf = vec4 ( 0.0 );\n\n\t\t\t\tif ( numMasses > 0.0 ) {\n\n\t\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\t\tfloat m = masses[ i ].z;\n\t\t\t\t\t\tvec3 p = vec3 ( masses[ i ].xy, 0.0 );\n\n\t\t\t\t\t\tfloat maxDist = 4.0;\n\t\t\t\t\t\tvec3 dir = ( p - vPos.xyz );\n\t\t\t\t\t\tfloat dist = length ( dir );\n\t\t\t\t\t\tdist = clamp ( dist, 0.0, maxDist );\n\n\n\t\t\t\t\t\trf.x += dir.x / ( dist * dist );\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\t// vec3 vPos = ( vec4 ( position.xyz, 1.0 ) * modelViewMatrix ).xyz;\n\t\t\t\tgl_Position = vPos + rf;\n\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float gridSubdivisions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.0 - min ( line, 1.0 ) ) * 0.6 );\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 			}
 
 };
 
 exports.shaderHelper = shaderHelper;
 
-},{}],6:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -674,6 +7689,8 @@ Object.defineProperty(exports, "__esModule", {
 exports.GameManager = undefined;
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _utils = require("./utils");
 
 var _GravityLevel = require("./GameElements/GravityLevel");
 
@@ -695,6 +7712,15 @@ var GameManager = exports.GameManager = function () {
 	}
 
 	_createClass(GameManager, [{
+		key: "onResize",
+		value: function onResize() {
+
+			if (this.currentLevel) {
+
+				this.currentLevel.onResize();
+			}
+		}
+	}, {
 		key: "onMove",
 		value: function onMove(_position) {
 
@@ -704,12 +7730,39 @@ var GameManager = exports.GameManager = function () {
 			}
 		}
 	}, {
+		key: "onDrag",
+		value: function onDrag(_position) {
+
+			if (this.currentLevel) {
+
+				this.currentLevel.onDrag(_position);
+			}
+		}
+	}, {
 		key: "onClick",
 		value: function onClick(_position) {
 
 			if (this.currentLevel) {
 
 				this.currentLevel.onClick(_position);
+			}
+		}
+	}, {
+		key: "onDown",
+		value: function onDown(_position) {
+
+			if (this.currentLevel) {
+
+				this.currentLevel.onDown(_position);
+			}
+		}
+	}, {
+		key: "onUp",
+		value: function onUp(_position) {
+
+			if (this.currentLevel) {
+
+				this.currentLevel.onUp(_position);
 			}
 		}
 	}, {
@@ -734,6 +7787,8 @@ var GameManager = exports.GameManager = function () {
 		key: "startLevel",
 		value: function startLevel(_levelFile, _onStart) {
 
+			this.end();
+
 			// Create a new level according to the level file passed as an argument.
 
 			switch (_levelFile.chapter) {
@@ -743,7 +7798,7 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityLevel.GravityLevel({
 
 						renderer: this.renderer,
-						levelFile: _levelFile,
+						levelFile: (0, _utils.clone)(_levelFile),
 						onStart: _onStart || function () {
 							console.log('Level Started');
 						}
@@ -757,7 +7812,7 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _ElectricLevel.ElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: _levelFile,
+						levelFile: (0, _utils.clone)(_levelFile),
 						onStart: _onStart || function () {
 							console.log('Level Started');
 						}
@@ -771,7 +7826,7 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityElectricLevel.GravityElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: _levelFile,
+						levelFile: (0, _utils.clone)(_levelFile),
 						onStart: _onStart || function () {
 							console.log('Level Started');
 						}
@@ -783,6 +7838,17 @@ var GameManager = exports.GameManager = function () {
 			}
 		}
 	}, {
+		key: "end",
+		value: function end() {
+
+			if (this.currentLevel) {
+
+				this.currentLevel.clearLevel();
+				delete this.currentLevel;
+				this.currentLevel = null;
+			}
+		}
+	}, {
 		key: "pauseCurrentLevel",
 		value: function pauseCurrentLevel() {}
 	}, {
@@ -791,12 +7857,18 @@ var GameManager = exports.GameManager = function () {
 
 			this.currentLevel = null;
 		}
+	}, {
+		key: "reloadLevel",
+		value: function reloadLevel() {
+
+			this.currentLevel.reloadLevel();
+		}
 	}]);
 
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":1,"./GameElements/GravityElectricLevel":2,"./GameElements/GravityLevel":3}],7:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":34,"./GameElements/GravityElectricLevel":38,"./GameElements/GravityLevel":39,"./utils":53}],50:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -871,9 +7943,105 @@ var _levels = require("./levels");
 
 		function init(_loadedResources) {
 
+				// Build GUI
+
+				var menu = document.querySelector('#menu');
+				var activePage = document.querySelector('.active');
+				var pages = document.querySelectorAll('.page');
+				var levelsPages = document.querySelectorAll('.levels');
+
+				var _loop = function _loop(i) {
+
+						var file = levelsPages[i].attributes.file.value;
+
+						var _loop2 = function _loop2(level) {
+
+								var levelElement = document.createElement('div');
+								levelElement.classList.add('button');
+								var content = document.createElement('div');
+								content.classList.add('content');
+								var title = document.createElement('h2');
+								title.classList.add('title');
+								title.innerHTML = level;
+								content.appendChild(title);
+								levelElement.appendChild(content);
+								levelsPages[i].appendChild(levelElement);
+
+								(0, _utils.addEvent)(levelElement, 'click', function () {
+
+										gameManager.startLevel(_levels.levels[file][level]);
+
+										setTimeout(function () {
+
+												menu.classList.add('hidden');
+												activePage.classList.remove('active');
+										}, 700);
+								});
+						};
+
+						for (var level in _levels.levels[file]) {
+								_loop2(level);
+						}
+				};
+
+				for (var i = 0; i < levelsPages.length; i++) {
+						_loop(i);
+				}
+
+				for (var i = 0; i < pages.length; i++) {
+
+						var buttons = pages[i].querySelectorAll('.button');
+
+						for (var j = 0; j < buttons.length; j++) {
+
+								var button = buttons[j];
+								button.style.height = 100 / buttons.length + "%";
+
+								if (button.attributes.target) {
+										(function () {
+
+												var target = button.attributes.target.value;
+
+												(0, _utils.addEvent)(button, 'click', function () {
+
+														makePageActive(target);
+												});
+										})();
+								}
+						}
+				}
+
+				function makePageActive(_target) {
+
+						activePage.classList.remove("active");
+						activePage = document.querySelector('#' + _target);
+						activePage.classList.add('active');
+				}
+
+				var backButton = document.querySelector('#back-button');
+				(0, _utils.addEvent)(backButton, 'click', function () {
+
+						menu.classList.remove('hidden');
+						gameManager.end();
+						makePageActive('home');
+				});
+
+				var reloadButton = document.querySelector('#reload-button');
+				(0, _utils.addEvent)(reloadButton, 'click', function () {
+
+						gameManager.reloadLevel();
+				});
+
 				// General
 
-				var renderer = new THREE.WebGLRenderer();
+				var renderer = new THREE.WebGLRenderer({ alpha: true });
+
+				var devicePixelRatio = window.devicePixelRatio;
+				if (devicePixelRatio > 1) {
+
+						devicePixelRatio = 1;
+				}
+				renderer.setPixelRatio(devicePixelRatio);
 				renderer.setSize(window.innerWidth, window.innerHeight);
 
 				var rendererElement = renderer.domElement;
@@ -886,22 +8054,111 @@ var _levels = require("./levels");
 
 				// Events
 
+				var down = false;
+				var lastPos = vec2.create();
+
+				// Cross mouse & touch
+
 				(0, _utils.addEvent)(rendererElement, 'click', function (event) {
 
+						var pos = vec2.fromValues(event.clientX, event.clientY);
 						gameManager.onClick(vec2.fromValues(event.clientX, event.clientY));
+						lastPos = pos;
+						// gameManager.update ();
+				});
+
+				// Mouse
+
+				(0, _utils.addEvent)(rendererElement, 'mousedown', function (event) {
+
+						down = true;
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+
+						var pos = vec2.fromValues(event.clientX, event.clientY);
+						gameManager.onDown(vec2.fromValues(event.clientX, event.clientY));
+						lastPos = pos;
+				});
+
+				(0, _utils.addEvent)(rendererElement, 'mouseup', function (event) {
+
+						down = false;
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+
+						gameManager.onUp(lastPos);
 				});
 
 				(0, _utils.addEvent)(rendererElement, 'mousemove', function (event) {
 
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+
+						var pos = vec2.fromValues(event.clientX, event.clientY);
 						gameManager.onMove(vec2.fromValues(event.clientX, event.clientY));
+
+						if (down) {
+
+								gameManager.onDrag(vec2.fromValues(event.clientX, event.clientY));
+						}
+
+						lastPos = pos;
+				});
+
+				// Touch
+
+				(0, _utils.addEvent)(rendererElement, 'touchstart', function (event) {
+
+						down = true;
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+
+						var pos = vec2.fromValues(event.touches[0].clientX, event.touches[0].clientY);
+						gameManager.onDown(pos);
+						lastPos = pos;
+				});
+
+				(0, _utils.addEvent)(rendererElement, 'touchend', function (event) {
+
+						down = false;
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+
+						gameManager.onUp(lastPos);
+				});
+
+				(0, _utils.addEvent)(rendererElement, 'touchmove', function (event) {
+
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+						var pos = vec2.fromValues(event.touches[0].clientX, event.touches[0].clientY);
+						gameManager.onMove(pos);
+
+						if (down) {
+
+								gameManager.onDrag(pos);
+						}
+
+						lastPos = pos;
+				});
+
+				// Window events
+
+				(0, _utils.addEvent)(window, 'resize', function () {
+
+						gameManager.onResize();
 				});
 
 				// Game
 
 				var gameManager = new _GameManager.GameManager({ renderer: renderer });
-				gameManager.startLevel(_levels.levels.gravity[0]);
 
-				function update() {}
+				// Debug
+
+				menu.classList.add('hidden');
+				activePage.classList.remove('active');
+				gameManager.startLevel(_levels.levels['gravity'][0]);
+				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+
+				function update() {
+
+						gameManager.update();
+				}
 
 				function render() {
 
@@ -924,209 +8181,1012 @@ var _levels = require("./levels");
 		}
 })();
 
-},{"./GameManager":6,"./levels":8,"./resourcesList":9,"./utils":10}],8:[function(require,module,exports){
+},{"./GameManager":49,"./levels":51,"./resourcesList":52,"./utils":53}],51:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
-		value: true
+						value: true
 });
 var levels = {
 
-		gravity: {
-
-				0: {
-
-						chapter: 'gravity',
-
-						elements: {
-
-								player: {
-
-										static: false,
-										manualMode: false,
-
-										shaders: {
-
-												main: null,
-
-												normal: {
-
-														name: 'player',
-														textureUrl: './resources/textures/generic_player_sdf.png',
-														uniforms: {}
-
-												},
-
-												scan: {
-
-														name: 'player',
-														textureUrl: './resources/textures/generic_player_sdf.png',
-														uniforms: {}
-
-												},
-
-												infos: {
-
-														name: 'player',
-														textureUrl: './resources/textures/generic_player_sdf.png',
-														uniforms: {}
-
-												}
-
-										},
-
-										instances: {
+						gravity: {
 
 												0: {
 
-														enabled: true,
-														position: vec3.fromValues(0, 0, 0),
-														rotation: vec3.fromValues(0.0, 0.0, 0.0),
-														scale: vec3.fromValues(1.0, 1.0, 1.0),
-														velocity: { x: 0, y: 0, z: 0 }
+																		chapter: 'gravity',
 
-												}
+																		elements: {
 
-										}
+																								planets: {
 
-								},
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
 
-								planets: {
+																														shaders: {
 
-										static: true,
-										manualMode: false,
+																																				main: null,
 
-										shaders: {
+																																				normal: {
 
-												main: null,
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
 
-												normal: {
+																																				},
 
-														name: 'planet',
-														textureUrl: './resources/textures/generic_circle_sdf.png',
-														uniforms: {}
+																																				scan: {
 
-												},
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
 
-												scan: {
+																																				},
 
-														name: 'planet',
-														textureUrl: './resources/textures/generic_circle_sdf.png',
-														uniforms: {}
+																																				infos: {
 
-												},
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
 
-												infos: {
+																																				}
 
-														name: 'planet',
-														textureUrl: './resources/textures/generic_circle_sdf.png',
-														uniforms: {}
+																														},
 
-												}
+																														instances: {
 
-										},
+																																				0: {
 
-										instances: {
+																																										enabled: true,
+																																										position: [-2, 0, 0],
+																																										radius: 4,
+																																										mass: 1000000,
+																																										scale: [1.8, 1.8, 1.8],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
 
-												0: {
+																																				}
 
-														enabled: true,
-														position: vec3.fromValues(-1.5, 0, 0),
-														rotation: vec3.fromValues(0.0, 0.0, 0.0),
-														scale: vec3.fromValues(1.0, 2.0, 1.0),
-														velocity: { x: 0, y: 0, z: 0 },
-														color: vec4.fromValues(1.0, 0.0, 0.0, 1.0)
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 400,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
 
 												},
 
 												1: {
 
-														enabled: true,
-														position: vec3.fromValues(1.0, 0, 0),
-														rotation: vec3.fromValues(0.0, 0.0, 0.3),
-														scale: vec3.fromValues(1.0, 1.0, 1.0),
-														velocity: { x: 0, y: 0, z: 0 },
-														color: vec4.fromValues(1.0, 0.0, 0.0, 1.0)
+																		chapter: 'gravity',
 
-												}
+																		elements: {
 
-										}
+																								planets: {
 
-								},
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
 
-								smoke: {
+																														shaders: {
 
-										static: false,
-										manualMode: true,
+																																				main: null,
 
-										shaders: {
+																																				normal: {
 
-												main: null,
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
 
-												normal: {
+																																				},
 
-														name: 'smoke',
-														textureUrl: './resources/textures/smoke.png',
-														uniforms: {}
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [1.8, 0, 0],
+																																										radius: 2,
+																																										mass: 10000,
+																																										scale: [0.6, 0.6, 0.6],
+																																										color: [245 / 255, 30 / 255, 30 / 255, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [-1.5, 1.5, 0],
+																																										radius: 2,
+																																										mass: 1000000,
+																																										scale: [1.0, 1.0, 1.0],
+																																										color: [180 / 255, 180 / 255, 180 / 255, 1]
+
+																																				},
+
+																																				3: {
+
+																																										position: [-1.8, -1.8, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [0.4, 0.4, 0.4],
+																																										color: [245 / 255, 30 / 255, 30 / 255, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 400,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										// blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
 
 												},
 
-												scan: null,
-												infos: null
+												2: {
 
-										},
+																		chapter: 'gravity',
 
-										instances: {}
+																		elements: {
 
-								}
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										position: [0, 0, 0],
+																																										radius: 2,
+																																										mass: 10000,
+																																										scale: [0.6, 0.6, 0.6],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
+
+																																				},
+
+																																				1: {
+
+																																										position: [1.8, -1.8, 0],
+																																										radius: 2,
+																																										mass: 500000,
+																																										scale: [1.0, 1.0, 1.0],
+																																										color: [229 / 255, 36 / 255, 31 / 255, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [-1.8, 1.8, 0],
+																																										radius: 2,
+																																										mass: 500000,
+																																										scale: [1.0, 1.0, 1.0],
+																																										color: [229 / 255, 36 / 255, 31 / 255, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 400,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										// blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												3: {
+
+																		chapter: 'gravity',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										position: [-2.0, 0, 0],
+																																										radius: 2,
+																																										mass: 600000,
+																																										scale: [2.5, 2.5, 2.5],
+																																										color: [229 / 255, 36 / 255, 31 / 255, 1]
+
+																																				},
+
+																																				1: {
+
+																																										position: [0.5, 0, 0],
+																																										radius: 2,
+																																										mass: 50000,
+																																										scale: [0.6, 0.6, 0.6],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 400,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										// blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												4: {
+
+																		chapter: 'gravity',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										position: [0, -1.0, 0],
+																																										radius: 2,
+																																										mass: 400000,
+																																										scale: [0.9, 0.9, 0.9],
+																																										color: [150 / 255, 150 / 255, 150 / 255, 1]
+
+																																				}
+
+																																				// 1: {
+
+																																				//     position: [ 1.5, 1.5, 0 ],
+																																				//     radius: 2,
+																																				//     mass: 100000,
+																																				//     scale: [ 0.6, 0.6, 0.6 ],
+																																				//     color: [ 255/255, 222/255, 40/255, 1 ],
+
+																																				// },
+
+																																				// 2: {
+
+																																				//     position: [ -1.5, 1.5, 0 ],
+																																				//     radius: 2,
+																																				//     mass: 100000,
+																																				//     scale: [ 0.6, 0.6, 0.6 ],
+																																				//     color: [ 255/255, 222/255, 40/255, 1 ],
+
+																																				// },
+
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 400,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										// blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatter',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												}
+
+						},
+
+						electric: {
+
+												0: {
+
+																		chapter: 'electric',
+
+																		elements: {
+
+																								fixedCharges: {
+
+																														elementType: 'ElectricParticle',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				// 1: {
+
+																																				//     position: [ 0, -1.0, 0.0 ],
+																																				//     radius: 2,
+																																				//     charge: 0,
+																																				//     scale: [ 0.8, 0.8, 0.1 ],
+																																				//     rotation: [ 0, 0, Math.PI * -0.25],
+																																				//     color: [ 0.9, 0.1, 0.1, 1 ],
+
+																																				// },
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										transparent: true,
+																																										blending: 'MultiplyBlending',
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [0.63, 0, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.0, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [-0.63, 0, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.0, 0.12, 0.6],
+																																										rotation: [0, 0, Math.PI * 0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
+												}
+
+												// 1: {
+
+
+												// },
+
+												// 2: {
+
+
+												// },
+
+												// 3: {
+
+
+												// },
+
+												// 4: {
+
+
+												// },
+
+						},
+
+						gravityElectric: {
+
+												0: {
+
+																		chapter: 'gravity-electric',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														enableUpdate: true,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										position: [-2, 0, 0],
+																																										radius: 4,
+																																										mass: 1000000,
+																																										scale: [1.8, 1.8, 1.8],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				1: {
+
+																																										position: [2, 0, 0],
+																																										radius: 3.5,
+																																										mass: 100000,
+																																										scale: [1.5, 1.5, 1.5],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricPlanetParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 200,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricChargeScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricChargeInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												}
+
+												// 1: {
+
+
+												// },
+
+												// 2: {
+
+
+												// },
+
+												// 3: {
+
+
+												// },
+
+												// 4: {
+
+
+												// },
 
 						}
-
-				},
-
-				1: {},
-
-				2: {},
-
-				3: {},
-
-				4: {}
-
-		},
-
-		electric: {
-
-				0: {},
-
-				1: {},
-
-				2: {},
-
-				3: {},
-
-				4: {}
-
-		},
-
-		gravityElectric: {
-
-				0: {},
-
-				1: {},
-
-				2: {},
-
-				3: {},
-
-				4: {}
-
-		}
 
 };
 
 exports.levels = levels;
 
-},{}],9:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1173,12 +9233,15 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],10:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
 exports.addEvent = addEvent;
 exports.removeEvent = removeEvent;
 exports.ajax = ajax;
@@ -1189,6 +9252,7 @@ exports.getColorsFromVertices = getColorsFromVertices;
 exports.clamp = clamp;
 exports.contains = contains;
 exports.Float32Concat = Float32Concat;
+exports.clone = clone;
 function addEvent(elem, event, fn) {
 
     // avoid memory overhead of new anonymous functions for every event handler that's installed
@@ -1381,4 +9445,38 @@ function Float32Concat(first, second) {
     return result;
 }
 
-},{}]},{},[7]);
+function clone(obj) {
+    var copy;
+
+    // Handle the 3 simple types, and null or undefined
+    if (null == obj || "object" != (typeof obj === "undefined" ? "undefined" : _typeof(obj))) return obj;
+
+    // Handle Date
+    if (obj instanceof Date) {
+        copy = new Date();
+        copy.setTime(obj.getTime());
+        return copy;
+    }
+
+    // Handle Array
+    if (obj instanceof Array) {
+        copy = [];
+        for (var i = 0, len = obj.length; i < len; i++) {
+            copy[i] = clone(obj[i]);
+        }
+        return copy;
+    }
+
+    // Handle Object
+    if (obj instanceof Object) {
+        copy = {};
+        for (var attr in obj) {
+            if (obj.hasOwnProperty(attr)) copy[attr] = clone(obj[attr]);
+        }
+        return copy;
+    }
+
+    throw new Error("Unable to copy obj! Its type isn't supported.");
+}
+
+},{}]},{},[50]);

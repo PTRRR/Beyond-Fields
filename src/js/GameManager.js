@@ -1,3 +1,4 @@
+import { clone } from "./utils";
 import { GravityLevel } from "./GameElements/GravityLevel";
 import { ElectricLevel } from "./GameElements/ElectricLevel";
 import { GravityElectricLevel } from "./GameElements/GravityElectricLevel";
@@ -14,6 +15,16 @@ export class GameManager {
 
 	}
 
+	onResize () {
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.onResize ();
+
+		}
+
+	}
+
 	onMove ( _position ) {
 
 		if ( this.currentLevel ) {
@@ -24,11 +35,41 @@ export class GameManager {
 
 	}
 
+	onDrag ( _position ) {
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.onDrag ( _position );
+
+		}
+
+	}
+
 	onClick ( _position ) {
 
 		if ( this.currentLevel ) {
 
 			this.currentLevel.onClick ( _position );
+
+		}
+
+	}
+
+	onDown ( _position ) {
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.onDown ( _position );
+
+		}
+
+	}
+
+	onUp ( _position ) {
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.onUp ( _position );
 
 		}
 
@@ -56,6 +97,8 @@ export class GameManager {
 
 	startLevel ( _levelFile, _onStart ) {
 
+		this.end();
+
 		// Create a new level according to the level file passed as an argument.
 
 		switch ( _levelFile.chapter ) {
@@ -65,7 +108,7 @@ export class GameManager {
 				this.currentLevel = new GravityLevel ( { 
 
 					renderer: this.renderer, 
-					levelFile: _levelFile,
+					levelFile: clone ( _levelFile ),
 					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
@@ -77,7 +120,7 @@ export class GameManager {
 				this.currentLevel = new ElectricLevel ( { 
 
 					renderer: this.renderer, 
-					levelFile: _levelFile,
+					levelFile: clone ( _levelFile ),
 					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
@@ -89,12 +132,24 @@ export class GameManager {
 				this.currentLevel = new GravityElectricLevel ( { 
 
 					renderer: this.renderer, 
-					levelFile: _levelFile,
+					levelFile: clone ( _levelFile ),
 					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
 
 			break;
+
+		}
+
+	}
+
+	end () {
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.clearLevel ();
+			delete this.currentLevel;
+			this.currentLevel = null;
 
 		}
 
@@ -109,6 +164,12 @@ export class GameManager {
 	endCurrentLevel () {
 
 		this.currentLevel = null;
+
+	}
+
+	reloadLevel () {
+
+		this.currentLevel.reloadLevel ();
 
 	}
 
