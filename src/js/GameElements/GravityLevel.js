@@ -26,7 +26,7 @@ export class GravityLevel extends LevelCore {
 		// build a grid
 
 		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
-		let gridGeometry = new THREE.PlaneBufferGeometry ( 1, 1, 200, 200 );
+		let gridGeometry = new THREE.PlaneBufferGeometry ( 1, 1, 80, 80 );
 		this.gridMaterial = new THREE.ShaderMaterial ( {
 
 			vertexShader: shaderHelper.grid.vertex,
@@ -35,11 +35,9 @@ export class GravityLevel extends LevelCore {
 
 			uniforms: {
 
-				gridSubdivisions: { value: 80 },
-				mouse: { value: [ 0, 0 ] },
+				gridSubdivisions: { value: 60 },
 				numMasses: { value: 0 },
-				masses: { value: [ 0, 0, 0 ] },
-				mouse: { value: [ 0, 0, 0 ] },
+				masses: { value: [ 0, 0, 0, 0 ] },
 
 			},
 
@@ -58,52 +56,52 @@ export class GravityLevel extends LevelCore {
 
 		// Text
 
-		bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
+		// bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
 
-			if ( err ) {
+		// 	if ( err ) {
 
-				console.error( err );
+		// 		console.error( err );
 
-			} else {
+		// 	} else {
 
-				let geometry = bmfontGeometry ( {
+		// 		let geometry = bmfontGeometry ( {
 
-					width: 1500,
-					align: 'center',
-					font: font
+		// 			width: 1500,
+		// 			align: 'center',
+		// 			font: font
 
-				} );
+		// 		} );
 
-				geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
+		// 		geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
 
-				geometry.computeBoundingBox ();
+		// 		geometry.computeBoundingBox ();
 
-				let textureLoader = new THREE.TextureLoader ();
-				textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
+		// 		let textureLoader = new THREE.TextureLoader ();
+		// 		textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
 
-					var material = new THREE.RawShaderMaterial( sdfShader ( {
+		// 			var material = new THREE.RawShaderMaterial( sdfShader ( {
 					  	
-					  	map: texture,
-					  	side: THREE.DoubleSide,
-					  	transparent: true,
-					  	color: 'rgb(0, 0, 0)',
+		// 			  	map: texture,
+		// 			  	side: THREE.DoubleSide,
+		// 			  	transparent: true,
+		// 			  	color: 'rgb(0, 0, 0)',
 
-					} ) );
+		// 			} ) );
 
-					let mesh = new THREE.Mesh ( geometry, material );
-					this.infoScene.add ( mesh );
-					mesh.material.extensions.derivatives = true;
-					geometry.computeBoundingSphere ();
-					mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
-					mesh.position.y += geometry.boundingSphere.center.y * 0.003;
-					mesh.rotation.x = Math.PI;
-					mesh.scale.set ( 0.003, 0.003, 0.003 );
+		// 			let mesh = new THREE.Mesh ( geometry, material );
+		// 			this.infoScene.add ( mesh );
+		// 			mesh.material.extensions.derivatives = true;
+		// 			geometry.computeBoundingSphere ();
+		// 			mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
+		// 			mesh.position.y += geometry.boundingSphere.center.y * 0.003;
+		// 			mesh.rotation.x = Math.PI;
+		// 			mesh.scale.set ( 0.003, 0.003, 0.003 );
 
-				}.bind ( this ) );
+		// 		}.bind ( this ) );
 
-			} 
+		// 	} 
 
-		}.bind ( this ) );
+		// }.bind ( this ) );
 		
 	}
 
@@ -339,8 +337,6 @@ export class GravityLevel extends LevelCore {
 			this.gridMaterial.uniforms.masses.value = massesUniforms;
 			
 		}
-
-		this.gridMaterial.uniforms.mouse.value = this.glMouseWorld;
 
 		for ( let j = 0; j < playerParticles.length; j ++ ) {
 

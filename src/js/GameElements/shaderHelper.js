@@ -1036,6 +1036,78 @@ let shaderHelper = {
 
 	},
 
+	grid: {
+
+		vertex: `\
+
+			const float MAX_Z = 40.0;
+			const int MAX_MASSES = 400;
+			uniform float numMasses;
+			uniform vec4 masses[ MAX_MASSES ];
+
+			varying vec2 f_Uv;
+			varying float f_maxZ;
+			varying float f_Z;
+
+			void main () {
+
+				vec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );
+				vec3 rV = vec3 ( 0.0 );
+
+				for ( int i = 0; i < MAX_MASSES; i ++ ) {
+
+					if ( i >= int ( numMasses ) ) break;
+
+					vec2 dir = masses[ i ].xy - vPos.xy;
+					float maxDist = 5.5;
+					float dist = length ( dir );
+
+					vec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;
+					exDir = normalize ( exDir );
+					exDir *= normalMatrix;
+					exDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;
+
+					rV += exDir;
+
+				}
+
+				f_Uv = uv;
+				f_maxZ = MAX_Z;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );
+				f_Z = gl_Position.z;
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform float gridSubdivisions;
+
+			varying vec2 f_Uv;
+			varying float f_maxZ;
+			varying float f_Z;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+
+				// Pick a coordinate to visualize in a grid
+				vec2 coord = f_Uv * gridSubdivisions;
+
+				// Compute anti-aliased world-space grid lines
+				vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );
+				float line = min ( grid.x, grid.y );
+
+				// Just visualize the grid lines directly
+				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
+				gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );
+				
+			}
+
+		`,
+	},
+
 	indicator: {
 
 		vertex: `\
@@ -1140,77 +1212,6 @@ let shaderHelper = {
 				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );
 				gl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );
 				gl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );
-					
-			}
-
-		`,
-	},
-
-	grid: {
-
-		vertex: `\
-
-			const int MAX_MASSES = 500;
-			varying vec2 f_Uv;
-			uniform float numMasses;
-			uniform vec4 masses [ MAX_MASSES ];
-			varying float z;
-			uniform vec3 mouse;
-
-			void main () {
-
-				f_Uv = uv;
-
-				vec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );
-				vec3 rV = vec3 ( 0.0 );
-
-				// for ( int i = 0; i < MAX_MASSES; i ++ ) {
-
-				// 	if ( i >= int ( numMasses ) ) break;
-
-				// 	vec2 dir = masses[ i ].xy - vPos.xy;
-				// 	float maxDist = 5.5;
-				// 	float dist = length ( dir );
-
-				// 	vec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;
-				// 	exDir = normalize ( exDir );
-				// 	exDir *= normalMatrix;
-				// 	exDir *= 40.0 * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;
-
-				// 	rV += exDir;
-
-				// }
-				
-				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );
-				z = gl_Position.z;
-
-			}
-
-		`,
-
-		fragment: `\
-
-			varying vec2 f_Uv;
-			uniform float gridSubdivisions;
-			varying float z;
-
-			void main () {
-
-				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
-
-				// Pick a coordinate to visualize in a grid
-				vec2 coord = f_Uv * gridSubdivisions;
-
-				// Compute anti-aliased world-space grid lines
-				vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );
-				float line = min ( grid.x, grid.y );
-
-				// Just visualize the grid lines directly
-				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
-				// gl_FragColor.a *= ( 1.0 - cDist * 0.5 ) * ( 1.0 - z / -2.0 ) * 0.7;
-				// gl_FragColor.a *= 1.0 - z / 60.0;
-				gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
-
 					
 			}
 

@@ -5272,8 +5272,6 @@ var _shaderHelper = require("./shaderHelper");
 
 var _LevelCore2 = require("./LevelCore");
 
-function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
-
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
@@ -5305,20 +5303,20 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 				// build a grid
 
 				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
-				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 200, 200);
+				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 80, 80);
 				_this.gridMaterial = new THREE.ShaderMaterial({
 
 						vertexShader: _shaderHelper.shaderHelper.grid.vertex,
 						fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
 						transparent: true,
 
-						uniforms: _defineProperty({
+						uniforms: {
 
-								gridSubdivisions: { value: 80 },
-								mouse: { value: [0, 0] },
+								gridSubdivisions: { value: 60 },
 								numMasses: { value: 0 },
-								masses: { value: [0, 0, 0] }
-						}, "mouse", { value: [0, 0, 0] })
+								masses: { value: [0, 0, 0, 0] }
+
+						}
 
 						// side: THREE.DoubleSide,
 
@@ -5335,48 +5333,52 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 				// Text
 
-				bmfontLoader('./resources/fonts/GT-America.fnt', function (err, font) {
+				// bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
 
-						if (err) {
+				// 	if ( err ) {
 
-								console.error(err);
-						} else {
+				// 		console.error( err );
 
-								var geometry = bmfontGeometry({
+				// 	} else {
 
-										width: 1500,
-										align: 'center',
-										font: font
+				// 		let geometry = bmfontGeometry ( {
 
-								});
+				// 			width: 1500,
+				// 			align: 'center',
+				// 			font: font
 
-								geometry.update("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum");
+				// 		} );
 
-								geometry.computeBoundingBox();
+				// 		geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
 
-								var textureLoader = new THREE.TextureLoader();
-								textureLoader.load('./resources/fonts/GT-America_sdf.png', function (texture) {
+				// 		geometry.computeBoundingBox ();
 
-										var material = new THREE.RawShaderMaterial(sdfShader({
+				// 		let textureLoader = new THREE.TextureLoader ();
+				// 		textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
 
-												map: texture,
-												side: THREE.DoubleSide,
-												transparent: true,
-												color: 'rgb(0, 0, 0)'
+				// 			var material = new THREE.RawShaderMaterial( sdfShader ( {
 
-										}));
+				// 			  	map: texture,
+				// 			  	side: THREE.DoubleSide,
+				// 			  	transparent: true,
+				// 			  	color: 'rgb(0, 0, 0)',
 
-										var mesh = new THREE.Mesh(geometry, material);
-										this.infoScene.add(mesh);
-										mesh.material.extensions.derivatives = true;
-										geometry.computeBoundingSphere();
-										mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
-										mesh.position.y += geometry.boundingSphere.center.y * 0.003;
-										mesh.rotation.x = Math.PI;
-										mesh.scale.set(0.003, 0.003, 0.003);
-								}.bind(this));
-						}
-				}.bind(_this));
+				// 			} ) );
+
+				// 			let mesh = new THREE.Mesh ( geometry, material );
+				// 			this.infoScene.add ( mesh );
+				// 			mesh.material.extensions.derivatives = true;
+				// 			geometry.computeBoundingSphere ();
+				// 			mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
+				// 			mesh.position.y += geometry.boundingSphere.center.y * 0.003;
+				// 			mesh.rotation.x = Math.PI;
+				// 			mesh.scale.set ( 0.003, 0.003, 0.003 );
+
+				// 		}.bind ( this ) );
+
+				// 	} 
+
+				// }.bind ( this ) );
 
 				return _this;
 		}
@@ -5597,8 +5599,6 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
 								this.gridMaterial.uniforms.masses.value = massesUniforms;
 						}
-
-						this.gridMaterial.uniforms.mouse.value = this.glMouseWorld;
 
 						for (var _j = 0; _j < playerParticles.length; _j++) {
 
@@ -7847,6 +7847,13 @@ var shaderHelper = {
 
 			},
 
+			grid: {
+
+						vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 400;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec4 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform float gridSubdivisions;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
 			indicator: {
 
 						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
@@ -7866,13 +7873,6 @@ var shaderHelper = {
 						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;\n\t\t\t\t// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
-
-			grid: {
-
-						vertex: "\n\t\t\tconst int MAX_MASSES = 500;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec4 masses [ MAX_MASSES ];\n\t\t\tvarying float z;\n\t\t\tuniform vec3 mouse;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\t// for ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t// \tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t// \tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t// \tfloat maxDist = 5.5;\n\t\t\t\t// \tfloat dist = length ( dir );\n\n\t\t\t\t// \tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t// \texDir = normalize ( exDir );\n\t\t\t\t// \texDir *= normalMatrix;\n\t\t\t\t// \texDir *= 40.0 * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;\n\n\t\t\t\t// \trV += exDir;\n\n\t\t\t\t// }\n\t\t\t\t\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tz = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
-
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float gridSubdivisions;\n\t\t\tvarying float z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\t// gl_FragColor.a *= ( 1.0 - cDist * 0.5 ) * ( 1.0 - z / -2.0 ) * 0.7;\n\t\t\t\t// gl_FragColor.a *= 1.0 - z / 60.0;\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 			},
 
 			sdfFont: {

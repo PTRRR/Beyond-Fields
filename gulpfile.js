@@ -10,6 +10,7 @@ var source = require( 'vinyl-source-stream' );
 var buffer = require( 'vinyl-buffer' );
 var cleanCSS = require( 'gulp-clean-css' );
 var htmlmin = require('gulp-html-minifier');
+var localWebServer = require('local-web-server')
 
 gulp.task( 'default', [ 'update-resources', 'update-libs', 'es6', 'clean-css', 'html-update', 'webserver' ], function(){} );
 
@@ -82,6 +83,7 @@ gulp.task('webserver',[ 'watch' ], function() {
 
   	gulp.src('.')
   	  	.pipe(webserver({
+          open: 'http://my-server:8080/public/',
   	    	livereload: false,
   	    	directoryListing: true,
   	    	open: true
