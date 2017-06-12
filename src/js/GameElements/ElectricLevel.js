@@ -262,9 +262,9 @@ export class ElectricLevel extends LevelCore {
 
 		}
 
-		// console.log(chargesUniform);
-
 		player.applyForce ( forceResult );
+
+		// Update the particles emitted by the player.
 
 		let playerParticles = this.gameElements.playerParticles.instances;
 

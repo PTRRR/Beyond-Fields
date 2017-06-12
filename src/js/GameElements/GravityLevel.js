@@ -35,7 +35,7 @@ export class GravityLevel extends LevelCore {
 
 			uniforms: {
 
-				// gridSubdivisions: { value: 60 },
+				gridSubdivisions: { value: 60 },
 				numMasses: { value: 0 },
 				masses: { value: [ 0, 0, 0 ] },
 
@@ -46,7 +46,7 @@ export class GravityLevel extends LevelCore {
 		} );
 
 		this.grid = new THREE.Mesh ( gridGeometry, this.gridMaterial );
-		this.grid.scale.set ( maxScale * 1.5, maxScale * 1.5, 1 );
+		this.grid.scale.set ( maxScale * 1.4, maxScale * 1.4, 1 );
 		this.scanScene.add ( this.grid );
 		this.gridMaterial.extensions.derivatives = true;
 
@@ -250,8 +250,8 @@ export class GravityLevel extends LevelCore {
 
 			massesUniforms.push ( bC.position[ 0 ] );
 			massesUniforms.push ( bC.position[ 1 ] );
-			massesUniforms.push ( bC.mass );
-			massesUniforms.push ( bC.maxMass );
+			massesUniforms.push ( bC.mass / bC.maxMass );
+			// massesUniforms.push ( bC.maxMass );
 
 			// console.log(bC.lifePercent);
 
@@ -281,8 +281,8 @@ export class GravityLevel extends LevelCore {
 
 			massesUniforms.push ( planet.position[ 0 ] );
 			massesUniforms.push ( planet.position[ 1 ] );
-			massesUniforms.push ( planet.mass );
-			massesUniforms.push ( planet.maxMass );
+			massesUniforms.push ( (planet.mass / planet.maxMass) * 2.0 );
+			// massesUniforms.push ( planet.maxMass );
 
 			if ( dist > planet.scale[ 0 ] ) {
 
@@ -333,8 +333,8 @@ export class GravityLevel extends LevelCore {
 
 		if ( massesUniforms.length > 0 ) {
 
-			// this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
-			// this.gridMaterial.uniforms.masses.value = massesUniforms;
+			this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+			this.gridMaterial.uniforms.masses.value = massesUniforms;
 			
 		}
 

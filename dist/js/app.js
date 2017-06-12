@@ -4346,9 +4346,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								this.scanMaterial.uniforms.charges.value = chargesUniform;
 						}
 
-						// console.log(chargesUniform);
-
 						player.applyForce(forceResult);
+
+						// Update the particles emitted by the player.
 
 						var playerParticles = this.gameElements.playerParticles.instances;
 
@@ -5299,7 +5299,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						uniforms: {
 
-								// gridSubdivisions: { value: 60 },
+								gridSubdivisions: { value: 60 },
 								numMasses: { value: 0 },
 								masses: { value: [0, 0, 0] }
 
@@ -5310,7 +5310,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 				});
 
 				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
-				_this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1);
+				_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
 				_this.scanScene.add(_this.grid);
 				_this.gridMaterial.extensions.derivatives = true;
 
@@ -5510,8 +5510,8 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 								massesUniforms.push(bC.position[0]);
 								massesUniforms.push(bC.position[1]);
-								massesUniforms.push(bC.mass);
-								massesUniforms.push(bC.maxMass);
+								massesUniforms.push(bC.mass / bC.maxMass);
+								// massesUniforms.push ( bC.maxMass );
 
 								// console.log(bC.lifePercent);
 
@@ -5538,8 +5538,8 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 								massesUniforms.push(planet.position[0]);
 								massesUniforms.push(planet.position[1]);
-								massesUniforms.push(planet.mass);
-								massesUniforms.push(planet.maxMass);
+								massesUniforms.push(planet.mass / planet.maxMass * 2.0);
+								// massesUniforms.push ( planet.maxMass );
 
 								if (_dist > planet.scale[0]) {
 
@@ -5583,9 +5583,8 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						if (massesUniforms.length > 0) {
 
-								// this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
-								// this.gridMaterial.uniforms.masses.value = massesUniforms;
-
+								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+								this.gridMaterial.uniforms.masses.value = massesUniforms;
 						}
 
 						for (var _j = 0; _j < playerParticles.length; _j++) {
@@ -7837,9 +7836,9 @@ var shaderHelper = {
 
 			grid: {
 
-						vertex: "\n\t\t\tconst int MAX_MASSES = 110;\n\t\t\t// uniform float numMasses;\n\t\t\tuniform float masses[ MAX_MASSES ];\n\t\t\t// uniform vec4 masses2[ MAX_MASSES ];\n\n\t\t\tvoid main () {\n\n\t\t\t\t// for ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t// \tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t// }\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 108;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z, 2.0 );\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\t// uniform float gridSubdivisions;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// // Pick a coordinate to visualize in a grid\n\t\t\t\t// vec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// // Compute anti-aliased world-space grid lines\n\t\t\t\t// vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\t// float line = min ( grid.x, grid.y );\n\n\t\t\t\t// // Just visualize the grid lines directly\n\t\t\t\t// gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\t// gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform float gridSubdivisions;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
 			},
 
 			indicator: {
@@ -8312,8 +8311,8 @@ var _levels = require("./levels");
 
 				menu.classList.add('hidden');
 				activePage.classList.remove('active');
-				// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
-				gameManager.startLevel(_levels.levels['electric'][0]);
+				gameManager.startLevel(_levels.levels['gravity'][0]);
+				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
 				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 				function update() {

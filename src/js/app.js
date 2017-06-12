@@ -265,8 +265,8 @@ import { levels } from "./levels";
 
 		menu.classList.add ( 'hidden' );
 		activePage.classList.remove ( 'active' );
-		// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
-		gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+		gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
+		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
 		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 		function update () {
