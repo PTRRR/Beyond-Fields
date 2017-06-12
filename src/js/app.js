@@ -7,6 +7,41 @@ import { levels } from "./levels";
 
 	function init () {
 
+		// Cross browser variables
+
+		let performance = window.performance || {};
+		performance.now = ( function() {
+
+		  	let _now = Date.now();
+		  	return performance.now    ||
+		  	performance.webkitNow     ||
+		  	performance.msNow         ||
+		  	performance.oNow          ||
+		  	performance.mozNow        ||
+		  	function() { return Date.now() - _now; };
+
+		})();
+
+		window.performance = performance;
+
+		if ( !window.requestAnimationFrame ) {
+
+			window.requestAnimationFrame = ( function() {
+
+				return window.webkitRequestAnimationFrame ||
+				window.mozRequestAnimationFrame ||
+				window.oRequestAnimationFrame ||
+				window.msRequestAnimationFrame ||
+				function( /* function FrameRequestCallback */ callback, /* DOMElement Element */ element ) {
+
+					window.setTimeout( callback, 1000 / 60 );
+
+				};
+
+			} )();
+
+		}
+
 		// Build GUI
 
 		let menu = document.querySelector('#menu');
@@ -100,6 +135,9 @@ import { levels } from "./levels";
 		// General
 
 		let renderer = new THREE.WebGLRenderer( { alpha: true } );
+		let gl = renderer.getContext ();
+
+		console.log(gl.getParameter ( gl.MAX_VERTEX_UNIFORM_VECTORS ));
 
 		let devicePixelRatio = window.devicePixelRatio;
 		if ( devicePixelRatio > 1.5 ) {
@@ -227,8 +265,8 @@ import { levels } from "./levels";
 
 		menu.classList.add ( 'hidden' );
 		activePage.classList.remove ( 'active' );
-		gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
-		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+		// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
+		gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
 		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 		function update () {

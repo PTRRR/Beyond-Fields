@@ -4119,6 +4119,30 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				_this.currentInstance = null;
 				_this.mouseOnDown = null;
 
+				// Build scan background
+
+				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
+				_this.scanGeometry = new THREE.PlaneGeometry(1, 1, 300, 300);
+				_this.scanMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.equipotentialLines.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.equipotentialLines.fragment,
+						transparent: true,
+
+						uniforms: {
+
+								numCharges: { value: 0 },
+								charges: { value: [0, 0, 0] }
+
+						}
+
+				});
+
+				_this.scanMesh = new THREE.Mesh(_this.scanGeometry, _this.scanMaterial);
+				_this.scanMesh.scale.set(maxScale, maxScale, 1.0);
+				_this.scanScene.add(_this.scanMesh);
+				_this.scanMaterial.extensions.derivatives = true;
+
 				return _this;
 		}
 
@@ -4235,41 +4259,6 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 										this.arrivedInGame = false;
 										this.gameElements.player.instances[0].mass = 400;
 										this.resetPlayer();
-
-										// let text = this.makeTextSprite ( 'popop', {
-
-										// 	fontsize: 70,
-
-										// } );
-										// text.position.set ( 0, 0, 0 );
-										// text.scale.set ( 1.0, 0.5, 0.5 );
-										// this.mainScene.add ( text );
-
-										this.scanScreenMaterial = new THREE.ShaderMaterial({
-
-												vertexShader: _shaderHelper.shaderHelper.equipotentialLines.vertex,
-												fragmentShader: _shaderHelper.shaderHelper.equipotentialLines.fragment,
-
-												uniforms: {
-
-														numCharges: { value: 0 },
-														charges: { value: [0, 0, 0] },
-														screenDimentions: { value: [this.getWidth(), this.getHeight()] }
-
-												},
-
-												transparent: true
-
-										});
-
-										console.log(this.scanScreenMaterial);
-
-										console.log(this.getHeight());
-
-										this.scanBackground = new THREE.Mesh(this.quadGeometry, this.scanScreenMaterial);
-										this.scanBackground.scale.set(10, 10, 1.0);
-										this.scanScene.add(this.scanBackground);
-										this.scanScreenMaterial.extensions.derivatives = true;
 								} else {
 
 										return;
@@ -4335,13 +4324,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								var _charge = charges[_i2];
 
-								var pos2d = this.get2DPos(new THREE.Vector3(_charge.position[0], _charge.position[1], _charge.position[2]));
-								chargesUniform.push(pos2d.x);
-								chargesUniform.push(pos2d.y);
-
-								// console.log(pos2d);
-
-								chargesUniform.push(_charge.charge * _charge.sign);
+								chargesUniform.push(_charge.position[0]);
+								chargesUniform.push(_charge.position[1]);
+								chargesUniform.push(Math.abs(_charge.charge / _charge.maxCharge) * _charge.sign);
 
 								var _dist2 = vec3.length(vec3.sub(vec3.create(), _charge.position, player.position));
 
@@ -4357,9 +4342,11 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						if (chargesUniform.length > 0) {
 
-								this.scanScreenMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
-								this.scanScreenMaterial.uniforms.charges.value = chargesUniform;
+								this.scanMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
+								this.scanMaterial.uniforms.charges.value = chargesUniform;
 						}
+
+						// console.log(chargesUniform);
 
 						player.applyForce(forceResult);
 
@@ -5312,9 +5299,9 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						uniforms: {
 
-								gridSubdivisions: { value: 60 },
+								// gridSubdivisions: { value: 60 },
 								numMasses: { value: 0 },
-								masses: { value: [0, 0, 0, 0] }
+								masses: { value: [0, 0, 0] }
 
 						}
 
@@ -5596,8 +5583,9 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						if (massesUniforms.length > 0) {
 
-								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
-								this.gridMaterial.uniforms.masses.value = massesUniforms;
+								// this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
+								// this.gridMaterial.uniforms.masses.value = massesUniforms;
+
 						}
 
 						for (var _j = 0; _j < playerParticles.length; _j++) {
@@ -7841,17 +7829,17 @@ var shaderHelper = {
 
 			equipotentialLines: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges [ MAX_CHARGES ];\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tfloat strength = 0.0;\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 cPos = vec2 ( charges[ i ].x, screenDimentions.y - charges[ i ].y );\n\t\t\t\t\tfloat dist = length ( cPos - gl_FragCoord.xy ) * 0.001;\n\t\t\t\t\tstrength += charges[ i ].z / ( dist * dist );\n\n\t\t\t\t}\n\n\t\t\t\t// float f = abs ( fract ( strength ) - 0.5 );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 1.2;\n\n\t\t\t\tfloat P = strength;\n\t\t\t\tfloat gsize = 150.5;\n\t\t\t\tfloat gwidth = 3.0;\n\t\t\t\tfloat f  = abs(fract (P * gsize)-0.5);\n\n\t\t\t\tfloat df = fwidth(P * gsize);\n\t\t\t\tfloat g = smoothstep(-gwidth*df,gwidth*df , f);\n\t\t\t\tfloat c = g; \n\t\t\t\tgl_FragColor = vec4( ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), 1.0 );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.1 - abs ( P ) * 4.0;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
 			grid: {
 
-						vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 400;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec4 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tconst int MAX_MASSES = 110;\n\t\t\t// uniform float numMasses;\n\t\t\tuniform float masses[ MAX_MASSES ];\n\t\t\t// uniform vec4 masses2[ MAX_MASSES ];\n\n\t\t\tvoid main () {\n\n\t\t\t\t// for ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t// \tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t// }\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform float gridSubdivisions;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\t// uniform float gridSubdivisions;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// // Pick a coordinate to visualize in a grid\n\t\t\t\t// vec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// // Compute anti-aliased world-space grid lines\n\t\t\t\t// vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\t// float line = min ( grid.x, grid.y );\n\n\t\t\t\t// // Just visualize the grid lines directly\n\t\t\t\t// gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\t// gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
 			},
 
 			indicator: {
@@ -8089,6 +8077,30 @@ var _levels = require("./levels");
 
 		function init() {
 
+				// Cross browser variables
+
+				var performance = window.performance || {};
+				performance.now = function () {
+
+						var _now = Date.now();
+						return performance.now || performance.webkitNow || performance.msNow || performance.oNow || performance.mozNow || function () {
+								return Date.now() - _now;
+						};
+				}();
+
+				window.performance = performance;
+
+				if (!window.requestAnimationFrame) {
+
+						window.requestAnimationFrame = function () {
+
+								return window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function ( /* function FrameRequestCallback */callback, /* DOMElement Element */element) {
+
+										window.setTimeout(callback, 1000 / 60);
+								};
+						}();
+				}
+
 				// Build GUI
 
 				var menu = document.querySelector('#menu');
@@ -8181,6 +8193,9 @@ var _levels = require("./levels");
 				// General
 
 				var renderer = new THREE.WebGLRenderer({ alpha: true });
+				var gl = renderer.getContext();
+
+				console.log(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS));
 
 				var devicePixelRatio = window.devicePixelRatio;
 				if (devicePixelRatio > 1.5) {
@@ -8297,8 +8312,8 @@ var _levels = require("./levels");
 
 				menu.classList.add('hidden');
 				activePage.classList.remove('active');
-				gameManager.startLevel(_levels.levels['gravity'][0]);
-				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+				// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
+				gameManager.startLevel(_levels.levels['electric'][0]);
 				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 				function update() {

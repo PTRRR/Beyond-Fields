@@ -978,72 +978,10 @@ let shaderHelper = {
 
 		vertex: `\
 
-			varying vec2 f_Uv;
-
-			void main () {
-
-				f_Uv = uv;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
-
-
-			}
-
-		`,
-
-		fragment: `\
-
-			varying vec2 f_Uv;
+			const float MAX_Z = 2.0;
 			const int MAX_CHARGES = 20;
 			uniform float numCharges;
-			uniform vec3 charges [ MAX_CHARGES ];
-			uniform vec2 screenDimentions;
-
-			void main () {
-
-				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );
-				float strength = 0.0;
-
-				for ( int i = 0; i < MAX_CHARGES; i ++ ) {
-
-					if ( i >= int ( numCharges ) ) break;
-
-					vec2 cPos = vec2 ( charges[ i ].x, screenDimentions.y - charges[ i ].y );
-					float dist = length ( cPos - gl_FragCoord.xy ) * 0.001;
-					strength += charges[ i ].z / ( dist * dist );
-
-				}
-
-				// float f = abs ( fract ( strength ) - 0.5 );
-
-				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );
-
-				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 1.2;
-
-				float P = strength;
-				float gsize = 150.5;
-				float gwidth = 3.0;
-				float f  = abs(fract (P * gsize)-0.5);
-
-				float df = fwidth(P * gsize);
-				float g = smoothstep(-gwidth*df,gwidth*df , f);
-				float c = g; 
-				gl_FragColor = vec4( ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), ( 1.0 - c ) * ( 1.0 - cDist ), 1.0 );// * gl_Color;
-				gl_FragColor.a *= 1.1 - abs ( P ) * 4.0;
-					
-			}
-
-		`,
-
-	},
-
-	grid: {
-
-		vertex: `\
-
-			const float MAX_Z = 40.0;
-			const int MAX_MASSES = 400;
-			uniform float numMasses;
-			uniform vec4 masses[ MAX_MASSES ];
+			uniform vec3 charges[ MAX_CHARGES ];
 
 			varying vec2 f_Uv;
 			varying float f_maxZ;
@@ -1054,18 +992,18 @@ let shaderHelper = {
 				vec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );
 				vec3 rV = vec3 ( 0.0 );
 
-				for ( int i = 0; i < MAX_MASSES; i ++ ) {
+				for ( int i = 0; i < MAX_CHARGES; i ++ ) {
 
-					if ( i >= int ( numMasses ) ) break;
+					if ( i >= int ( numCharges ) ) break;
 
-					vec2 dir = masses[ i ].xy - vPos.xy;
+					vec2 dir = charges[ i ].xy - vPos.xy;
 					float maxDist = 5.5;
 					float dist = length ( dir );
 
-					vec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;
+					vec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;
 					exDir = normalize ( exDir );
 					exDir *= normalMatrix;
-					exDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;
+					exDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;
 
 					rV += exDir;
 
@@ -1073,8 +1011,10 @@ let shaderHelper = {
 
 				f_Uv = uv;
 				f_maxZ = MAX_Z;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );
-				f_Z = gl_Position.z;
+
+				vec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );
+				f_Z = rV.z;
+				gl_Position = outPosition;
 
 			}
 
@@ -1082,7 +1022,59 @@ let shaderHelper = {
 
 		fragment: `\
 
-			uniform float gridSubdivisions;
+			varying vec2 f_Uv;
+			varying float f_maxZ;
+			varying float f_Z;
+
+			void main()
+			{
+
+				float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;
+				vec3 P = vec3 ( f_Z );
+
+				float gsize = 50.0;
+				float gwidth = 1.5;
+
+				vec3 f  = abs( fract ( P * gsize ) -0.5 );
+				vec3 df = fwidth ( P * gsize );
+				vec3 g = smoothstep ( -gwidth * df, gwidth * df, f );
+				float c = g.x * g.y * g.z; 
+				gl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;
+				gl_FragColor.a *= 1.0 - cDist * 0.6;
+				gl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );
+
+			}
+
+		`,
+
+	},
+
+	grid: {
+
+		vertex: `\
+
+			const int MAX_MASSES = 110;
+			// uniform float numMasses;
+			uniform float masses[ MAX_MASSES ];
+			// uniform vec4 masses2[ MAX_MASSES ];
+
+			void main () {
+
+				// for ( int i = 0; i < MAX_MASSES; i ++ ) {
+
+				// 	if ( i >= int ( numMasses ) ) break;
+
+				// }
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			// uniform float gridSubdivisions;
 
 			varying vec2 f_Uv;
 			varying float f_maxZ;
@@ -1090,18 +1082,20 @@ let shaderHelper = {
 
 			void main () {
 
-				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+				// float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
 
-				// Pick a coordinate to visualize in a grid
-				vec2 coord = f_Uv * gridSubdivisions;
+				// // Pick a coordinate to visualize in a grid
+				// vec2 coord = f_Uv * gridSubdivisions;
 
-				// Compute anti-aliased world-space grid lines
-				vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );
-				float line = min ( grid.x, grid.y );
+				// // Compute anti-aliased world-space grid lines
+				// vec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );
+				// float line = min ( grid.x, grid.y );
 
-				// Just visualize the grid lines directly
-				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
-				gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );
+				// // Just visualize the grid lines directly
+				// gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
+				// gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.95 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );
+
+				gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
 				
 			}
 

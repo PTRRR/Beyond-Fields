@@ -21,6 +21,31 @@ export class ElectricLevel extends LevelCore {
 		this.currentInstance = null;
 		this.mouseOnDown = null;
 
+		// Build scan background
+
+		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
+		this.scanGeometry = new THREE.PlaneGeometry ( 1, 1, 300, 300 );
+		this.scanMaterial = new THREE.ShaderMaterial ( {
+
+			vertexShader: shaderHelper.equipotentialLines.vertex,
+			fragmentShader: shaderHelper.equipotentialLines.fragment,
+			transparent: true,
+
+			uniforms: {
+
+
+				numCharges: { value: 0 },
+				charges: { value: [ 0, 0, 0 ] },
+
+			}
+
+		} );
+
+		this.scanMesh = new THREE.Mesh ( this.scanGeometry, this.scanMaterial );
+		this.scanMesh.scale.set ( maxScale, maxScale, 1.0 );
+		this.scanScene.add ( this.scanMesh );
+		this.scanMaterial.extensions.derivatives = true;
+
 	}
 
 	build () {
@@ -139,41 +164,6 @@ export class ElectricLevel extends LevelCore {
 				this.gameElements.player.instances[ 0 ].mass = 400;
 				this.resetPlayer();
 
-				// let text = this.makeTextSprite ( 'popop', {
-
-				// 	fontsize: 70,
-
-				// } );
-				// text.position.set ( 0, 0, 0 );
-				// text.scale.set ( 1.0, 0.5, 0.5 );
-				// this.mainScene.add ( text );
-
-				this.scanScreenMaterial = new THREE.ShaderMaterial ( {
-
-					vertexShader: shaderHelper.equipotentialLines.vertex,
-					fragmentShader: shaderHelper.equipotentialLines.fragment,
-
-					uniforms: {
-
-						numCharges: { value: 0 },
-						charges: { value: [ 0, 0, 0 ] },
-						screenDimentions: { value: [ this.getWidth (), this.getHeight () ] },
-
-					},
-
-					transparent: true,
-
-				} );
-
-				console.log(this.scanScreenMaterial);
-
-				console.log(this.getHeight ());
-
-				this.scanBackground = new THREE.Mesh ( this.quadGeometry, this.scanScreenMaterial );
-				this.scanBackground.scale.set ( 10, 10, 1.0 );
-				this.scanScene.add ( this.scanBackground );
-				this.scanScreenMaterial.extensions.derivatives = true;
-
 			} else {
 
 				return;
@@ -246,13 +236,9 @@ export class ElectricLevel extends LevelCore {
 
 			let charge = charges[ i ];
 
-			let pos2d = this.get2DPos ( new THREE.Vector3 ( charge.position[ 0 ], charge.position[ 1 ], charge.position[ 2 ] ) );
-			chargesUniform.push ( pos2d.x );
-			chargesUniform.push ( pos2d.y );
-
-			// console.log(pos2d);
-
-			chargesUniform.push ( charge.charge * charge.sign );
+			chargesUniform.push ( charge.position[ 0 ] );
+			chargesUniform.push ( charge.position[ 1 ] );
+			chargesUniform.push ( Math.abs ( charge.charge / charge.maxCharge ) * charge.sign );
 
 			let dist = vec3.length ( vec3.sub ( vec3.create(), charge.position, player.position ) );
 
@@ -271,10 +257,12 @@ export class ElectricLevel extends LevelCore {
 
 		if ( chargesUniform.length > 0 ) {
 
-			this.scanScreenMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
-			this.scanScreenMaterial.uniforms.charges.value = chargesUniform;
+			this.scanMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
+			this.scanMaterial.uniforms.charges.value = chargesUniform;
 
 		}
+
+		// console.log(chargesUniform);
 
 		player.applyForce ( forceResult );
 

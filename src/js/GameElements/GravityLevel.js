@@ -35,9 +35,9 @@ export class GravityLevel extends LevelCore {
 
 			uniforms: {
 
-				gridSubdivisions: { value: 60 },
+				// gridSubdivisions: { value: 60 },
 				numMasses: { value: 0 },
-				masses: { value: [ 0, 0, 0, 0 ] },
+				masses: { value: [ 0, 0, 0 ] },
 
 			},
 
@@ -333,8 +333,8 @@ export class GravityLevel extends LevelCore {
 
 		if ( massesUniforms.length > 0 ) {
 
-			this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
-			this.gridMaterial.uniforms.masses.value = massesUniforms;
+			// this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
+			// this.gridMaterial.uniforms.masses.value = massesUniforms;
 			
 		}
 
