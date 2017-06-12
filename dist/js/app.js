@@ -2446,7 +2446,7 @@ function findChar (array, value, start) {
   }
   return -1
 }
-},{"as-number":2,"word-wrapper":29,"xtend":32}],15:[function(require,module,exports){
+},{"as-number":2,"word-wrapper":31,"xtend":34}],15:[function(require,module,exports){
 (function (Buffer){
 var xhr = require('xhr')
 var noop = function(){}
@@ -2547,7 +2547,7 @@ function getBinaryOpts(opt) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./lib/is-binary":16,"buffer":5,"parse-bmfont-ascii":18,"parse-bmfont-binary":19,"parse-bmfont-xml":20,"xhr":30,"xtend":32}],16:[function(require,module,exports){
+},{"./lib/is-binary":16,"buffer":5,"parse-bmfont-ascii":18,"parse-bmfont-binary":19,"parse-bmfont-xml":20,"xhr":32,"xtend":34}],16:[function(require,module,exports){
 (function (Buffer){
 var equal = require('buffer-equal')
 var HEADER = new Buffer([66, 77, 70, 3])
@@ -3006,7 +3006,7 @@ function getAttribList(element) {
 function mapName(nodeName) {
   return NAME_MAP[nodeName.toLowerCase()] || nodeName
 }
-},{"./parse-attribs":21,"xml-parse-from-string":31}],21:[function(require,module,exports){
+},{"./parse-attribs":21,"xml-parse-from-string":33}],21:[function(require,module,exports){
 //Some versions of GlyphDesigner have a typo
 //that causes some bugs with parsing. 
 //Need to confirm with recent version of the software
@@ -3067,7 +3067,7 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":8,"trim":28}],23:[function(require,module,exports){
+},{"for-each":8,"trim":30}],23:[function(require,module,exports){
 var dtype = require('dtype')
 var anArray = require('an-array')
 var isBuffer = require('is-buffer')
@@ -3236,7 +3236,7 @@ TextGeometry.prototype.computeBoundingBox = function () {
   utils.computeBox(positions, bbox)
 }
 
-},{"./lib/utils":25,"./lib/vertices":26,"inherits":11,"layout-bmfont-text":14,"object-assign":17,"quad-indices":23,"three-buffer-vertex-data":27}],25:[function(require,module,exports){
+},{"./lib/utils":25,"./lib/vertices":26,"inherits":11,"layout-bmfont-text":14,"object-assign":17,"quad-indices":23,"three-buffer-vertex-data":29}],25:[function(require,module,exports){
 var itemSize = 2
 var box = { min: [0, 0], max: [0, 0] }
 
@@ -3356,6 +3356,132 @@ module.exports.positions = function positions (glyphs) {
 }
 
 },{}],27:[function(require,module,exports){
+var assign = require('object-assign');
+
+module.exports = function createMSDFShader (opt) {
+  opt = opt || {};
+  var opacity = typeof opt.opacity === 'number' ? opt.opacity : 1;
+  var alphaTest = typeof opt.alphaTest === 'number' ? opt.alphaTest : 0.0001;
+  var precision = opt.precision || 'highp';
+  var color = opt.color;
+  var map = opt.map;
+
+  // remove to satisfy r73
+  delete opt.map;
+  delete opt.color;
+  delete opt.precision;
+  delete opt.opacity;
+
+  return assign({
+    uniforms: {
+      opacity: { type: 'f', value: opacity },
+      map: { type: 't', value: map || new THREE.Texture() },
+      color: { type: 'c', value: new THREE.Color(color) }
+    },
+    vertexShader: [
+      'attribute vec2 uv;',
+      'attribute vec4 position;',
+      'uniform mat4 projectionMatrix;',
+      'uniform mat4 modelViewMatrix;',
+      'varying vec2 vUv;',
+      'void main() {',
+      'vUv = uv;',
+      'gl_Position = projectionMatrix * modelViewMatrix * position;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      '#ifdef GL_OES_standard_derivatives',
+      '#extension GL_OES_standard_derivatives : enable',
+      '#endif',
+      'precision ' + precision + ' float;',
+      'uniform float opacity;',
+      'uniform vec3 color;',
+      'uniform sampler2D map;',
+      'varying vec2 vUv;',
+
+      'float median(float r, float g, float b) {',
+      '  return max(min(r, g), min(max(r, g), b));',
+      '}',
+
+      'void main() {',
+      '  vec3 sample = 1.0 - texture2D(map, vUv).rgb;',
+      '  float sigDist = median(sample.r, sample.g, sample.b) - 0.5;',
+      '  float alpha = clamp(sigDist/fwidth(sigDist) + 0.5, 0.0, 1.0);',
+      '  gl_FragColor = vec4(color.xyz, alpha * opacity);',
+      alphaTest === 0
+        ? ''
+        : '  if (gl_FragColor.a < ' + alphaTest + ') discard;',
+      '}'
+    ].join('\n')
+  }, opt);
+};
+
+},{"object-assign":17}],28:[function(require,module,exports){
+var assign = require('object-assign')
+
+module.exports = function createSDFShader (opt) {
+  opt = opt || {}
+  var opacity = typeof opt.opacity === 'number' ? opt.opacity : 1
+  var alphaTest = typeof opt.alphaTest === 'number' ? opt.alphaTest : 0.0001
+  var precision = opt.precision || 'highp'
+  var color = opt.color
+  var map = opt.map
+
+  // remove to satisfy r73
+  delete opt.map
+  delete opt.color
+  delete opt.precision
+  delete opt.opacity
+
+  return assign({
+    uniforms: {
+      opacity: { type: 'f', value: opacity },
+      map: { type: 't', value: map || new THREE.Texture() },
+      color: { type: 'c', value: new THREE.Color(color) }
+    },
+    vertexShader: [
+      'attribute vec2 uv;',
+      'attribute vec4 position;',
+      'uniform mat4 projectionMatrix;',
+      'uniform mat4 modelViewMatrix;',
+      'varying vec2 vUv;',
+      'void main() {',
+      'vUv = uv;',
+      'gl_Position = projectionMatrix * modelViewMatrix * position;',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      '#ifdef GL_OES_standard_derivatives',
+      '#extension GL_OES_standard_derivatives : enable',
+      '#endif',
+      'precision ' + precision + ' float;',
+      'uniform float opacity;',
+      'uniform vec3 color;',
+      'uniform sampler2D map;',
+      'varying vec2 vUv;',
+
+      'float aastep(float value) {',
+      '  #ifdef GL_OES_standard_derivatives',
+      '    float afwidth = length(vec2(dFdx(value), dFdy(value))) * 0.70710678118654757;',
+      '  #else',
+      '    float afwidth = (1.0 / 32.0) * (1.4142135623730951 / (2.0 * gl_FragCoord.w));',
+      '  #endif',
+      '  return smoothstep(0.5 - afwidth, 0.5 + afwidth, value);',
+      '}',
+
+      'void main() {',
+      '  vec4 texColor = texture2D(map, vUv);',
+      '  float alpha = aastep(texColor.a);',
+      '  gl_FragColor = vec4(color, opacity * alpha);',
+      alphaTest === 0
+        ? ''
+        : '  if (gl_FragColor.a < ' + alphaTest + ') discard;',
+      '}'
+    ].join('\n')
+  }, opt)
+}
+
+},{"object-assign":17}],29:[function(require,module,exports){
 var flatten = require('flatten-vertex-data')
 var warned = false;
 
@@ -3455,7 +3581,7 @@ function rebuildAttribute (attrib, data, itemSize) {
   return false
 }
 
-},{"flatten-vertex-data":7}],28:[function(require,module,exports){
+},{"flatten-vertex-data":7}],30:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -3471,7 +3597,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],29:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var newline = /\n/
 var newlineChar = '\n'
 var whitespace = /\s/
@@ -3599,7 +3725,7 @@ function monospace(text, start, end, width) {
         end: start+glyphs
     }
 }
-},{}],30:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var isFunction = require("is-function")
@@ -3842,7 +3968,7 @@ function getXml(xhr) {
 
 function noop() {}
 
-},{"global/window":9,"is-function":13,"parse-headers":22,"xtend":32}],31:[function(require,module,exports){
+},{"global/window":9,"is-function":13,"parse-headers":22,"xtend":34}],33:[function(require,module,exports){
 module.exports = (function xmlparser() {
   //common browsers
   if (typeof self.DOMParser !== 'undefined') {
@@ -3871,7 +3997,7 @@ module.exports = (function xmlparser() {
   }
 })()
 
-},{}],32:[function(require,module,exports){
+},{}],34:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -3892,7 +4018,7 @@ function extend() {
     return target
 }
 
-},{}],33:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -3924,7 +4050,8 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 				_this.scale = vec3.create();
 				_this.applyForce([(Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70]);
 
-				_this.targetMass = _this.mass;
+				_this.maxMass = _this.mass;
+				_this.targetMass = _this.maxMass;
 				_this.mass = 0;
 
 				return _this;
@@ -3941,6 +4068,7 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 						this.scale[2] += (this.targetScale[2] - this.scale[2]) * 0.07;
 
 						this.mass = this.scale[0] / this.targetScale[0] * this.targetMass;
+						this.targetMass = this.maxMass * this.lifePercent;
 
 						this.color[3] = this.lifePercent;
 				}
@@ -3949,7 +4077,7 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 		return BlackMatter;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],34:[function(require,module,exports){
+},{"./PhysicalElement":45}],36:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4369,7 +4497,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 		return ElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":40,"./shaderHelper":48}],35:[function(require,module,exports){
+},{"./LevelCore":42,"./shaderHelper":50}],37:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4510,7 +4638,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 		return ElectricParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],36:[function(require,module,exports){
+},{"./PhysicalElement":45}],38:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4625,7 +4753,7 @@ var ElectricPlanetParticle = exports.ElectricPlanetParticle = function (_Physica
 		return ElectricPlanetParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],37:[function(require,module,exports){
+},{"./PhysicalElement":45}],39:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4695,7 +4823,7 @@ var ElementCore = exports.ElementCore = function () {
 		return ElementCore;
 }();
 
-},{}],38:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5126,7 +5254,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":40,"./Text":46,"./shaderHelper":48}],39:[function(require,module,exports){
+},{"./LevelCore":42,"./Text":48,"./shaderHelper":50}],41:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5144,11 +5272,18 @@ var _shaderHelper = require("./shaderHelper");
 
 var _LevelCore2 = require("./LevelCore");
 
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var sdfShader = require('three-bmfont-text/shaders/sdf');
+var msdfShader = require('three-bmfont-text/shaders/msdf');
+var bmfontGeometry = require('three-bmfont-text');
+var bmfontLoader = require('load-bmfont');
 
 var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 		_inherits(GravityLevel, _LevelCore);
@@ -5169,33 +5304,79 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 				// build a grid
 
-				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 100, 100);
+				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
+				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 200, 200);
 				_this.gridMaterial = new THREE.ShaderMaterial({
 
 						vertexShader: _shaderHelper.shaderHelper.grid.vertex,
 						fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
 						transparent: true,
 
-						uniforms: {
+						uniforms: _defineProperty({
 
-								gridSubdivisions: { value: 50 },
+								gridSubdivisions: { value: 80 },
 								mouse: { value: [0, 0] },
 								numMasses: { value: 0 },
 								masses: { value: [0, 0, 0] }
+						}, "mouse", { value: [0, 0, 0] })
 
-						}
+						// side: THREE.DoubleSide,
 
 				});
 
-				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
 				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
-				_this.grid.scale.set(maxScale, maxScale, 1);
+				_this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1);
 				_this.scanScene.add(_this.grid);
 				_this.gridMaterial.extensions.derivatives = true;
 
 				// Blackmatter
 
 				_this.canDraw = true;
+
+				// Text
+
+				bmfontLoader('./resources/fonts/GT-America.fnt', function (err, font) {
+
+						if (err) {
+
+								console.error(err);
+						} else {
+
+								var geometry = bmfontGeometry({
+
+										width: 1500,
+										align: 'center',
+										font: font
+
+								});
+
+								geometry.update("Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum");
+
+								geometry.computeBoundingBox();
+
+								var textureLoader = new THREE.TextureLoader();
+								textureLoader.load('./resources/fonts/GT-America_sdf.png', function (texture) {
+
+										var material = new THREE.RawShaderMaterial(sdfShader({
+
+												map: texture,
+												side: THREE.DoubleSide,
+												transparent: true,
+												color: 'rgb(0, 0, 0)'
+
+										}));
+
+										var mesh = new THREE.Mesh(geometry, material);
+										this.infoScene.add(mesh);
+										mesh.material.extensions.derivatives = true;
+										geometry.computeBoundingSphere();
+										mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
+										mesh.position.y += geometry.boundingSphere.center.y * 0.003;
+										mesh.rotation.x = Math.PI;
+										mesh.scale.set(0.003, 0.003, 0.003);
+								}.bind(this));
+						}
+				}.bind(_this));
 
 				return _this;
 		}
@@ -5277,7 +5458,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
 
 						var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
-						this.grid.scale.set(maxScale, maxScale, 1.0);
+						this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1.0);
 				}
 		}, {
 				key: "update",
@@ -5341,6 +5522,9 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								massesUniforms.push(bC.position[0]);
 								massesUniforms.push(bC.position[1]);
 								massesUniforms.push(bC.mass);
+								massesUniforms.push(bC.maxMass);
+
+								// console.log(bC.lifePercent);
 
 								if (dist > bC.scale[0]) {
 
@@ -5366,6 +5550,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								massesUniforms.push(planet.position[0]);
 								massesUniforms.push(planet.position[1]);
 								massesUniforms.push(planet.mass);
+								massesUniforms.push(planet.maxMass);
 
 								if (_dist > planet.scale[0]) {
 
@@ -5407,8 +5592,13 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						// Update the grid in the scan scene.
 
-						this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
-						this.gridMaterial.uniforms.masses.value = massesUniforms;
+						if (massesUniforms.length > 0) {
+
+								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
+								this.gridMaterial.uniforms.masses.value = massesUniforms;
+						}
+
+						this.gridMaterial.uniforms.mouse.value = this.glMouseWorld;
 
 						for (var _j = 0; _j < playerParticles.length; _j++) {
 
@@ -5477,7 +5667,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 		return GravityLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":40,"./PhysicalElement":43,"./shaderHelper":48}],40:[function(require,module,exports){
+},{"./LevelCore":42,"./PhysicalElement":45,"./shaderHelper":50,"load-bmfont":15,"three-bmfont-text":24,"three-bmfont-text/shaders/msdf":27,"three-bmfont-text/shaders/sdf":28}],42:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5735,7 +5925,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Update screns size & position.
 
-						this.scanScreenTargetPosition.set(this.getWorldRight() * 2.0, 0.0, 0.0);
+						this.scanScreenTargetPosition.set(0.0, 0.0, 0.0);
 						this.scanScreen.position.set(this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z);
 
 						this.scanScreen.scale.x = this.getWorldRight() * 2.0;
@@ -7055,7 +7245,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":53,"./library":47,"./shaderHelper":48,"load-bmfont":15,"three-bmfont-text":24}],41:[function(require,module,exports){
+},{"../utils":55,"./library":49,"./shaderHelper":50,"load-bmfont":15,"three-bmfont-text":24}],43:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7083,7 +7273,7 @@ var Obstacle = exports.Obstacle = function (_PhysicalElement) {
 	return Obstacle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],42:[function(require,module,exports){
+},{"./PhysicalElement":45}],44:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7134,7 +7324,7 @@ var Particle = exports.Particle = function (_PhysicalElement) {
 		return Particle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],43:[function(require,module,exports){
+},{"./PhysicalElement":45}],45:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7260,7 +7450,7 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 	return PhysicalElement;
 }(_ElementCore2.ElementCore);
 
-},{"./ElementCore":37}],44:[function(require,module,exports){
+},{"./ElementCore":39}],46:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7296,6 +7486,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 				_this.charge = _options.charge || 0;
 
 				_this.charges = [];
+				_this.maxMass = _this.mass;
 
 				return _this;
 		}
@@ -7322,7 +7513,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 		return Planet;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"../utils":53,"./PhysicalElement":43}],45:[function(require,module,exports){
+},{"../utils":55,"./PhysicalElement":45}],47:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7374,7 +7565,7 @@ var Player = exports.Player = function (_PhysicalElement) {
 		return Player;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],46:[function(require,module,exports){
+},{"./PhysicalElement":45}],48:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -7441,7 +7632,7 @@ var Text = exports.Text = function (_PhysicalElement) {
 		return Text;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":43}],47:[function(require,module,exports){
+},{"./PhysicalElement":45}],49:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7480,7 +7671,7 @@ var library = {
 
 exports.library = library;
 
-},{"./BlackMatter":33,"./ElectricParticle":35,"./ElectricPlanetParticle":36,"./Obstacle":41,"./Particle":42,"./PhysicalElement":43,"./Planet":44,"./Player":45}],48:[function(require,module,exports){
+},{"./BlackMatter":35,"./ElectricParticle":37,"./ElectricPlanetParticle":38,"./Obstacle":43,"./Particle":44,"./PhysicalElement":45,"./Planet":46,"./Player":47}],50:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7501,6 +7692,14 @@ var shaderHelper = {
 						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			blackMatterScan: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -7671,16 +7870,23 @@ var shaderHelper = {
 
 			grid: {
 
-						vertex: "\n\t\t\tconst int MAX_MASSES = 500;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses [ MAX_MASSES ];\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\n\t\t\t\tvec4 vPos = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec4 rf = vec4 ( 0.0 );\n\n\t\t\t\tif ( numMasses > 0.0 ) {\n\n\t\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\t\tfloat m = masses[ i ].z;\n\t\t\t\t\t\tvec3 p = vec3 ( masses[ i ].xy, 0.0 );\n\n\t\t\t\t\t\tfloat maxDist = 4.0;\n\t\t\t\t\t\tvec3 dir = ( p - vPos.xyz );\n\t\t\t\t\t\tfloat dist = length ( dir );\n\t\t\t\t\t\tdist = clamp ( dist, 0.0, maxDist );\n\n\n\t\t\t\t\t\trf.x += dir.x / ( dist * dist );\n\n\t\t\t\t\t}\n\n\t\t\t\t}\n\n\t\t\t\t// vec3 vPos = ( vec4 ( position.xyz, 1.0 ) * modelViewMatrix ).xyz;\n\t\t\t\tgl_Position = vPos + rf;\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tconst int MAX_MASSES = 500;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec4 masses [ MAX_MASSES ];\n\t\t\tvarying float z;\n\t\t\tuniform vec3 mouse;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\t// for ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t// \tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t// \tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t// \tfloat maxDist = 5.5;\n\t\t\t\t// \tfloat dist = length ( dir );\n\n\t\t\t\t// \tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t// \texDir = normalize ( exDir );\n\t\t\t\t// \texDir *= normalMatrix;\n\t\t\t\t// \texDir *= 40.0 * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;\n\n\t\t\t\t// \trV += exDir;\n\n\t\t\t\t// }\n\t\t\t\t\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tz = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float gridSubdivisions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.0 - min ( line, 1.0 ) ) * 0.6 );\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float gridSubdivisions;\n\t\t\tvarying float z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\t// gl_FragColor.a *= ( 1.0 - cDist * 0.5 ) * ( 1.0 - z / -2.0 ) * 0.7;\n\t\t\t\t// gl_FragColor.a *= 1.0 - z / 60.0;\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
+			sdfFont: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 			}
 
 };
 
 exports.shaderHelper = shaderHelper;
 
-},{}],49:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7868,7 +8074,7 @@ var GameManager = exports.GameManager = function () {
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":34,"./GameElements/GravityElectricLevel":38,"./GameElements/GravityLevel":39,"./utils":53}],50:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":36,"./GameElements/GravityElectricLevel":40,"./GameElements/GravityLevel":41,"./utils":55}],52:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -7881,67 +8087,7 @@ var _levels = require("./levels");
 
 (function () {
 
-		function loadAllResources(_resources, _onLoad) {
-
-				var loadedResources = {};
-
-				if (_resources instanceof Object) {
-						(function () {
-
-								var numResources = 0;
-
-								for (var resource in _resources) {
-
-										var type = _resources[resource].type;
-										var url = _resources[resource].url;
-
-										loadedResources[resource] = {};
-										loadedResources[resource].type = type;
-										loadedResources[resource].url = url;
-
-										(function () {
-												switch (type) {
-
-														case 'img':
-
-																var image = new Image();
-																image.src = url;
-
-																(function (name) {
-
-																		(0, _utils.addEvent)(image, 'load', function () {
-
-																				loadedResources[name].element = this;
-
-																				numResources--;
-
-																				if (numResources == 0) {
-
-																						_onLoad(loadedResources);
-																				}
-																		});
-																})(resource);
-
-																break;
-
-												}
-										})();
-
-										numResources++;
-								}
-						})();
-				} else {
-
-						console.error('APP ERROR: resources attribute must be an object!');
-				}
-		}
-
-		loadAllResources(_resourcesList.resourcesList, function (_loadedResources) {
-
-				init(_loadedResources);
-		});
-
-		function init(_loadedResources) {
+		function init() {
 
 				// Build GUI
 
@@ -8037,9 +8183,9 @@ var _levels = require("./levels");
 				var renderer = new THREE.WebGLRenderer({ alpha: true });
 
 				var devicePixelRatio = window.devicePixelRatio;
-				if (devicePixelRatio > 1) {
+				if (devicePixelRatio > 1.5) {
 
-						devicePixelRatio = 1;
+						devicePixelRatio = 1.5;
 				}
 				renderer.setPixelRatio(devicePixelRatio);
 				renderer.setSize(window.innerWidth, window.innerHeight);
@@ -8179,9 +8325,11 @@ var _levels = require("./levels");
 
 				requestAnimationFrame(mainLoop);
 		}
+
+		init();
 })();
 
-},{"./GameManager":49,"./levels":51,"./resourcesList":52,"./utils":53}],51:[function(require,module,exports){
+},{"./GameManager":51,"./levels":53,"./resourcesList":54,"./utils":55}],53:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -8278,7 +8426,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9186,7 +9334,7 @@ var levels = {
 
 exports.levels = levels;
 
-},{}],52:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -9233,7 +9381,7 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],53:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9479,4 +9627,4 @@ function clone(obj) {
     throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
-},{}]},{},[50]);
+},{}]},{},[52]);

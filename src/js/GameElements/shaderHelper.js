@@ -102,6 +102,85 @@ let shaderHelper = {
 
 	},
 
+	blackMatterScan: {
+
+		vertex: `\
+
+			attribute vec4 transform;
+			attribute vec4 rgbaColor;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+
+			mat4 scaleMatrix ( vec3 scale ) {
+
+				return mat4(scale.x, 0.0, 0.0, 0.0,
+				            0.0, scale.y, 0.0, 0.0,
+				            0.0, 0.0, scale.z, 0.0,
+				            0.0, 0.0, 0.0, 1.0);
+
+			}
+
+			mat4 rotationMatrix(vec3 axis, float angle) {
+
+				axis = normalize(axis);
+				float s = sin(angle);
+				float c = cos(angle);
+				float oc = 1.0 - c;
+				    
+				return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+				            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+				            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+				            0.0,                                0.0,                                0.0,                                1.0);
+				
+			}
+
+			void main () {
+
+				f_Color = rgbaColor;
+				f_Uv = uv;
+				vec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );
+				f_Scale = transform.z;
+
+				// Transform the position
+
+				outPosition *= scaleMatrix ( vec3 ( transform.z ) );
+				outPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );
+				
+
+				outPosition.x += transform.x;
+				outPosition.y += transform.y;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform sampler2D texture;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+
+			void main () {
+
+				vec4 sdf = texture2D ( texture, f_Uv );
+				float sdfDist = sdf.x * sdf.y * sdf.z;
+
+				float w = 0.05 / f_Scale;
+				float t = 0.99 - w;
+
+				gl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );
+				gl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;
+
+			}
+
+		`,
+
+	},
+
 	solidQuad: {
 
 		vertex: `\
@@ -1074,39 +1153,36 @@ let shaderHelper = {
 			const int MAX_MASSES = 500;
 			varying vec2 f_Uv;
 			uniform float numMasses;
-			uniform vec3 masses [ MAX_MASSES ];
+			uniform vec4 masses [ MAX_MASSES ];
+			varying float z;
+			uniform vec3 mouse;
 
 			void main () {
 
 				f_Uv = uv;
 
-				vec4 vPos = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );
-				vec4 rf = vec4 ( 0.0 );
+				vec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );
+				vec3 rV = vec3 ( 0.0 );
 
-				if ( numMasses > 0.0 ) {
+				// for ( int i = 0; i < MAX_MASSES; i ++ ) {
 
-					for ( int i = 0; i < MAX_MASSES; i ++ ) {
+				// 	if ( i >= int ( numMasses ) ) break;
 
-						if ( i >= int ( numMasses ) ) break;
+				// 	vec2 dir = masses[ i ].xy - vPos.xy;
+				// 	float maxDist = 5.5;
+				// 	float dist = length ( dir );
 
-						float m = masses[ i ].z;
-						vec3 p = vec3 ( masses[ i ].xy, 0.0 );
+				// 	vec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;
+				// 	exDir = normalize ( exDir );
+				// 	exDir *= normalMatrix;
+				// 	exDir *= 40.0 * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z / masses[ i ].w, 2.0 ) ;
 
-						float maxDist = 4.0;
-						vec3 dir = ( p - vPos.xyz );
-						float dist = length ( dir );
-						dist = clamp ( dist, 0.0, maxDist );
+				// 	rV += exDir;
 
-
-						rf.x += dir.x / ( dist * dist );
-
-					}
-
-				}
-
-				// vec3 vPos = ( vec4 ( position.xyz, 1.0 ) * modelViewMatrix ).xyz;
-				gl_Position = vPos + rf;
-
+				// }
+				
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );
+				z = gl_Position.z;
 
 			}
 
@@ -1116,10 +1192,11 @@ let shaderHelper = {
 
 			varying vec2 f_Uv;
 			uniform float gridSubdivisions;
+			varying float z;
 
 			void main () {
 
-				float cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
 
 				// Pick a coordinate to visualize in a grid
 				vec2 coord = f_Uv * gridSubdivisions;
@@ -1129,8 +1206,43 @@ let shaderHelper = {
 				float line = min ( grid.x, grid.y );
 
 				// Just visualize the grid lines directly
-				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.0 - min ( line, 1.0 ) ) * 0.6 );
+				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
+				// gl_FragColor.a *= ( 1.0 - cDist * 0.5 ) * ( 1.0 - z / -2.0 ) * 0.7;
+				// gl_FragColor.a *= 1.0 - z / 60.0;
+				gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
 
+					
+			}
+
+		`,
+	},
+
+	sdfFont: {
+
+		vertex: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				f_Uv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+			uniform sampler2D texture;
+
+			void main () {
+
+				// Just visualize the grid lines directly
+				gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+				// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+				gl_FragColor.a *= texture2D ( texture, f_Uv ).a;
 					
 			}
 

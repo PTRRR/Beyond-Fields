@@ -5,71 +5,7 @@ import { levels } from "./levels";
 
 ( function () {
 
-	function loadAllResources ( _resources, _onLoad ) {
-
-		let loadedResources = {};
-
-		if ( _resources instanceof Object ) {
-
-			let numResources = 0;
-
-			for ( let resource in _resources ) {
-
-				let type = _resources[ resource ].type;
-				let url = _resources[ resource ].url;
-
-				loadedResources[ resource ] = {};
-				loadedResources[ resource ].type = type;
-				loadedResources[ resource ].url = url;
-
-				switch ( type ) {
-
-					case 'img':
-
-						let image = new Image ();
-						image.src = url;
-
-						( function ( name ) {
-
-							addEvent ( image, 'load', function () {
-
-								loadedResources[ name ].element = this;
-
-								numResources --;
-
-								if ( numResources == 0 ) {
-
-									_onLoad ( loadedResources );
-
-								}
-
-							} );
-
-						} )( resource );
-
-					break;
-
-				}
-
-				numResources ++;
-
-			}
-
-		} else {
-
-			console.error ( 'APP ERROR: resources attribute must be an object!' );
-
-		}
-
-	}
-
-	loadAllResources ( resourcesList, function ( _loadedResources ) {
-
-		init ( _loadedResources );
-
-	} );
-
-	function init ( _loadedResources ) {
+	function init () {
 
 		// Build GUI
 
@@ -166,9 +102,9 @@ import { levels } from "./levels";
 		let renderer = new THREE.WebGLRenderer( { alpha: true } );
 
 		let devicePixelRatio = window.devicePixelRatio;
-		if ( devicePixelRatio > 1 ) {
+		if ( devicePixelRatio > 1.5 ) {
 
-			devicePixelRatio = 1;
+			devicePixelRatio = 1.5;
 
 		}
 		renderer.setPixelRatio ( devicePixelRatio );
@@ -323,5 +259,7 @@ import { levels } from "./levels";
 		requestAnimationFrame ( mainLoop );		
 
 	}
+
+	init ();
 
 } )();

@@ -10,7 +10,8 @@ export class BlackMatter extends PhysicalElement {
 		this.scale = vec3.create();
 		this.applyForce ( [ ( Math.random () - 0.5 ) * 70, ( Math.random () - 0.5 ) * 70, ( Math.random () - 0.5 ) * 70 ] );
 
-		this.targetMass = this.mass;
+		this.maxMass = this.mass;
+		this.targetMass = this.maxMass;
 		this.mass = 0;
 
 	}
@@ -24,6 +25,7 @@ export class BlackMatter extends PhysicalElement {
 		this.scale[ 2 ] += ( this.targetScale[ 2 ] - this.scale[ 2 ] ) * 0.07;
 
 		this.mass = ( this.scale[ 0 ] / this.targetScale[ 0 ] ) * this.targetMass;
+		this.targetMass = this.maxMass * this.lifePercent;
 
 		this.color[ 3 ] = this.lifePercent;
 

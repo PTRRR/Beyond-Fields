@@ -90,7 +90,7 @@ let levels = {
 
 						scan: {
 
-							name: 'blackMatter',
+							name: 'blackMatterScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},

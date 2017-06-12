@@ -1,6 +1,10 @@
 import { PhysicalElement } from "./PhysicalElement";
 import { shaderHelper } from './shaderHelper';
 import { LevelCore } from "./LevelCore";
+let sdfShader = require('three-bmfont-text/shaders/sdf');
+let msdfShader = require('three-bmfont-text/shaders/msdf');
+let bmfontGeometry = require ( 'three-bmfont-text' );
+let bmfontLoader = require ( 'load-bmfont' );
 
 export class GravityLevel extends LevelCore {
 
@@ -21,7 +25,8 @@ export class GravityLevel extends LevelCore {
 
 		// build a grid
 
-		let gridGeometry = new THREE.PlaneBufferGeometry ( 1, 1, 100, 100 );
+		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
+		let gridGeometry = new THREE.PlaneBufferGeometry ( 1, 1, 200, 200 );
 		this.gridMaterial = new THREE.ShaderMaterial ( {
 
 			vertexShader: shaderHelper.grid.vertex,
@@ -30,24 +35,75 @@ export class GravityLevel extends LevelCore {
 
 			uniforms: {
 
-				gridSubdivisions: { value: 50 },
+				gridSubdivisions: { value: 80 },
 				mouse: { value: [ 0, 0 ] },
 				numMasses: { value: 0 },
 				masses: { value: [ 0, 0, 0 ] },
+				mouse: { value: [ 0, 0, 0 ] },
 
-			}
+			},
+
+			// side: THREE.DoubleSide,
 
 		} );
 
-		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
 		this.grid = new THREE.Mesh ( gridGeometry, this.gridMaterial );
-		this.grid.scale.set ( maxScale, maxScale, 1 );
+		this.grid.scale.set ( maxScale * 1.5, maxScale * 1.5, 1 );
 		this.scanScene.add ( this.grid );
 		this.gridMaterial.extensions.derivatives = true;
 
 		// Blackmatter
 
 		this.canDraw = true;
+
+		// Text
+
+		bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
+
+			if ( err ) {
+
+				console.error( err );
+
+			} else {
+
+				let geometry = bmfontGeometry ( {
+
+					width: 1500,
+					align: 'center',
+					font: font
+
+				} );
+
+				geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
+
+				geometry.computeBoundingBox ();
+
+				let textureLoader = new THREE.TextureLoader ();
+				textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
+
+					var material = new THREE.RawShaderMaterial( sdfShader ( {
+					  	
+					  	map: texture,
+					  	side: THREE.DoubleSide,
+					  	transparent: true,
+					  	color: 'rgb(0, 0, 0)',
+
+					} ) );
+
+					let mesh = new THREE.Mesh ( geometry, material );
+					this.infoScene.add ( mesh );
+					mesh.material.extensions.derivatives = true;
+					geometry.computeBoundingSphere ();
+					mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
+					mesh.position.y += geometry.boundingSphere.center.y * 0.003;
+					mesh.rotation.x = Math.PI;
+					mesh.scale.set ( 0.003, 0.003, 0.003 );
+
+				}.bind ( this ) );
+
+			} 
+
+		}.bind ( this ) );
 		
 	}
 
@@ -130,7 +186,7 @@ export class GravityLevel extends LevelCore {
 		super.onResize ();
 
 		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
-		this.grid.scale.set ( maxScale, maxScale, 1.0 );
+		this.grid.scale.set ( maxScale * 1.5, maxScale * 1.5, 1.0 );
 
 	}
 
@@ -197,6 +253,9 @@ export class GravityLevel extends LevelCore {
 			massesUniforms.push ( bC.position[ 0 ] );
 			massesUniforms.push ( bC.position[ 1 ] );
 			massesUniforms.push ( bC.mass );
+			massesUniforms.push ( bC.maxMass );
+
+			// console.log(bC.lifePercent);
 
 			if ( dist > bC.scale[ 0 ] ) {
 
@@ -225,6 +284,7 @@ export class GravityLevel extends LevelCore {
 			massesUniforms.push ( planet.position[ 0 ] );
 			massesUniforms.push ( planet.position[ 1 ] );
 			massesUniforms.push ( planet.mass );
+			massesUniforms.push ( planet.maxMass );
 
 			if ( dist > planet.scale[ 0 ] ) {
 
@@ -273,8 +333,14 @@ export class GravityLevel extends LevelCore {
 
 		// Update the grid in the scan scene.
 
-		this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
-		this.gridMaterial.uniforms.masses.value = massesUniforms;
+		if ( massesUniforms.length > 0 ) {
+
+			this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 4;
+			this.gridMaterial.uniforms.masses.value = massesUniforms;
+			
+		}
+
+		this.gridMaterial.uniforms.mouse.value = this.glMouseWorld;
 
 		for ( let j = 0; j < playerParticles.length; j ++ ) {
 

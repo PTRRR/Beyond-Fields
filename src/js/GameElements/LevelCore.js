@@ -246,7 +246,7 @@ export class LevelCore {
 
 		// Update screns size & position.
 
-		this.scanScreenTargetPosition.set ( this.getWorldRight () * 2.0, 0.0, 0.0 );
+		this.scanScreenTargetPosition.set ( 0.0, 0.0, 0.0 );
 		this.scanScreen.position.set ( this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z );
 
 		this.scanScreen.scale.x = this.getWorldRight () * 2.0;

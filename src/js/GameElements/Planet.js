@@ -13,6 +13,7 @@ export class Planet extends PhysicalElement {
 		this.charge = _options.charge || 0;
 
 		this.charges = [];
+		this.maxMass = this.mass;
 
 	}
 
