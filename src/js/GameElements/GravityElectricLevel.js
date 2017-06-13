@@ -25,16 +25,19 @@ export class GravityElectricLevel extends LevelCore {
 
 		super.build ();
 
-		this.scanBackgroundMaterial = new THREE.ShaderMaterial ( {
+		// Build the scan background.
+		// Electric Potential of the planets
+		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
+		let scanElectricGeometry = new THREE.PlaneGeometry ( 1, 1, 100, 100 );
+		this.scanElectricMaterial = new THREE.ShaderMaterial ( {
 
-			vertexShader: shaderHelper.equidistantLines.vertex,
-			fragmentShader: shaderHelper.equidistantLines.fragment,
+			vertexShader: shaderHelper.equipotentialLines.vertex,
+			fragmentShader: shaderHelper.equipotentialLines.fragment,
 
 			uniforms: {
 
-				numCharges: { value: 2 },
-				charges: { value: [ 1000, 1000, 300, 300 ] },
-				screenDimentions: { value: [ this.getWidth (), this.getHeight () ] },
+				numCharges: { value: 0 },
+				charges: { value: [ 0, 0, 0 ] },
 
 			},
 
@@ -42,17 +45,24 @@ export class GravityElectricLevel extends LevelCore {
 
 		} );
 
-		this.scanBackground = new THREE.Mesh ( this.quadGeometry, this.scanBackgroundMaterial );
-		this.scanBackground.scale.set ( this.getWorldLeft () * 2, this.getWorldBottom () * 2, 2 );
+		this.scanElectric = new THREE.Mesh ( scanElectricGeometry, this.scanElectricMaterial );
+		this.scanElectric.scale.set ( maxScale, maxScale, 1.0 );
+		this.scanScene.add ( this.scanElectric );
+		this.scanElectricMaterial.extensions.derivatives = true;
 
-		this.indicatorMaterial = new THREE.ShaderMaterial ( {
+		// Gravity bending
 
-			vertexShader: shaderHelper.indicator.vertex,
-			fragmentShader: shaderHelper.indicator.fragment,
+		this.scanGravityMaterial = new THREE.ShaderMaterial ( {
+
+			vertexShader: shaderHelper.grid.vertex,
+			fragmentShader: shaderHelper.grid.fragment,
 
 			uniforms: {
 
-				alpha: { value: 1 },
+				gridSubdivisions: { value: 60 },
+				mainAlpha: { value: 0.5 },
+				numMasses: { value: 0 },
+				masses: { value: [ 0, 0, 0 ] },
 
 			},
 
@@ -60,28 +70,10 @@ export class GravityElectricLevel extends LevelCore {
 
 		} );
 
-		// console.log(this.indicatorMaterial);
-
-		this.indicator = new THREE.Mesh ( this.quadGeometry, this.indicatorMaterial );
-		this.indicator.position.y += 0.5;
-		this.indicatorObj = new THREE.Object3D ();
-		this.indicatorObj.add ( this.indicator );
-		this.indicatorAlphaTarget = 0.0;
-		this.indicatorAngleTarget = 0.0;
-		this.indicatorScaleTarget = 0.0;
-		this.mainScene.add ( this.indicatorObj );
-
-		// Info text
-
-		this.text = new Text ( {
-
-			size: [ 512, 512 ],
-
-		} );
-		this.text.canvas.style.position = 'fixed';
-		this.text.canvas.style.top = '0';
-		this.text.canvas.style.left = '0';
-		document.body.appendChild ( this.text.canvas );
+		this.scanGravity = new THREE.Mesh ( scanElectricGeometry, this.scanGravityMaterial );
+		this.scanGravity.scale.set ( maxScale * 1.4, maxScale * 1.4, 1.0 );
+		this.scanScene.add ( this.scanGravity );
+		this.scanGravityMaterial.extensions.derivatives = true;
 
 	}
 
@@ -100,19 +92,19 @@ export class GravityElectricLevel extends LevelCore {
 		super.onDown ( _position );
 		this.activePlanet = this.checkPlanets ( this.glMouseWorld );
 
-		if ( this.activePlanet ) {
+		if ( !this.activeScreen && this.activePlanet ) {
 
-			this.indicatorObj.position.x = this.activePlanet.position[ 0 ];
-			this.indicatorObj.position.y = this.activePlanet.position[ 1 ];
-			this.indicatorObj.position.z = this.activePlanet.position[ 2 ];
+			// this.indicatorObj.position.x = this.activePlanet.position[ 0 ];
+			// this.indicatorObj.position.y = this.activePlanet.position[ 1 ];
+			// this.indicatorObj.position.z = this.activePlanet.position[ 2 ];
 
 			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.activePlanet.position );
 			let angle = Math.atan2 ( dir[ 1 ], dir[ 0 ] ) - Math.PI * 0.5;
 			let dist = vec3.length ( dir );
 
-			this.indicatorAlphaTarget = 1.0;
-			this.indicatorObj.rotation.z = angle;
-			this.indicatorScaleTarget = dist;
+			// this.indicatorAlphaTarget = 1.0;
+			// this.indicatorObj.rotation.z = angle;
+			// this.indicatorScaleTarget = dist;
 
 		}
 
@@ -121,6 +113,7 @@ export class GravityElectricLevel extends LevelCore {
 	onClick ( _position ) {
 
 		super.onClick ( _position );
+
 
 	}
 
@@ -134,7 +127,7 @@ export class GravityElectricLevel extends LevelCore {
 
 		super.onDrag ( _position );
 
-		if ( this.activePlanet ) {
+		if ( !this.activeScreen && this.activePlanet ) {
 
 			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.activePlanet.position );
 			let sign = Math.sign ( dir[ 1 ] );
@@ -142,13 +135,13 @@ export class GravityElectricLevel extends LevelCore {
 			let maxDist = this.activePlanet.scale[ 0 ] * 1.2;
 
 			this.activePlanet.sign = sign;
-			this.activePlanet.charge = ( dist / maxDist ) * this.activePlanet.maxCharge;
+			this.activePlanet.targetCharge = ( dist / maxDist ) * this.activePlanet.maxCharge;
 
 			let angle = Math.atan2 ( dir[ 1 ], dir[ 0 ] ) - Math.PI * 0.5;
 
-			this.indicatorAlphaTarget = 1.0;
-			this.indicatorObj.rotation.z = angle;
-			this.indicatorScaleTarget = dist;
+			// this.indicatorAlphaTarget = 1.0;
+			// this.indicatorObj.rotation.z = angle;
+			// this.indicatorScaleTarget = dist;
 
 		}
 
@@ -182,9 +175,9 @@ export class GravityElectricLevel extends LevelCore {
 
 		super.update ();
 
-		this.indicatorObj.scale.y += ( this.indicatorScaleTarget - this.indicatorObj.scale.y ) * 0.2;
+		// this.indicatorObj.scale.y += ( this.indicatorScaleTarget - this.indicatorObj.scale.y ) * 0.2;
 		// this.indicatorObj.rotation.z += ( this.indicatorAngleTarget - this.indicatorObj.rotation.z ) * 0.2;
-		this.indicatorMaterial.uniforms.alpha.value += ( this.indicatorAlphaTarget - this.indicatorMaterial.uniforms.alpha.value ) * 0.1;
+		// this.indicatorMaterial.uniforms.alpha.value += ( this.indicatorAlphaTarget - this.indicatorMaterial.uniforms.alpha.value ) * 0.1;
 
 		// main player
 
@@ -198,16 +191,29 @@ export class GravityElectricLevel extends LevelCore {
 
 		let resultForce = vec3.create ();
 
+		let chargesUniform = [];
+		let massesUniforms = [];
 		let planets = this.gameElements.planets.instances;
 
 		for ( let i = 0; i < planets.length; i ++ ) {
+
+			// Update the uniforms passed to the scan vertex shader.
+
+			chargesUniform.push ( planets[ i ].position[ 0 ] );
+			chargesUniform.push ( planets[ i ].position[ 1 ] );
+			chargesUniform.push ( Math.abs ( planets[ i ].charge / planets[ i ].maxCharge ) * planets[ i ].sign );
+
+			massesUniforms.push ( planets[ i ].position[ 0 ] );
+			massesUniforms.push ( planets[ i ].position[ 1 ] );
+			massesUniforms.push ( 3.0 );
+			
+			// Put this after uniform update to prevent glitches.
 
 			let dist = vec3.length ( vec3.sub ( vec3.create (), planets[ i ].position, player.position ) );
 
 			if ( dist < planets[ i ].scale[ 0 ] ) {
 
 				this.resetPlayer ();
-				break;
 
 			}
 
@@ -253,7 +259,27 @@ export class GravityElectricLevel extends LevelCore {
 
 		}
 
+		// Change the uniform's values.
+
+		if ( chargesUniform.length > 0 ) {
+
+			this.scanElectricMaterial.uniforms.numCharges.value = chargesUniform.length / 3;
+			this.scanElectricMaterial.uniforms.charges.value = chargesUniform;
+
+		}
+
+		if ( massesUniforms.length > 0 ) {
+
+			this.scanGravityMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+			this.scanGravityMaterial.uniforms.masses.value = massesUniforms;
+
+		}
+
+		// Update the player according to the resulting of all forces merged together.
+
 		player.applyForce ( resultForce );
+
+		// Update particles emitted by the player.
 
 		let playerParticles = this.gameElements.playerParticles.instances;
 

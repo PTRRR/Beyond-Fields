@@ -1042,6 +1042,7 @@ let shaderHelper = {
 				gl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;
 				gl_FragColor.a *= 1.0 - cDist * 0.6;
 				gl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );
+				// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
 
 			}
 
@@ -1096,6 +1097,7 @@ let shaderHelper = {
 		fragment: `\
 
 			uniform float gridSubdivisions;
+			uniform float mainAlpha;
 
 			varying vec2 f_Uv;
 			varying float f_maxZ;
@@ -1114,7 +1116,7 @@ let shaderHelper = {
 
 				// Just visualize the grid lines directly
 				gl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );
-				gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 );
+				gl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 ) * mainAlpha;
 				
 			}
 

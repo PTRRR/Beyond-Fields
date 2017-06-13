@@ -35,6 +35,7 @@ export class GravityLevel extends LevelCore {
 
 			uniforms: {
 
+				mainAlpha: { value: 1.0 },
 				gridSubdivisions: { value: 60 },
 				numMasses: { value: 0 },
 				masses: { value: [ 0, 0, 0 ] },

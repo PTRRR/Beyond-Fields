@@ -11,6 +11,7 @@ export class Planet extends PhysicalElement {
 		this.maxCharge = _options.maxCharge || 50;
 		this.minCharge =  _options.minCharge || -50;
 		this.charge = _options.charge || 0;
+		this.targetCharge = this.charge;
 
 		this.charges = [];
 		this.maxMass = this.mass;
@@ -21,7 +22,9 @@ export class Planet extends PhysicalElement {
 
 		super.update ();
 
-		this.charge = clamp ( this.charge, this.minCharge, this.maxCharge );
+		this.targetCharge = clamp ( this.targetCharge, this.minCharge, this.maxCharge );
+
+		this.charge += ( this.targetCharge - this.charge ) * 0.1;
 
 		let stepCharge = this.charges.length / this.maxCharge;
 
