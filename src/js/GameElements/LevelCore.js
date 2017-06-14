@@ -93,6 +93,7 @@ export class LevelCore {
 		this.scanScreenButtonMaterial.uniforms.texture.value = this.scanSceneRenderTarget.texture;
 		this.scanScreenButton = new THREE.Mesh ( this.quadGeometry, this.scanScreenButtonMaterial );
 		this.scanScreenButton.scale.set ( 0.5, 0.5, 0.5 );
+
 		
 		this.screensScene.add ( this.scanScreen );
 		this.screensScene.add ( this.scanScreenButton );
@@ -117,11 +118,29 @@ export class LevelCore {
 		this.screensScene.add ( this.infoScreen );
 		this.screensScene.add ( this.infoScreenButton );
 
+		// Display the scan screen button also in the info scene
+
+		// this.infoScanButton = new THREE.Mesh ( this.scanScreenButton.geometry.clone (), this.scanScreenButton.material.clone () );
+
+		this.scanScreenButtonMaterial2 = this.scanScreen.material.clone ();
+		this.scanScreenButtonMaterial2.vertexShader = shaderHelper.screenButton.vertex;
+		this.scanScreenButtonMaterial2.fragmentShader = shaderHelper.screenButton.fragment;
+		this.scanScreenButtonMaterial2.uniforms.texture.value = this.scanSceneRenderTarget.texture;
+		this.scanScreenButton2 = new THREE.Mesh ( this.quadGeometry, this.scanScreenButtonMaterial2 );
+		this.scanScreenButton2.scale.set ( 0.5, 0.5, 0.5 );
+
+		this.infoScene.add ( this.scanScreenButton2 );
+		// this.infoScene.add ( new THREE.Mesh ( this.scanScreenButton.clone (), this.scanScreenButtonMaterial.clone () ) );
+
 		// Render all scenes once the get right matrices.
 
 		this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
 		this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
 		this.renderer.render ( this.mainScene, this.mainCamera );
+
+		// Set the second scan button after the first rendering
+
+		this.scanScreenButton2.position.set ( this.getWorldRight (), 0.0, 0.0 );
 
 		// Declare objects for drawing lines
 
@@ -193,10 +212,12 @@ export class LevelCore {
 		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
 
 		this.glMouse = vec2.clone ( _position );
-
 		this.updateMouseWorld ( this.mouse );
-
 		this.activeScreen = this.checkButtons ();
+
+		// If there is a text intro remove it.
+
+		this.removeTextIntro ();
 
 	}
 
@@ -306,6 +327,7 @@ export class LevelCore {
 						} );
 
 						this.textBackground = new THREE.Mesh ( this.quadGeometry, this.textBackgroundMaterial );
+						this.textBackground.material.alphaTarget = 0.9;
 						this.textBackground.renderOrder = 5;
 						this.textBackground.scale.set ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, 3 );
 						this.infoScene.add ( this.textBackground );
@@ -331,6 +353,7 @@ export class LevelCore {
 						} ) );
 
 						this.textIntro = new THREE.Mesh ( geometry, material );
+						this.textIntro.material.alphaTarget = 1.0;
 						this.infoScene.add ( this.textIntro );
 						this.textIntro.material.extensions.derivatives = true;
 						this.textIntro.renderOrder = 6;
@@ -608,6 +631,23 @@ export class LevelCore {
 
 		} );
 
+		// Build a base grid to draw infos.
+
+		this.baseGridX = 9;
+		this.baseGridY = 20;
+
+		let gridGeometry = new THREE.PlaneBufferGeometry ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, this.baseGridX - 1, this.baseGridY - 1 );
+		let gridMaterialDebug = new THREE.MeshBasicMaterial ( {
+
+			color: 0x000000,
+			wireframe: true,
+
+		} );
+
+		let gridDebug = new THREE.Mesh ( gridGeometry, gridMaterialDebug );
+		this.infoScene.add ( gridDebug );
+		this.baseGrid = gridGeometry.attributes.position.array;
+
 		// Add lines
 
 		this.onLoad ( function () {
@@ -635,7 +675,7 @@ export class LevelCore {
 				uniforms: {
 
 					diffuse: { value: [ 0, 0, 0 ] },
-					thickness: { value: 0.017 },
+					thickness: { value: 0.06 },
 
 				},
 
@@ -1278,6 +1318,15 @@ export class LevelCore {
 			if ( this.gameElements[ element ].drawInfos ) {
 				
 				let maxInstancesNum = this.gameElements[ element ].maxInstancesNum || 0;
+
+				let mainInfoPointIndex = undefined;
+
+				if ( this.gameElements[ element ].mainInfoPointIndex !== undefined ) {
+
+					mainInfoPointIndex = this.gameElements[ element ].mainInfoPointIndex;
+
+				}
+
 				let instances = this.gameElements[ element ].instances;
 
 				for ( let i = 0; i < maxInstancesNum; i ++ ) {
@@ -1287,16 +1336,52 @@ export class LevelCore {
 
 					if ( i < instances.length ) {
 
-						let iPos2 = [ instances[ i ].position[ 0 ], instances[ i ].position[ 1 ] ];
-						let tPos2 = [ -1, 1 ];
-						let cPos2 = [ 0, 0 ];
+						let infoPointIndex = instances[ i ].infoPointIndex;
+
+						let iPos2 = [ instances[ i ].position[ 0 ], instances[ i ].position[ 1 ] ]; // Object position
+						let tPos2 = [ 0, 0 ];
+
+						if ( mainInfoPointIndex !== undefined && infoPointIndex === undefined ) {
+
+							let numPerPoint = Math.floor ( this.baseGridY / instances.length );
+
+							for ( let j = 0; j < this.baseGridY; j ++ ) {
+
+								let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
+								let point = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
+								let dY = Math.abs ( iPos2[ 1 ] - point[ 1 ] );
+
+								if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
+
+									tPos2 = point;
+									break;
+									
+								}
+
+							}
+
+
+						} else if ( infoPointIndex !== undefined ){
+
+							let index = infoPointIndex * 3;
+							tPos2 = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
+
+						} else {
+
+							tPos2 = [ this.baseGrid[ infoPointIndex * 3 + 0 ], this.baseGrid[ infoPointIndex * 3 + 1 ] ];
+
+						}
+
+						let dir = [ ( iPos2[ 0 ] - tPos2[ 0 ] ) * 0.5, ( iPos2[ 1 ] - tPos2[ 1 ] ) * 0.5 ];
+
+						let cPos2 = [ tPos2[ 0 ] + dir[ 0 ], tPos2[ 1 ] ];
 						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
-						opacity = instances[ i ].color[ 3 ];
+						opacity = instances[ i ].color[ 3 ] * instances[ i ].lifeStartMultiplier;
 
 					} else {
 
-						let iPos2 = [ 0.0, 0.0 ];
-						let tPos2 = [ 0, 0 ];
+						let iPos2 = [ 30, 30 ];
+						let tPos2 = [ 10, 10 ];
 						let cPos2 = [ 0, 0 ];
 						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
 
@@ -1768,6 +1853,8 @@ export class LevelCore {
 
 	update () {
 
+		if ( !this.levelLoaded ) return;
+
 		// Update the screens.
 
 		if ( this.scanScreen.position.x >= this.getWorldRight () * 1.8 ) this.scanScreenClosed = true;
@@ -1921,6 +2008,11 @@ export class LevelCore {
 
 		}
 
+		// Update text intro
+
+		if ( this.textBackground ) this.textBackground.material.opacity += ( this.textBackground.material.alphaTarget - this.textBackground.material.opacity ) * 0.1;
+		if ( this.textIntro ) this.textIntro.material.uniforms.opacity.value += ( this.textIntro.material.alphaTarget - this.textIntro.material.uniforms.opacity.value ) * 0.1;
+
 		// Update lines
 
 		let linesData = this.getLinesData ();
@@ -1939,6 +2031,13 @@ export class LevelCore {
 
 		this.linesGeometry.attributes.lineOpacity.array = new Float32Array ( linesData.lineOpacity );
 		this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
+
+	}
+
+	removeTextIntro () {
+
+		if ( this.textIntro ) this.textIntro.material.alphaTarget = 0;
+		if ( this.textBackground ) this.textBackground.material.alphaTarget = 0;
 
 	}
 

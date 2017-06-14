@@ -109,6 +109,7 @@ export class GravityLevel extends LevelCore {
 					drag: 0.95,
 					lifeSpan: Math.random () * 4000 + 6000,
 					canDye: true,
+					targetLinePosition: [ -2.0, 2.0, 0.0 ],
 
 				} );
 

@@ -17,6 +17,9 @@ export class ElementCore {
 		this.time = this.lastTime;
 		this.deltaTime = this.time - this.lastTime;
 
+		this.lifeStartMultiplier = 0;
+		this.lifeStartSpeed = _options.lifeStartSpeed || 0.05;
+
 		for ( let o in _options ) {
 
 			if ( !this[ o ] ) this[ o ] = _options[ o ];
@@ -30,6 +33,8 @@ export class ElementCore {
 		this.time = performance.now();
 		this.deltaTime = this.time - this.lastTime;
 		this.lastTime = this.time;
+
+		this.lifeStartMultiplier += ( 1 - this.lifeStartMultiplier ) * this.lifeStartSpeed; 
 
 		if ( this.lifeLeft > 0 ) {
 

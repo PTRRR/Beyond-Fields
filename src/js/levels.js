@@ -58,6 +58,7 @@ let levels = {
 
 						0: {
 
+							infoPointIndex: 3 * 9 + 1,
 							enabled: true,
                             position: [ -2, 0, 0 ],
                             radius: 4,
@@ -82,6 +83,7 @@ let levels = {
 					maxInstancesNum: 108,
 					renderOrder: 3,
 					drawInfos: true,
+					mainInfoPointIndex: 7, // 0 - 8
 
 					shaders: {
 

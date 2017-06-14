@@ -5470,6 +5470,9 @@ var ElementCore = exports.ElementCore = function () {
 				this.time = this.lastTime;
 				this.deltaTime = this.time - this.lastTime;
 
+				this.lifeStartMultiplier = 0;
+				this.lifeStartSpeed = _options.lifeStartSpeed || 0.05;
+
 				for (var o in _options) {
 
 						if (!this[o]) this[o] = _options[o];
@@ -5483,6 +5486,8 @@ var ElementCore = exports.ElementCore = function () {
 						this.time = performance.now();
 						this.deltaTime = this.time - this.lastTime;
 						this.lastTime = this.time;
+
+						this.lifeStartMultiplier += (1 - this.lifeStartMultiplier) * this.lifeStartSpeed;
 
 						if (this.lifeLeft > 0) {
 
@@ -6096,7 +6101,8 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 												mass: 20000,
 												drag: 0.95,
 												lifeSpan: Math.random() * 4000 + 6000,
-												canDye: true
+												canDye: true,
+												targetLinePosition: [-2.0, 2.0, 0.0]
 
 										});
 								}
@@ -6454,11 +6460,29 @@ var LevelCore = exports.LevelCore = function () {
 				this.screensScene.add(this.infoScreen);
 				this.screensScene.add(this.infoScreenButton);
 
+				// Display the scan screen button also in the info scene
+
+				// this.infoScanButton = new THREE.Mesh ( this.scanScreenButton.geometry.clone (), this.scanScreenButton.material.clone () );
+
+				this.scanScreenButtonMaterial2 = this.scanScreen.material.clone();
+				this.scanScreenButtonMaterial2.vertexShader = _shaderHelper.shaderHelper.screenButton.vertex;
+				this.scanScreenButtonMaterial2.fragmentShader = _shaderHelper.shaderHelper.screenButton.fragment;
+				this.scanScreenButtonMaterial2.uniforms.texture.value = this.scanSceneRenderTarget.texture;
+				this.scanScreenButton2 = new THREE.Mesh(this.quadGeometry, this.scanScreenButtonMaterial2);
+				this.scanScreenButton2.scale.set(0.5, 0.5, 0.5);
+
+				this.infoScene.add(this.scanScreenButton2);
+				// this.infoScene.add ( new THREE.Mesh ( this.scanScreenButton.clone (), this.scanScreenButtonMaterial.clone () ) );
+
 				// Render all scenes once the get right matrices.
 
 				this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
 				this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
 				this.renderer.render(this.mainScene, this.mainCamera);
+
+				// Set the second scan button after the first rendering
+
+				this.scanScreenButton2.position.set(this.getWorldRight(), 0.0, 0.0);
 
 				// Declare objects for drawing lines
 
@@ -6528,10 +6552,12 @@ var LevelCore = exports.LevelCore = function () {
 						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
 
 						this.glMouse = vec2.clone(_position);
-
 						this.updateMouseWorld(this.mouse);
-
 						this.activeScreen = this.checkButtons();
+
+						// If there is a text intro remove it.
+
+						this.removeTextIntro();
 				}
 		}, {
 				key: 'onUp',
@@ -6635,6 +6661,7 @@ var LevelCore = exports.LevelCore = function () {
 														});
 
 														this.textBackground = new THREE.Mesh(this.quadGeometry, this.textBackgroundMaterial);
+														this.textBackground.material.alphaTarget = 0.9;
 														this.textBackground.renderOrder = 5;
 														this.textBackground.scale.set(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, 3);
 														this.infoScene.add(this.textBackground);
@@ -6660,6 +6687,7 @@ var LevelCore = exports.LevelCore = function () {
 														}));
 
 														this.textIntro = new THREE.Mesh(geometry, material);
+														this.textIntro.material.alphaTarget = 1.0;
 														this.infoScene.add(this.textIntro);
 														this.textIntro.material.extensions.derivatives = true;
 														this.textIntro.renderOrder = 6;
@@ -6931,6 +6959,23 @@ var LevelCore = exports.LevelCore = function () {
 
 						});
 
+						// Build a base grid to draw infos.
+
+						this.baseGridX = 9;
+						this.baseGridY = 20;
+
+						var gridGeometry = new THREE.PlaneBufferGeometry(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, this.baseGridX - 1, this.baseGridY - 1);
+						var gridMaterialDebug = new THREE.MeshBasicMaterial({
+
+								color: 0x000000,
+								wireframe: true
+
+						});
+
+						var gridDebug = new THREE.Mesh(gridGeometry, gridMaterialDebug);
+						this.infoScene.add(gridDebug);
+						this.baseGrid = gridGeometry.attributes.position.array;
+
 						// Add lines
 
 						this.onLoad(function () {
@@ -6958,7 +7003,7 @@ var LevelCore = exports.LevelCore = function () {
 										uniforms: {
 
 												diffuse: { value: [0, 0, 0] },
-												thickness: { value: 0.017 }
+												thickness: { value: 0.06 }
 
 										},
 
@@ -7551,6 +7596,14 @@ var LevelCore = exports.LevelCore = function () {
 								if (this.gameElements[element].drawInfos) {
 
 										var maxInstancesNum = this.gameElements[element].maxInstancesNum || 0;
+
+										var mainInfoPointIndex = undefined;
+
+										if (this.gameElements[element].mainInfoPointIndex !== undefined) {
+
+												mainInfoPointIndex = this.gameElements[element].mainInfoPointIndex;
+										}
+
 										var instances = this.gameElements[element].instances;
 
 										for (var i = 0; i < maxInstancesNum; i++) {
@@ -7560,39 +7613,69 @@ var LevelCore = exports.LevelCore = function () {
 
 												if (i < instances.length) {
 
-														var iPos2 = [instances[i].position[0], instances[i].position[1]];
-														var tPos2 = [-1, 1];
-														var cPos2 = [0, 0];
+														var infoPointIndex = instances[i].infoPointIndex;
+
+														var iPos2 = [instances[i].position[0], instances[i].position[1]]; // Object position
+														var tPos2 = [0, 0];
+
+														if (mainInfoPointIndex !== undefined && infoPointIndex === undefined) {
+
+																var numPerPoint = Math.floor(this.baseGridY / instances.length);
+
+																for (var j = 0; j < this.baseGridY; j++) {
+
+																		var index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
+																		var point = [this.baseGrid[index + 0], this.baseGrid[index + 1]];
+																		var dY = Math.abs(iPos2[1] - point[1]);
+
+																		if (dY < this.getWorldTop() / (this.baseGridY - 1.0)) {
+
+																				tPos2 = point;
+																				break;
+																		}
+																}
+														} else if (infoPointIndex !== undefined) {
+
+																var _index = infoPointIndex * 3;
+																tPos2 = [this.baseGrid[_index + 0], this.baseGrid[_index + 1]];
+														} else {
+
+																tPos2 = [this.baseGrid[infoPointIndex * 3 + 0], this.baseGrid[infoPointIndex * 3 + 1]];
+														}
+
+														var dir = [(iPos2[0] - tPos2[0]) * 0.5, (iPos2[1] - tPos2[1]) * 0.5];
+
+														var cPos2 = [tPos2[0] + dir[0], tPos2[1]];
 														lPoints = this.quadratic(iPos2, cPos2, tPos2, 0);
-														opacity = instances[i].color[3];
+														opacity = instances[i].color[3] * instances[i].lifeStartMultiplier;
 												} else {
 
-														var _iPos = [0.0, 0.0];
-														var _tPos = [0, 0];
+														var _iPos = [30, 30];
+														var _tPos = [10, 10];
 														var _cPos = [0, 0];
 														lPoints = this.quadratic(_iPos, _cPos, _tPos, 0);
 												}
 
 												var lGeom = this.generateLine(lPoints);
 
-												for (var j = 0; j < lGeom.index.length; j++) {
+												for (var _j7 = 0; _j7 < lGeom.index.length; _j7++) {
 
-														linesIndices.push(lGeom.index[j] + linesPositions.length / 3);
+														linesIndices.push(lGeom.index[_j7] + linesPositions.length / 3);
 												}
 
-												for (var _j7 = 0; _j7 < lGeom.position.length; _j7++) {
+												for (var _j8 = 0; _j8 < lGeom.position.length; _j8++) {
 
-														linesPositions.push(lGeom.position[_j7]);
+														linesPositions.push(lGeom.position[_j8]);
 												}
 
-												for (var _j8 = 0; _j8 < lGeom.lineNormal.length; _j8++) {
+												for (var _j9 = 0; _j9 < lGeom.lineNormal.length; _j9++) {
 
-														linesNormals.push(lGeom.lineNormal[_j8]);
+														linesNormals.push(lGeom.lineNormal[_j9]);
 												}
 
-												for (var _j9 = 0; _j9 < lGeom.lineMiter.length; _j9++) {
+												for (var _j10 = 0; _j10 < lGeom.lineMiter.length; _j10++) {
 
-														linesMiters.push(lGeom.lineMiter[_j9]);
+														linesMiters.push(lGeom.lineMiter[_j10]);
 														linesOpacities.push(opacity);
 												}
 										}
@@ -8015,6 +8098,8 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'update',
 				value: function update() {
 
+						if (!this.levelLoaded) return;
+
 						// Update the screens.
 
 						if (this.scanScreen.position.x >= this.getWorldRight() * 1.8) this.scanScreenClosed = true;else this.scanScreenClosed = false;
@@ -8081,16 +8166,16 @@ var LevelCore = exports.LevelCore = function () {
 
 																		_instances4[_i5].update();
 
-																		for (var _j10 = 0; _j10 < 4; _j10++) {
+																		for (var _j11 = 0; _j11 < 4; _j11++) {
 
-																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 0] = _instances4[_i5].position[0];
-																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 1] = _instances4[_i5].position[1];
+																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 0] = _instances4[_i5].position[0];
+																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 1] = _instances4[_i5].position[1];
 
-																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 3] = _instances4[_i5].rotation[2];
+																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 3] = _instances4[_i5].rotation[2];
 
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 0] = _instances4[_i5].color[0];
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 1] = _instances4[_i5].color[1];
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].color[2];
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 0] = _instances4[_i5].color[0];
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 1] = _instances4[_i5].color[1];
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].color[2];
 
 																				// Hack pass the sign along with the scale & color alpha
 
@@ -8099,11 +8184,11 @@ var LevelCore = exports.LevelCore = function () {
 																						// console.log(instances[ i ].charge);
 																						var s = Math.sign(_instances4[_i5].charge);
 																						if (s == 0) s = 1;
-																						geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].scale[0] * s;
+																						geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].scale[0] * s;
 																				} else {
 
-																						geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].scale[0];
-																						geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 3] = _instances4[_i5].color[3];
+																						geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].scale[0];
+																						geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 3] = _instances4[_i5].color[3];
 																				}
 																		}
 																} else {
@@ -8112,17 +8197,17 @@ var LevelCore = exports.LevelCore = function () {
 																}
 														} else {
 
-																for (var _j11 = 0; _j11 < 4; _j11++) {
+																for (var _j12 = 0; _j12 < 4; _j12++) {
 
-																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 0] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 1] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 3] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 0] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 1] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 2] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 3] = 0;
 
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 0] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 1] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 2] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 3] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 0] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 1] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 2] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 3] = 0;
 																}
 														}
 												}
@@ -8144,6 +8229,11 @@ var LevelCore = exports.LevelCore = function () {
 								}
 						}
 
+						// Update text intro
+
+						if (this.textBackground) this.textBackground.material.opacity += (this.textBackground.material.alphaTarget - this.textBackground.material.opacity) * 0.1;
+						if (this.textIntro) this.textIntro.material.uniforms.opacity.value += (this.textIntro.material.alphaTarget - this.textIntro.material.uniforms.opacity.value) * 0.1;
+
 						// Update lines
 
 						var linesData = this.getLinesData();
@@ -8162,6 +8252,13 @@ var LevelCore = exports.LevelCore = function () {
 
 						this.linesGeometry.attributes.lineOpacity.array = new Float32Array(linesData.lineOpacity);
 						this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
+				}
+		}, {
+				key: 'removeTextIntro',
+				value: function removeTextIntro() {
+
+						if (this.textIntro) this.textIntro.material.alphaTarget = 0;
+						if (this.textBackground) this.textBackground.material.alphaTarget = 0;
 				}
 		}, {
 				key: 'reloadLevel',
@@ -8811,7 +8908,7 @@ var shaderHelper = {
 
 						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.2 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.1, abs ( sdfDist - t ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b * ( f_Scale);\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = f_Scale - 0.1 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.5, 0.5, 0.5, 1.0 );\n\t\t\t\tgl_FragColor.rgb *= 1.0 - smoothstep ( w, w - 0.03, abs ( sdfDist - t ) );\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.1, f_Scale - 0.15, sdfDist ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -8996,7 +9093,7 @@ var shaderHelper = {
 
 						vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( diffuse, f_Opacity );\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.1, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
+						fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
 
 			}
 
@@ -9535,6 +9632,7 @@ var levels = {
 
 																																				0: {
 
+																																										infoPointIndex: 3 * 9 + 1,
 																																										enabled: true,
 																																										position: [-2, 0, 0],
 																																										radius: 4,
@@ -9559,6 +9657,7 @@ var levels = {
 																														maxInstancesNum: 108,
 																														renderOrder: 3,
 																														drawInfos: true,
+																														mainInfoPointIndex: 7, // 0 - 8
 
 																														shaders: {
 
