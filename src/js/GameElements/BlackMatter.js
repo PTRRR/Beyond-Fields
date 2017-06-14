@@ -8,11 +8,13 @@ export class BlackMatter extends PhysicalElement {
 
 		this.targetScale = vec3.clone ( this.scale );
 		this.scale = vec3.create();
-		this.applyForce ( [ ( Math.random () - 0.5 ) * 70, ( Math.random () - 0.5 ) * 70, ( Math.random () - 0.5 ) * 70 ] );
+		this.applyForce ( [ ( Math.random () - 0.5 ) * 300, ( Math.random () - 0.5 ) * 300, ( Math.random () - 0.5 ) * 300 ] );
 
 		this.maxMass = this.mass;
 		this.targetMass = this.maxMass;
 		this.mass = 0;
+
+		this.enabled = true;
 
 	}
 

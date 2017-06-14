@@ -1,10 +1,6 @@
 import { PhysicalElement } from "./PhysicalElement";
 import { shaderHelper } from './shaderHelper';
 import { LevelCore } from "./LevelCore";
-let sdfShader = require('three-bmfont-text/shaders/sdf');
-let msdfShader = require('three-bmfont-text/shaders/msdf');
-let bmfontGeometry = require ( 'three-bmfont-text' );
-let bmfontLoader = require ( 'load-bmfont' );
 
 export class GravityLevel extends LevelCore {
 
@@ -48,67 +44,21 @@ export class GravityLevel extends LevelCore {
 
 		this.grid = new THREE.Mesh ( gridGeometry, this.gridMaterial );
 		this.grid.scale.set ( maxScale * 1.4, maxScale * 1.4, 1 );
+		this.grid.renderOrder = 0;
 		this.scanScene.add ( this.grid );
 		this.gridMaterial.extensions.derivatives = true;
 
 		// Blackmatter
 
 		this.canDraw = true;
-
-		// Text
-
-		// bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
-
-		// 	if ( err ) {
-
-		// 		console.error( err );
-
-		// 	} else {
-
-		// 		let geometry = bmfontGeometry ( {
-
-		// 			width: 1500,
-		// 			align: 'center',
-		// 			font: font
-
-		// 		} );
-
-		// 		geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
-
-		// 		geometry.computeBoundingBox ();
-
-		// 		let textureLoader = new THREE.TextureLoader ();
-		// 		textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
-
-		// 			var material = new THREE.RawShaderMaterial( sdfShader ( {
-					  	
-		// 			  	map: texture,
-		// 			  	side: THREE.DoubleSide,
-		// 			  	transparent: true,
-		// 			  	color: 'rgb(0, 0, 0)',
-
-		// 			} ) );
-
-		// 			let mesh = new THREE.Mesh ( geometry, material );
-		// 			this.infoScene.add ( mesh );
-		// 			mesh.material.extensions.derivatives = true;
-		// 			geometry.computeBoundingSphere ();
-		// 			mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
-		// 			mesh.position.y += geometry.boundingSphere.center.y * 0.003;
-		// 			mesh.rotation.x = Math.PI;
-		// 			mesh.scale.set ( 0.003, 0.003, 0.003 );
-
-		// 		}.bind ( this ) );
-
-		// 	} 
-
-		// }.bind ( this ) );
 		
 	}
 
 	build () {
 
 		super.build ();
+
+		
 
 	}
 
@@ -143,20 +93,26 @@ export class GravityLevel extends LevelCore {
 		if ( !this.activeScreen && this.canDraw ) {
 
 			let r = rc();
-			let s = Math.random () * 0.2 + 0.1;
+			let s = Math.random () * 0.3 + 0.2;
 
-			this.addInstanceOf ( 'blackMatter', {
+			// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
 
-				position: [ this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z ],
-				scale: [ s, s, s ],
-				color: [ 0.8 + r, 0.8 + r, 0.8 + r, 1.0 ],
-				rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-				mass: 1500,
-				drag: 0.95,
-				lifeSpan: Math.random () * 4000 + 6000,
-				canDye: true,
+			if ( this.gameElements.blackMatter.instances.length < 108 ) {
 
-			} );
+				this.addInstanceOf ( 'blackMatter', {
+
+					position: [ this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z ],
+					scale: [ s, s, s ],
+					color: [ 0.8 + r, 0.8 + r, 0.8 + r, 1.0 ],
+					rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+					mass: 20000,
+					drag: 0.95,
+					lifeSpan: Math.random () * 4000 + 6000,
+					canDye: true,
+
+				} );
+
+			}
 
 		}
 
@@ -168,7 +124,7 @@ export class GravityLevel extends LevelCore {
 
 				this.canDraw = true;
 
-			}.bind ( this ), 40 );
+			}.bind ( this ), 100 );
 
 		}
 
@@ -195,20 +151,14 @@ export class GravityLevel extends LevelCore {
 
 		if ( !this.ready ) {
 
-			if ( Object.keys( this.gameElements ).length == this.elementToLoad ) {
+			if ( this.levelLoaded && this.levelStarted ) {
 
 				this.ready = true;
 				// this.start = this.getInstanceByName ( 'goals', 'bottom' );
 				// this.arrival = this.getInstanceByName ( 'goals', 'top' );
 				this.arrivedInGame = false;
+				this.gameElements.player.instances[ 0 ].enabled = true;
 				this.resetPlayer ();
-				console.log(this.gameElements);
-
-				this.lineGeometry = new THREE.BufferGeometry ();
-				this.lineGeometry.addAttribute ( 'position', new THREE.BufferAttribute ( new Float32Array ( 9 ), 3 ) );
-				let lineMaterial = new THREE.LineBasicMaterial( { color: 0xffffff } );
-				this.lines = new THREE.Line ( this.lineGeometry, lineMaterial );
-				this.mainScene.add ( this.lines );
 
 			} else {
 
@@ -222,10 +172,10 @@ export class GravityLevel extends LevelCore {
 
 		super.update ();
 
-		// main player
+		// Main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position ) && this.arrivedInGame ) this.resetPlayer ();
+		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
 		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -252,9 +202,6 @@ export class GravityLevel extends LevelCore {
 			massesUniforms.push ( bC.position[ 0 ] );
 			massesUniforms.push ( bC.position[ 1 ] );
 			massesUniforms.push ( bC.mass / bC.maxMass );
-			// massesUniforms.push ( bC.maxMass );
-
-			// console.log(bC.lifePercent);
 
 			if ( dist > bC.scale[ 0 ] ) {
 
@@ -283,7 +230,6 @@ export class GravityLevel extends LevelCore {
 			massesUniforms.push ( planet.position[ 0 ] );
 			massesUniforms.push ( planet.position[ 1 ] );
 			massesUniforms.push ( (planet.mass / planet.maxMass) * 2.0 );
-			// massesUniforms.push ( planet.maxMass );
 
 			if ( dist > planet.scale[ 0 ] ) {
 

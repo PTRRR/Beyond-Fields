@@ -29,7 +29,7 @@ export class ElectricPlanetParticle extends PhysicalElement {
 
 		// Color
 
-		this.neutralColor = vec4.fromValues ( 0.7, 0.7, 0.7, 1.0 );
+		this.neutralColor = vec4.fromValues ( 0.8, 0.8, 0.8, 1.0 );
 		this.positiveColor = vec4.fromValues ( 252/255 + rCV(), 74/255 + rCV(), 50/255 + rCV(), 1.0 );
 		this.negativeColor = vec4.fromValues ( 50/255 + rCV(), 104/255 + rCV(), 252/255 + rCV(), 1.0 );
 		this.color = vec4.clone ( this.neutralColor );

@@ -359,8 +359,9 @@ export class GravityElectricLevel extends LevelCore {
 
 						this.addInstanceOf ( 'charges', {
 
-							name: 'charge',
+							name: 'gravityChargeParticle',
 							position: vec3.fromValues ( planet.position[ 0 ] + Math.cos ( angle ) * dist, planet.position[ 1 ] + Math.sin ( angle ) * dist, 0.0 ),
+							rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
 							minRadius: 0.1,
 							maxRadius: 0.5,
 							radius: ( j == 0 ) ? 0.2 : 0.05,

@@ -34,7 +34,7 @@ export class PhysicalElement extends ElementCore {
 
 		if ( !this.enabled ) return;
 
-		this.acceleration = this.mulScal ( this.acceleration, this.deltaTime / 16 );
+		// this.acceleration = this.mulScal ( this.acceleration, this.deltaTime / 16 );
 		this.velocity = this.add ( this.velocity, this.acceleration );
 		this.velocity = this.mulScal ( this.velocity, this.drag );
 		

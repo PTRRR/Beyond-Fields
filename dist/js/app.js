@@ -1,4 +1,321 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+function clone(point) { //TODO: use gl-vec2 for this
+    return [point[0], point[1]]
+}
+
+function vec2(x, y) {
+    return [x, y]
+}
+
+module.exports = function createBezierBuilder(opt) {
+    opt = opt||{}
+
+    var RECURSION_LIMIT = typeof opt.recursion === 'number' ? opt.recursion : 8
+    var FLT_EPSILON = typeof opt.epsilon === 'number' ? opt.epsilon : 1.19209290e-7
+    var PATH_DISTANCE_EPSILON = typeof opt.pathEpsilon === 'number' ? opt.pathEpsilon : 1.0
+
+    var curve_angle_tolerance_epsilon = typeof opt.angleEpsilon === 'number' ? opt.angleEpsilon : 0.01
+    var m_angle_tolerance = opt.angleTolerance || 0
+    var m_cusp_limit = opt.cuspLimit || 0
+
+    return function bezierCurve(start, c1, c2, end, scale, points) {
+        if (!points)
+            points = []
+
+        scale = typeof scale === 'number' ? scale : 1.0
+        var distanceTolerance = PATH_DISTANCE_EPSILON / scale
+        distanceTolerance *= distanceTolerance
+        begin(start, c1, c2, end, points, distanceTolerance)
+        return points
+    }
+
+
+    ////// Based on:
+    ////// https://github.com/pelson/antigrain/blob/master/agg-2.4/src/agg_curves.cpp
+
+    function begin(start, c1, c2, end, points, distanceTolerance) {
+        points.push(clone(start))
+        var x1 = start[0],
+            y1 = start[1],
+            x2 = c1[0],
+            y2 = c1[1],
+            x3 = c2[0],
+            y3 = c2[1],
+            x4 = end[0],
+            y4 = end[1]
+        recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, 0)
+        points.push(clone(end))
+    }
+
+    function recursive(x1, y1, x2, y2, x3, y3, x4, y4, points, distanceTolerance, level) {
+        if(level > RECURSION_LIMIT) 
+            return
+
+        var pi = Math.PI
+
+        // Calculate all the mid-points of the line segments
+        //----------------------
+        var x12   = (x1 + x2) / 2
+        var y12   = (y1 + y2) / 2
+        var x23   = (x2 + x3) / 2
+        var y23   = (y2 + y3) / 2
+        var x34   = (x3 + x4) / 2
+        var y34   = (y3 + y4) / 2
+        var x123  = (x12 + x23) / 2
+        var y123  = (y12 + y23) / 2
+        var x234  = (x23 + x34) / 2
+        var y234  = (y23 + y34) / 2
+        var x1234 = (x123 + x234) / 2
+        var y1234 = (y123 + y234) / 2
+
+        if(level > 0) { // Enforce subdivision first time
+            // Try to approximate the full cubic curve by a single straight line
+            //------------------
+            var dx = x4-x1
+            var dy = y4-y1
+
+            var d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx)
+            var d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx)
+
+            var da1, da2
+
+            if(d2 > FLT_EPSILON && d3 > FLT_EPSILON) {
+                // Regular care
+                //-----------------
+                if((d2 + d3)*(d2 + d3) <= distanceTolerance * (dx*dx + dy*dy)) {
+                    // If the curvature doesn't exceed the distanceTolerance value
+                    // we tend to finish subdivisions.
+                    //----------------------
+                    if(m_angle_tolerance < curve_angle_tolerance_epsilon) {
+                        points.push(vec2(x1234, y1234))
+                        return
+                    }
+
+                    // Angle & Cusp Condition
+                    //----------------------
+                    var a23 = Math.atan2(y3 - y2, x3 - x2)
+                    da1 = Math.abs(a23 - Math.atan2(y2 - y1, x2 - x1))
+                    da2 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - a23)
+                    if(da1 >= pi) da1 = 2*pi - da1
+                    if(da2 >= pi) da2 = 2*pi - da2
+
+                    if(da1 + da2 < m_angle_tolerance) {
+                        // Finally we can stop the recursion
+                        //----------------------
+                        points.push(vec2(x1234, y1234))
+                        return
+                    }
+
+                    if(m_cusp_limit !== 0.0) {
+                        if(da1 > m_cusp_limit) {
+                            points.push(vec2(x2, y2))
+                            return
+                        }
+
+                        if(da2 > m_cusp_limit) {
+                            points.push(vec2(x3, y3))
+                            return
+                        }
+                    }
+                }
+            }
+            else {
+                if(d2 > FLT_EPSILON) {
+                    // p1,p3,p4 are collinear, p2 is considerable
+                    //----------------------
+                    if(d2 * d2 <= distanceTolerance * (dx*dx + dy*dy)) {
+                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {
+                            points.push(vec2(x1234, y1234))
+                            return
+                        }
+
+                        // Angle Condition
+                        //----------------------
+                        da1 = Math.abs(Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1))
+                        if(da1 >= pi) da1 = 2*pi - da1
+
+                        if(da1 < m_angle_tolerance) {
+                            points.push(vec2(x2, y2))
+                            points.push(vec2(x3, y3))
+                            return
+                        }
+
+                        if(m_cusp_limit !== 0.0) {
+                            if(da1 > m_cusp_limit) {
+                                points.push(vec2(x2, y2))
+                                return
+                            }
+                        }
+                    }
+                }
+                else if(d3 > FLT_EPSILON) {
+                    // p1,p2,p4 are collinear, p3 is considerable
+                    //----------------------
+                    if(d3 * d3 <= distanceTolerance * (dx*dx + dy*dy)) {
+                        if(m_angle_tolerance < curve_angle_tolerance_epsilon) {
+                            points.push(vec2(x1234, y1234))
+                            return
+                        }
+
+                        // Angle Condition
+                        //----------------------
+                        da1 = Math.abs(Math.atan2(y4 - y3, x4 - x3) - Math.atan2(y3 - y2, x3 - x2))
+                        if(da1 >= pi) da1 = 2*pi - da1
+
+                        if(da1 < m_angle_tolerance) {
+                            points.push(vec2(x2, y2))
+                            points.push(vec2(x3, y3))
+                            return
+                        }
+
+                        if(m_cusp_limit !== 0.0) {
+                            if(da1 > m_cusp_limit)
+                            {
+                                points.push(vec2(x3, y3))
+                                return
+                            }
+                        }
+                    }
+                }
+                else {
+                    // Collinear case
+                    //-----------------
+                    dx = x1234 - (x1 + x4) / 2
+                    dy = y1234 - (y1 + y4) / 2
+                    if(dx*dx + dy*dy <= distanceTolerance) {
+                        points.push(vec2(x1234, y1234))
+                        return
+                    }
+                }
+            }
+        }
+
+        // Continue subdivision
+        //----------------------
+        recursive(x1, y1, x12, y12, x123, y123, x1234, y1234, points, distanceTolerance, level + 1) 
+        recursive(x1234, y1234, x234, y234, x34, y34, x4, y4, points, distanceTolerance, level + 1) 
+    }
+}
+
+},{}],2:[function(require,module,exports){
+module.exports = require('./function')()
+},{"./function":1}],3:[function(require,module,exports){
+function clone(point) { //TODO: use gl-vec2 for this
+    return [point[0], point[1]]
+}
+
+function vec2(x, y) {
+    return [x, y]
+}
+
+module.exports = function createQuadraticBuilder(opt) {
+    opt = opt||{}
+
+    var RECURSION_LIMIT = typeof opt.recursion === 'number' ? opt.recursion : 8
+    var FLT_EPSILON = typeof opt.epsilon === 'number' ? opt.epsilon : 1.19209290e-7
+    var PATH_DISTANCE_EPSILON = typeof opt.pathEpsilon === 'number' ? opt.pathEpsilon : 1.0
+
+    var curve_angle_tolerance_epsilon = typeof opt.angleEpsilon === 'number' ? opt.angleEpsilon : 0.01
+    var m_angle_tolerance = opt.angleTolerance || 0
+
+    return function quadraticCurve(start, c1, end, scale, points) {
+        if (!points)
+            points = []
+
+        scale = typeof scale === 'number' ? scale : 1.0
+        var distanceTolerance = PATH_DISTANCE_EPSILON / scale
+        distanceTolerance *= distanceTolerance
+        begin(start, c1, end, points, distanceTolerance)
+        return points
+    }
+
+    ////// Based on:
+    ////// https://github.com/pelson/antigrain/blob/master/agg-2.4/src/agg_curves.cpp
+
+    function begin(start, c1, end, points, distanceTolerance) {
+        points.push(clone(start))
+        var x1 = start[0],
+            y1 = start[1],
+            x2 = c1[0],
+            y2 = c1[1],
+            x3 = end[0],
+            y3 = end[1]
+        recursive(x1, y1, x2, y2, x3, y3, points, distanceTolerance, 0)
+        points.push(clone(end))
+    }
+
+
+
+    function recursive(x1, y1, x2, y2, x3, y3, points, distanceTolerance, level) {
+        if(level > RECURSION_LIMIT) 
+            return
+
+        var pi = Math.PI
+
+        // Calculate all the mid-points of the line segments
+        //----------------------
+        var x12   = (x1 + x2) / 2                
+        var y12   = (y1 + y2) / 2
+        var x23   = (x2 + x3) / 2
+        var y23   = (y2 + y3) / 2
+        var x123  = (x12 + x23) / 2
+        var y123  = (y12 + y23) / 2
+
+        var dx = x3-x1
+        var dy = y3-y1
+        var d = Math.abs(((x2 - x3) * dy - (y2 - y3) * dx))
+
+        if(d > FLT_EPSILON)
+        { 
+            // Regular care
+            //-----------------
+            if(d * d <= distanceTolerance * (dx*dx + dy*dy))
+            {
+                // If the curvature doesn't exceed the distance_tolerance value
+                // we tend to finish subdivisions.
+                //----------------------
+                if(m_angle_tolerance < curve_angle_tolerance_epsilon)
+                {
+                    points.push(vec2(x123, y123))
+                    return
+                }
+
+                // Angle & Cusp Condition
+                //----------------------
+                var da = Math.abs(Math.atan2(y3 - y2, x3 - x2) - Math.atan2(y2 - y1, x2 - x1))
+                if(da >= pi) da = 2*pi - da
+
+                if(da < m_angle_tolerance)
+                {
+                    // Finally we can stop the recursion
+                    //----------------------
+                    points.push(vec2(x123, y123))
+                    return                 
+                }
+            }
+        }
+        else
+        {
+            // Collinear case
+            //-----------------
+            dx = x123 - (x1 + x3) / 2
+            dy = y123 - (y1 + y3) / 2
+            if(dx*dx + dy*dy <= distanceTolerance)
+            {
+                points.push(vec2(x123, y123))
+                return
+            }
+        }
+
+        // Continue subdivision
+        //----------------------
+        recursive(x1, y1, x12, y12, x123, y123, points, distanceTolerance, level + 1) 
+        recursive(x123, y123, x23, y23, x3, y3, points, distanceTolerance, level + 1) 
+    }
+}
+},{}],4:[function(require,module,exports){
+arguments[4][2][0].apply(exports,arguments)
+},{"./function":3,"dup":2}],5:[function(require,module,exports){
 var str = Object.prototype.toString
 
 module.exports = anArray
@@ -11,13 +328,13 @@ function anArray(arr) {
   )
 }
 
-},{}],2:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 module.exports = function numtype(num, def) {
 	return typeof num === 'number'
 		? num 
 		: (typeof def === 'number' ? def : 0)
 }
-},{}],3:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -133,7 +450,7 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],4:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 var Buffer = require('buffer').Buffer; // for use with browserify
 
 module.exports = function (a, b) {
@@ -149,7 +466,7 @@ module.exports = function (a, b) {
     return true;
 };
 
-},{"buffer":5}],5:[function(require,module,exports){
+},{"buffer":9}],9:[function(require,module,exports){
 /*!
  * The buffer module from node.js, for the browser.
  *
@@ -1857,7 +2174,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":3,"ieee754":10}],6:[function(require,module,exports){
+},{"base64-js":7,"ieee754":19}],10:[function(require,module,exports){
 module.exports = function(dtype) {
   switch (dtype) {
     case 'int8':
@@ -1883,7 +2200,7 @@ module.exports = function(dtype) {
   }
 }
 
-},{}],7:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 /*eslint new-cap:0*/
 var dtype = require('dtype')
 module.exports = flattenVertexData
@@ -1930,7 +2247,7 @@ function flattenVertexData (data, output, offset) {
   return output
 }
 
-},{"dtype":6}],8:[function(require,module,exports){
+},{"dtype":10}],12:[function(require,module,exports){
 var isFunction = require('is-function')
 
 module.exports = forEach
@@ -1978,7 +2295,90 @@ function forEachObject(object, iterator, context) {
     }
 }
 
-},{"is-function":13}],9:[function(require,module,exports){
+},{"is-function":22}],13:[function(require,module,exports){
+module.exports = add
+
+/**
+ * Adds two vec2's
+ *
+ * @param {vec2} out the receiving vector
+ * @param {vec2} a the first operand
+ * @param {vec2} b the second operand
+ * @returns {vec2} out
+ */
+function add(out, a, b) {
+    out[0] = a[0] + b[0]
+    out[1] = a[1] + b[1]
+    return out
+}
+},{}],14:[function(require,module,exports){
+module.exports = dot
+
+/**
+ * Calculates the dot product of two vec2's
+ *
+ * @param {vec2} a the first operand
+ * @param {vec2} b the second operand
+ * @returns {Number} dot product of a and b
+ */
+function dot(a, b) {
+    return a[0] * b[0] + a[1] * b[1]
+}
+},{}],15:[function(require,module,exports){
+module.exports = normalize
+
+/**
+ * Normalize a vec2
+ *
+ * @param {vec2} out the receiving vector
+ * @param {vec2} a vector to normalize
+ * @returns {vec2} out
+ */
+function normalize(out, a) {
+    var x = a[0],
+        y = a[1]
+    var len = x*x + y*y
+    if (len > 0) {
+        //TODO: evaluate use of glm_invsqrt here?
+        len = 1 / Math.sqrt(len)
+        out[0] = a[0] * len
+        out[1] = a[1] * len
+    }
+    return out
+}
+},{}],16:[function(require,module,exports){
+module.exports = set
+
+/**
+ * Set the components of a vec2 to the given values
+ *
+ * @param {vec2} out the receiving vector
+ * @param {Number} x X component
+ * @param {Number} y Y component
+ * @returns {vec2} out
+ */
+function set(out, x, y) {
+    out[0] = x
+    out[1] = y
+    return out
+}
+},{}],17:[function(require,module,exports){
+module.exports = subtract
+
+/**
+ * Subtracts vector b from vector a
+ *
+ * @param {vec2} out the receiving vector
+ * @param {vec2} a the first operand
+ * @param {vec2} b the second operand
+ * @returns {vec2} out
+ */
+function subtract(out, a, b) {
+    out[0] = a[0] - b[0]
+    out[1] = a[1] - b[1]
+    return out
+}
+},{}],18:[function(require,module,exports){
 (function (global){
 var win;
 
@@ -1995,7 +2395,7 @@ if (typeof window !== "undefined") {
 module.exports = win;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],10:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -2081,7 +2481,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],11:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -2106,7 +2506,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],12:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -2129,7 +2529,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],13:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 module.exports = isFunction
 
 var toString = Object.prototype.toString
@@ -2146,7 +2546,7 @@ function isFunction (fn) {
       fn === window.prompt))
 };
 
-},{}],14:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 var wordWrap = require('word-wrapper')
 var xtend = require('xtend')
 var number = require('as-number')
@@ -2446,7 +2846,7 @@ function findChar (array, value, start) {
   }
   return -1
 }
-},{"as-number":2,"word-wrapper":31,"xtend":34}],15:[function(require,module,exports){
+},{"as-number":6,"word-wrapper":44,"xtend":47}],24:[function(require,module,exports){
 (function (Buffer){
 var xhr = require('xhr')
 var noop = function(){}
@@ -2547,7 +2947,7 @@ function getBinaryOpts(opt) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./lib/is-binary":16,"buffer":5,"parse-bmfont-ascii":18,"parse-bmfont-binary":19,"parse-bmfont-xml":20,"xhr":32,"xtend":34}],16:[function(require,module,exports){
+},{"./lib/is-binary":25,"buffer":9,"parse-bmfont-ascii":27,"parse-bmfont-binary":28,"parse-bmfont-xml":29,"xhr":45,"xtend":47}],25:[function(require,module,exports){
 (function (Buffer){
 var equal = require('buffer-equal')
 var HEADER = new Buffer([66, 77, 70, 3])
@@ -2558,7 +2958,7 @@ module.exports = function(buf) {
   return buf.length > 4 && equal(buf.slice(0, 4), HEADER)
 }
 }).call(this,require("buffer").Buffer)
-},{"buffer":5,"buffer-equal":4}],17:[function(require,module,exports){
+},{"buffer":9,"buffer-equal":8}],26:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -2650,7 +3050,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],18:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 module.exports = function parseBMFontAscii(data) {
   if (!data)
     throw new Error('no data provided')
@@ -2759,7 +3159,7 @@ function parseIntList(data) {
     return parseInt(val, 10)
   })
 }
-},{}],19:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 var HEADER = [66, 77, 70]
 
 module.exports = function readBMFontBinary(buf) {
@@ -2920,7 +3320,7 @@ function readNameNT(buf, offset) {
 function readStringNT(buf, offset) {
   return readNameNT(buf, offset).toString('utf8')
 }
-},{}],20:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var parseAttributes = require('./parse-attribs')
 var parseFromString = require('xml-parse-from-string')
 
@@ -3006,7 +3406,7 @@ function getAttribList(element) {
 function mapName(nodeName) {
   return NAME_MAP[nodeName.toLowerCase()] || nodeName
 }
-},{"./parse-attribs":21,"xml-parse-from-string":33}],21:[function(require,module,exports){
+},{"./parse-attribs":30,"xml-parse-from-string":46}],30:[function(require,module,exports){
 //Some versions of GlyphDesigner have a typo
 //that causes some bugs with parsing. 
 //Need to confirm with recent version of the software
@@ -3035,7 +3435,7 @@ function parseIntList(data) {
     return parseInt(val, 10)
   })
 }
-},{}],22:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 var trim = require('trim')
   , forEach = require('for-each')
   , isArray = function(arg) {
@@ -3067,7 +3467,109 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":8,"trim":30}],23:[function(require,module,exports){
+},{"for-each":12,"trim":43}],32:[function(require,module,exports){
+var add = require('gl-vec2/add')
+var set = require('gl-vec2/set')
+var normalize = require('gl-vec2/normalize')
+var subtract = require('gl-vec2/subtract')
+var dot = require('gl-vec2/dot')
+
+var tmp = [0, 0]
+
+module.exports.computeMiter = function computeMiter(tangent, miter, lineA, lineB, halfThick) {
+    //get tangent line
+    add(tangent, lineA, lineB)
+    normalize(tangent, tangent)
+
+    //get miter as a unit vector
+    set(miter, -tangent[1], tangent[0])
+    set(tmp, -lineA[1], lineA[0])
+
+    //get the necessary length of our miter
+    return halfThick / dot(miter, tmp)
+}
+
+module.exports.normal = function normal(out, dir) {
+    //get perpendicular
+    set(out, -dir[1], dir[0])
+    return out
+}
+
+module.exports.direction = function direction(out, a, b) {
+    //get unit dir of two lines
+    subtract(out, a, b)
+    normalize(out, out)
+    return out
+}
+},{"gl-vec2/add":13,"gl-vec2/dot":14,"gl-vec2/normalize":15,"gl-vec2/set":16,"gl-vec2/subtract":17}],33:[function(require,module,exports){
+var util = require('polyline-miter-util')
+
+var lineA = [0, 0]
+var lineB = [0, 0]
+var tangent = [0, 0]
+var miter = [0, 0]
+
+module.exports = function(points, closed) {
+    var curNormal = null
+    var out = []
+    if (closed) {
+        points = points.slice()
+        points.push(points[0])
+    }
+
+    var total = points.length
+    for (var i=1; i<total; i++) {
+        var last = points[i-1]
+        var cur = points[i]
+        var next = i<points.length-1 ? points[i+1] : null
+
+        util.direction(lineA, cur, last)
+        if (!curNormal)  {
+            curNormal = [0, 0]
+            util.normal(curNormal, lineA)
+        }
+
+        if (i === 1) //add initial normals
+            addNext(out, curNormal, 1)
+
+        if (!next) { //no miter, simple segment
+            util.normal(curNormal, lineA) //reset normal
+            addNext(out, curNormal, 1)
+        } else { //miter with last
+            //get unit dir of next line
+            util.direction(lineB, next, cur)
+
+            //stores tangent & miter
+            var miterLen = util.computeMiter(tangent, miter, lineA, lineB, 1)
+            addNext(out, miter, miterLen)
+        }
+    }
+
+    //if the polyline is a closed loop, clean up the last normal
+    if (points.length > 2 && closed) {
+        var last2 = points[total-2]
+        var cur2 = points[0]
+        var next2 = points[1]
+
+        util.direction(lineA, cur2, last2)
+        util.direction(lineB, next2, cur2)
+        util.normal(curNormal, lineA)
+        
+        var miterLen2 = util.computeMiter(tangent, miter, lineA, lineB, 1)
+        out[0][0] = miter.slice()
+        out[total-1][0] = miter.slice()
+        out[0][1] = miterLen2
+        out[total-1][1] = miterLen2
+        out.pop()
+    }
+
+    return out
+}
+
+function addNext(out, normal, length) {
+    out.push([[normal[0], normal[1]], length])
+}
+},{"polyline-miter-util":32}],34:[function(require,module,exports){
 var dtype = require('dtype')
 var anArray = require('an-array')
 var isBuffer = require('is-buffer')
@@ -3110,7 +3612,7 @@ module.exports = function createQuadElements(array, opt) {
     }
     return indices
 }
-},{"an-array":1,"dtype":6,"is-buffer":12}],24:[function(require,module,exports){
+},{"an-array":5,"dtype":10,"is-buffer":21}],35:[function(require,module,exports){
 var createLayout = require('layout-bmfont-text')
 var inherits = require('inherits')
 var createIndices = require('quad-indices')
@@ -3236,7 +3738,7 @@ TextGeometry.prototype.computeBoundingBox = function () {
   utils.computeBox(positions, bbox)
 }
 
-},{"./lib/utils":25,"./lib/vertices":26,"inherits":11,"layout-bmfont-text":14,"object-assign":17,"quad-indices":23,"three-buffer-vertex-data":29}],25:[function(require,module,exports){
+},{"./lib/utils":36,"./lib/vertices":37,"inherits":20,"layout-bmfont-text":23,"object-assign":26,"quad-indices":34,"three-buffer-vertex-data":40}],36:[function(require,module,exports){
 var itemSize = 2
 var box = { min: [0, 0], max: [0, 0] }
 
@@ -3276,7 +3778,7 @@ module.exports.computeSphere = function (positions, output) {
   output.radius = length / 2
 }
 
-},{}],26:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 module.exports.pages = function pages (glyphs) {
   var pages = new Float32Array(glyphs.length * 4 * 1)
   var i = 0
@@ -3355,7 +3857,7 @@ module.exports.positions = function positions (glyphs) {
   return positions
 }
 
-},{}],27:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 var assign = require('object-assign');
 
 module.exports = function createMSDFShader (opt) {
@@ -3416,7 +3918,7 @@ module.exports = function createMSDFShader (opt) {
   }, opt);
 };
 
-},{"object-assign":17}],28:[function(require,module,exports){
+},{"object-assign":26}],39:[function(require,module,exports){
 var assign = require('object-assign')
 
 module.exports = function createSDFShader (opt) {
@@ -3481,7 +3983,7 @@ module.exports = function createSDFShader (opt) {
   }, opt)
 }
 
-},{"object-assign":17}],29:[function(require,module,exports){
+},{"object-assign":26}],40:[function(require,module,exports){
 var flatten = require('flatten-vertex-data')
 var warned = false;
 
@@ -3581,7 +4083,193 @@ function rebuildAttribute (attrib, data, itemSize) {
   return false
 }
 
-},{"flatten-vertex-data":7}],30:[function(require,module,exports){
+},{"flatten-vertex-data":11}],41:[function(require,module,exports){
+var inherits = require('inherits');
+var getNormals = require('polyline-normals');
+var VERTS_PER_POINT = 2;
+
+module.exports = function createLineMesh (THREE) {
+  function LineMesh (path, opt) {
+    if (!(this instanceof LineMesh)) {
+      return new LineMesh(path, opt);
+    }
+    THREE.BufferGeometry.call(this);
+
+    if (Array.isArray(path)) {
+      opt = opt || {};
+    } else if (typeof path === 'object') {
+      opt = path;
+      path = [];
+    }
+
+    opt = opt || {};
+
+    this.addAttribute('position', new THREE.BufferAttribute(undefined, 3));
+    this.addAttribute('lineNormal', new THREE.BufferAttribute(undefined, 2));
+    this.addAttribute('lineMiter', new THREE.BufferAttribute(undefined, 1));
+    if (opt.distances) {
+      this.addAttribute('lineDistance', new THREE.BufferAttribute(undefined, 1));
+    }
+    if (typeof this.setIndex === 'function') {
+      this.setIndex(new THREE.BufferAttribute(undefined, 1));
+    } else {
+      this.addAttribute('index', new THREE.BufferAttribute(undefined, 1));
+    }
+    this.update(path, opt.closed);
+  }
+
+  inherits(LineMesh, THREE.BufferGeometry);
+
+  LineMesh.prototype.update = function (path, closed) {
+    path = path || [];
+    var normals = getNormals(path, closed);
+
+    if (closed) {
+      path = path.slice();
+      path.push(path[0]);
+      normals.push(normals[0]);
+    }
+
+    var attrPosition = this.getAttribute('position');
+    var attrNormal = this.getAttribute('lineNormal');
+    var attrMiter = this.getAttribute('lineMiter');
+    var attrDistance = this.getAttribute('lineDistance');
+    var attrIndex = typeof this.getIndex === 'function' ? this.getIndex() : this.getAttribute('index');
+
+    var indexCount = Math.max(0, (path.length - 1) * 6);
+    if (!attrPosition.array ||
+        (path.length !== attrPosition.array.length / 3 / VERTS_PER_POINT)) {
+      var count = path.length * VERTS_PER_POINT;
+      attrPosition.array = new Float32Array(count * 3);
+      attrNormal.array = new Float32Array(count * 2);
+      attrMiter.array = new Float32Array(count);
+      attrIndex.array = new Uint16Array(indexCount);
+
+      if (attrDistance) {
+        attrDistance.array = new Float32Array(count);
+      }
+    }
+
+    if (undefined !== attrPosition.count) {
+      attrPosition.count = count;
+    }
+    attrPosition.needsUpdate = true;
+
+    if (undefined !== attrNormal.count) {
+      attrNormal.count = count;
+    }
+    attrNormal.needsUpdate = true;
+
+    if (undefined !== attrMiter.count) {
+      attrMiter.count = count;
+    }
+    attrMiter.needsUpdate = true;
+
+    if (undefined !== attrIndex.count) {
+      attrIndex.count = indexCount;
+    }
+    attrIndex.needsUpdate = true;
+
+    if (attrDistance) {
+      if (undefined !== attrDistance.count) {
+        attrDistance.count = count;
+      }
+      attrDistance.needsUpdate = true;
+    }
+
+    var index = 0;
+    var c = 0;
+    var dIndex = 0;
+    var indexArray = attrIndex.array;
+
+    path.forEach(function (point, pointIndex, list) {
+      var i = index;
+      indexArray[c++] = i + 0;
+      indexArray[c++] = i + 1;
+      indexArray[c++] = i + 2;
+      indexArray[c++] = i + 2;
+      indexArray[c++] = i + 1;
+      indexArray[c++] = i + 3;
+
+      attrPosition.setXYZ(index++, point[0], point[1], 0);
+      attrPosition.setXYZ(index++, point[0], point[1], 0);
+
+      if (attrDistance) {
+        var d = pointIndex / (list.length - 1);
+        attrDistance.setX(dIndex++, d);
+        attrDistance.setX(dIndex++, d);
+      }
+    });
+
+    var nIndex = 0;
+    var mIndex = 0;
+    normals.forEach(function (n) {
+      var norm = n[0];
+      var miter = n[1];
+      attrNormal.setXY(nIndex++, norm[0], norm[1]);
+      attrNormal.setXY(nIndex++, norm[0], norm[1]);
+
+      attrMiter.setX(mIndex++, -miter);
+      attrMiter.setX(mIndex++, miter);
+    });
+  };
+
+  return LineMesh;
+};
+
+},{"inherits":20,"polyline-normals":33}],42:[function(require,module,exports){
+var assign = require('object-assign');
+
+module.exports = function (THREE) {
+  return function (opt) {
+    opt = opt || {};
+    var thickness = typeof opt.thickness === 'number' ? opt.thickness : 0.1;
+    var opacity = typeof opt.opacity === 'number' ? opt.opacity : 1.0;
+    var diffuse = opt.diffuse !== null ? opt.diffuse : 0xffffff;
+
+    // remove to satisfy r73
+    delete opt.thickness;
+    delete opt.opacity;
+    delete opt.diffuse;
+    delete opt.precision;
+
+    var ret = assign({
+      uniforms: {
+        thickness: { type: 'f', value: thickness },
+        opacity: { type: 'f', value: opacity },
+        diffuse: { type: 'c', value: new THREE.Color(diffuse) }
+      },
+      vertexShader: [
+        'uniform float thickness;',
+        'attribute float lineMiter;',
+        'attribute vec2 lineNormal;',
+        'void main() {',
+        'vec3 pointPos = position.xyz + vec3(lineNormal * thickness / 2.0 * lineMiter, 0.0);',
+        'gl_Position = projectionMatrix * modelViewMatrix * vec4(pointPos, 1.0);',
+        '}'
+      ].join('\n'),
+      fragmentShader: [
+        'uniform vec3 diffuse;',
+        'uniform float opacity;',
+        'void main() {',
+        'gl_FragColor = vec4(diffuse, opacity);',
+        '}'
+      ].join('\n')
+    }, opt);
+
+    var threeVers = (parseInt(THREE.REVISION, 10) || 0) | 0;
+    if (threeVers < 72) {
+      // Old versions need to specify shader attributes
+      ret.attributes = {
+        lineMiter: { type: 'f', value: 0 },
+        lineNormal: { type: 'v2', value: new THREE.Vector2() }
+      };
+    }
+    return ret;
+  };
+};
+
+},{"object-assign":26}],43:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -3597,7 +4285,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],31:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 var newline = /\n/
 var newlineChar = '\n'
 var whitespace = /\s/
@@ -3725,7 +4413,7 @@ function monospace(text, start, end, width) {
         end: start+glyphs
     }
 }
-},{}],32:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var isFunction = require("is-function")
@@ -3968,7 +4656,7 @@ function getXml(xhr) {
 
 function noop() {}
 
-},{"global/window":9,"is-function":13,"parse-headers":22,"xtend":34}],33:[function(require,module,exports){
+},{"global/window":18,"is-function":22,"parse-headers":31,"xtend":47}],46:[function(require,module,exports){
 module.exports = (function xmlparser() {
   //common browsers
   if (typeof self.DOMParser !== 'undefined') {
@@ -3997,7 +4685,7 @@ module.exports = (function xmlparser() {
   }
 })()
 
-},{}],34:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -4018,7 +4706,7 @@ function extend() {
     return target
 }
 
-},{}],35:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4048,11 +4736,13 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 
 				_this.targetScale = vec3.clone(_this.scale);
 				_this.scale = vec3.create();
-				_this.applyForce([(Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70, (Math.random() - 0.5) * 70]);
+				_this.applyForce([(Math.random() - 0.5) * 300, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 300]);
 
 				_this.maxMass = _this.mass;
 				_this.targetMass = _this.maxMass;
 				_this.mass = 0;
+
+				_this.enabled = true;
 
 				return _this;
 		}
@@ -4077,7 +4767,7 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 		return BlackMatter;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],36:[function(require,module,exports){
+},{"./PhysicalElement":58}],49:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4122,7 +4812,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				// Build scan background
 
 				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
-				_this.scanGeometry = new THREE.PlaneGeometry(1, 1, 300, 300);
+				_this.scanGeometry = new THREE.PlaneGeometry(1, 1, 150, 150);
 				_this.scanMaterial = new THREE.ShaderMaterial({
 
 						vertexShader: _shaderHelper.shaderHelper.equipotentialLines.vertex,
@@ -4139,6 +4829,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				});
 
 				_this.scanMesh = new THREE.Mesh(_this.scanGeometry, _this.scanMaterial);
+				_this.scanMesh.renderOrder = 0;
 				_this.scanMesh.scale.set(maxScale, maxScale, 1.0);
 				_this.scanScene.add(_this.scanMesh);
 				_this.scanMaterial.extensions.derivatives = true;
@@ -4225,8 +4916,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 										case 'center':
 
 												this.currentInstance.element.targetPosition = mouse;
-												this.currentInstance.element.targetRadius = 0;
-												this.d;
+												// this.currentInstance.element.targetRadius = 0;
 
 												break;
 
@@ -4243,6 +4933,15 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						}
 				}
 		}, {
+				key: "onResize",
+				value: function onResize() {
+
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onResize", this).call(this);
+
+						var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
+						this.scanMesh.scale.set(maxScale, maxScale, 1.0);
+				}
+		}, {
 				key: "update",
 				value: function update() {
 
@@ -4252,6 +4951,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								if (Object.keys(this.gameElements).length == this.elementToLoad) {
 
+										this.updateRenderer();
 										this.ready = true;
 										this.resetPlayer();
 										// this.start = this.getInstanceByName ( 'goals', 'top' );
@@ -4484,7 +5184,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 		return ElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":42,"./shaderHelper":50}],37:[function(require,module,exports){
+},{"./LevelCore":55,"./shaderHelper":63}],50:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4625,7 +5325,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 		return ElectricParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],38:[function(require,module,exports){
+},{"./PhysicalElement":58}],51:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4676,7 +5376,7 @@ var ElectricPlanetParticle = exports.ElectricPlanetParticle = function (_Physica
 
 				// Color
 
-				_this.neutralColor = vec4.fromValues(0.7, 0.7, 0.7, 1.0);
+				_this.neutralColor = vec4.fromValues(0.8, 0.8, 0.8, 1.0);
 				_this.positiveColor = vec4.fromValues(252 / 255 + rCV(), 74 / 255 + rCV(), 50 / 255 + rCV(), 1.0);
 				_this.negativeColor = vec4.fromValues(50 / 255 + rCV(), 104 / 255 + rCV(), 252 / 255 + rCV(), 1.0);
 				_this.color = vec4.clone(_this.neutralColor);
@@ -4740,7 +5440,7 @@ var ElectricPlanetParticle = exports.ElectricPlanetParticle = function (_Physica
 		return ElectricPlanetParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],39:[function(require,module,exports){
+},{"./PhysicalElement":58}],52:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -4810,7 +5510,7 @@ var ElementCore = exports.ElementCore = function () {
 		return ElementCore;
 }();
 
-},{}],40:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5174,8 +5874,9 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 												planets[i].charges.push(this.addInstanceOf('charges', {
 
-														name: 'charge',
+														name: 'gravityChargeParticle',
 														position: vec3.fromValues(planet.position[0] + Math.cos(angle) * dist, planet.position[1] + Math.sin(angle) * dist, 0.0),
+														rotation: [0, 0, Math.random() * Math.PI * 2],
 														minRadius: 0.1,
 														maxRadius: 0.5,
 														radius: j == 0 ? 0.2 : 0.05,
@@ -5264,7 +5965,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":42,"./Text":48,"./shaderHelper":50}],41:[function(require,module,exports){
+},{"./LevelCore":55,"./Text":61,"./shaderHelper":63}],54:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5287,11 +5988,6 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
-
-var sdfShader = require('three-bmfont-text/shaders/sdf');
-var msdfShader = require('three-bmfont-text/shaders/msdf');
-var bmfontGeometry = require('three-bmfont-text');
-var bmfontLoader = require('load-bmfont');
 
 var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 		_inherits(GravityLevel, _LevelCore);
@@ -5335,61 +6031,13 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
 				_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
+				_this.grid.renderOrder = 0;
 				_this.scanScene.add(_this.grid);
 				_this.gridMaterial.extensions.derivatives = true;
 
 				// Blackmatter
 
 				_this.canDraw = true;
-
-				// Text
-
-				// bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
-
-				// 	if ( err ) {
-
-				// 		console.error( err );
-
-				// 	} else {
-
-				// 		let geometry = bmfontGeometry ( {
-
-				// 			width: 1500,
-				// 			align: 'center',
-				// 			font: font
-
-				// 		} );
-
-				// 		geometry.update ( "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy\n-\n text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and more recently with desktop publishing software like Aldus PageMaker including versions of Lorem Ipsum" );
-
-				// 		geometry.computeBoundingBox ();
-
-				// 		let textureLoader = new THREE.TextureLoader ();
-				// 		textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
-
-				// 			var material = new THREE.RawShaderMaterial( sdfShader ( {
-
-				// 			  	map: texture,
-				// 			  	side: THREE.DoubleSide,
-				// 			  	transparent: true,
-				// 			  	color: 'rgb(0, 0, 0)',
-
-				// 			} ) );
-
-				// 			let mesh = new THREE.Mesh ( geometry, material );
-				// 			this.infoScene.add ( mesh );
-				// 			mesh.material.extensions.derivatives = true;
-				// 			geometry.computeBoundingSphere ();
-				// 			mesh.position.x -= geometry.boundingSphere.center.x * 0.003;
-				// 			mesh.position.y += geometry.boundingSphere.center.y * 0.003;
-				// 			mesh.rotation.x = Math.PI;
-				// 			mesh.scale.set ( 0.003, 0.003, 0.003 );
-
-				// 		}.bind ( this ) );
-
-				// 	} 
-
-				// }.bind ( this ) );
 
 				return _this;
 		}
@@ -5433,20 +6081,25 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 						if (!this.activeScreen && this.canDraw) {
 
 								var r = rc();
-								var s = Math.random() * 0.2 + 0.1;
+								var s = Math.random() * 0.3 + 0.2;
 
-								this.addInstanceOf('blackMatter', {
+								// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
 
-										position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
-										scale: [s, s, s],
-										color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
-										rotation: [0, 0, Math.random() * Math.PI * 2],
-										mass: 1500,
-										drag: 0.95,
-										lifeSpan: Math.random() * 4000 + 6000,
-										canDye: true
+								if (this.gameElements.blackMatter.instances.length < 108) {
 
-								});
+										this.addInstanceOf('blackMatter', {
+
+												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
+												scale: [s, s, s],
+												color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
+												rotation: [0, 0, Math.random() * Math.PI * 2],
+												mass: 20000,
+												drag: 0.95,
+												lifeSpan: Math.random() * 4000 + 6000,
+												canDye: true
+
+										});
+								}
 						}
 
 						if (this.canDraw) {
@@ -5456,7 +6109,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								setTimeout(function () {
 
 										this.canDraw = true;
-								}.bind(this), 40);
+								}.bind(this), 100);
 						}
 
 						function rc() {
@@ -5481,20 +6134,14 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						if (!this.ready) {
 
-								if (Object.keys(this.gameElements).length == this.elementToLoad) {
+								if (this.levelLoaded && this.levelStarted) {
 
 										this.ready = true;
 										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
 										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
 										this.arrivedInGame = false;
+										this.gameElements.player.instances[0].enabled = true;
 										this.resetPlayer();
-										console.log(this.gameElements);
-
-										this.lineGeometry = new THREE.BufferGeometry();
-										this.lineGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
-										var lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
-										this.lines = new THREE.Line(this.lineGeometry, lineMaterial);
-										this.mainScene.add(this.lines);
 								} else {
 
 										return;
@@ -5505,10 +6152,10 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this);
 
-						// main player
+						// Main player
 
 						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position) && this.arrivedInGame) this.resetPlayer();
+						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
 						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -5535,9 +6182,6 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								massesUniforms.push(bC.position[0]);
 								massesUniforms.push(bC.position[1]);
 								massesUniforms.push(bC.mass / bC.maxMass);
-								// massesUniforms.push ( bC.maxMass );
-
-								// console.log(bC.lifePercent);
 
 								if (dist > bC.scale[0]) {
 
@@ -5563,7 +6207,6 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								massesUniforms.push(planet.position[0]);
 								massesUniforms.push(planet.position[1]);
 								massesUniforms.push(planet.mass / planet.maxMass * 2.0);
-								// massesUniforms.push ( planet.maxMass );
 
 								if (_dist > planet.scale[0]) {
 
@@ -5678,7 +6321,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 		return GravityLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":42,"./PhysicalElement":45,"./shaderHelper":50,"load-bmfont":15,"three-bmfont-text":24,"three-bmfont-text/shaders/msdf":27,"three-bmfont-text/shaders/sdf":28}],42:[function(require,module,exports){
+},{"./LevelCore":55,"./PhysicalElement":58,"./shaderHelper":63}],55:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5696,8 +6339,18 @@ var _library = require('./library');
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var bmfont = require('three-bmfont-text');
+// Import some npm libs
+
+var sdfShader = require('three-bmfont-text/shaders/sdf');
+var msdfShader = require('three-bmfont-text/shaders/msdf');
+var bmfontGeometry = require('three-bmfont-text');
 var bmfontLoader = require('load-bmfont');
+
+var bezier = require('adaptive-bezier-curve');
+var quadratic = require('adaptive-quadratic-curve');
+var line = require('three-line-2d')(THREE);
+var basicShader = require('three-line-2d/shaders/basic')(THREE);
+var getNormals = require('polyline-normals');
 
 var LevelCore = exports.LevelCore = function () {
 		function LevelCore(_options) {
@@ -5715,6 +6368,9 @@ var LevelCore = exports.LevelCore = function () {
 
 				// Core elements
 
+				this.loadObjects = 0;
+				this.levelLoaded = false;
+				this.levelStarted = false;
 				this.levelIsReady = false;
 				this.elementToLoad = 0;
 				this.levelFile = _options.levelFile;
@@ -5763,6 +6419,8 @@ var LevelCore = exports.LevelCore = function () {
 				this.scanSceneRenderTarget = new THREE.WebGLRenderTarget(this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false });
 
 				this.scanScreenTargetPosition = new THREE.Vector3(0, 0, 0);
+				this.scanScreenClosed = true;
+				this.scanScreenOpened = false;
 				this.scanScreen = new THREE.Mesh(this.quadGeometry, this.screenMaterial.clone());
 				this.scanScreen.material.uniforms.texture.value = this.scanSceneRenderTarget.texture;
 
@@ -5781,6 +6439,8 @@ var LevelCore = exports.LevelCore = function () {
 				this.infoSceneRenderTarget = new THREE.WebGLRenderTarget(this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false });
 
 				this.infoScreenTargetPosition = new THREE.Vector3(0, 0, 0);
+				this.infoScreenClosed = true;
+				this.infoScreenOpened = false;
 				this.infoScreen = new THREE.Mesh(this.quadGeometry, this.screenMaterial.clone());
 				this.infoScreen.material.uniforms.texture.value = this.infoSceneRenderTarget.texture;
 
@@ -5796,26 +6456,16 @@ var LevelCore = exports.LevelCore = function () {
 
 				// Render all scenes once the get right matrices.
 
+				this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+				this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
 				this.renderer.render(this.mainScene, this.mainCamera);
-				this.renderer.render(this.scanScene, this.mainCamera);
-				this.renderer.render(this.infoScene, this.mainCamera);
 
-				// test
+				// Declare objects for drawing lines
 
-				this.testDerivative = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
-
-						vertexShader: _shaderHelper.shaderHelper.testDerivative.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.testDerivative.fragment,
-						transparent: true
-
-				}));
-
-				this.testDerivative.position.set(0.0, 0.0, 1);
-				this.testDerivative.scale.set(3.0, 3.0, 0.1);
-				this.testDerivative.material.extensions.derivatives = true;
-				// this.mainScene.add ( this.testDerivative );
-
-				// console.log(this.testDerivative);
+				this.line = line;
+				this.bezier = bezier;
+				this.quadratic = quadratic;
+				this.basicShader = basicShader;
 
 				// Objects
 
@@ -5867,6 +6517,12 @@ var LevelCore = exports.LevelCore = function () {
 		}, {
 				key: 'onDown',
 				value: function onDown(_position) {
+
+						if (!this.levelStarted) {
+
+								this.levelStarted = true;
+								// this.infoScreenTargetPosition.x = this.getWorldLeft () * 2.0;
+						}
 
 						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
 						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
@@ -5936,17 +6592,86 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Update screns size & position.
 
-						this.scanScreenTargetPosition.set(0.0, 0.0, 0.0);
+						this.scanScreenTargetPosition.set(this.getWorldRight() * 2.0, 0.0, 0.0);
 						this.scanScreen.position.set(this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z);
 
 						this.scanScreen.scale.x = this.getWorldRight() * 2.0;
 						this.scanScreen.scale.y = this.getWorldTop() * 2.0;
 
-						this.infoScreenTargetPosition.set(this.getWorldLeft() * 2.0, 0.0, 0.0);
+						this.infoScreenTargetPosition.set(0.0, 0.0, 0.0);
 						this.infoScreen.position.set(this.infoScreenTargetPosition.x, this.infoScreenTargetPosition.y, this.infoScreenTargetPosition.z);
 
 						this.infoScreen.scale.x = this.getWorldRight() * 2.0;
 						this.infoScreen.scale.y = this.getWorldTop() * 2.0;
+
+						// Load a font that will be used for font rendering in the level.
+
+						this.addLoadingObject();
+						bmfontLoader('./resources/fonts/GT-America.fnt', function (err, font) {
+
+								if (err) {
+
+										console.error(err);
+								} else {
+
+										this.addLoadingObject();
+										this.objectOnLoad('fnt');
+
+										var textureLoader = new THREE.TextureLoader();
+										textureLoader.load('./resources/fonts/GT-America_sdf.png', function (texture) {
+
+												this.objectOnLoad('font texture');
+
+												// Check if an intro text is specified in the level file.
+
+												if (this.levelFile.textIntro) {
+
+														this.textBackgroundMaterial = new THREE.MeshBasicMaterial({
+
+																color: 'rgb( 128, 128, 128 )',
+																opacity: 0.9,
+																transparent: true
+
+														});
+
+														this.textBackground = new THREE.Mesh(this.quadGeometry, this.textBackgroundMaterial);
+														this.textBackground.renderOrder = 5;
+														this.textBackground.scale.set(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, 3);
+														this.infoScene.add(this.textBackground);
+
+														var geometry = bmfontGeometry({
+
+																width: 1000,
+																align: 'center',
+																font: font
+
+														});
+
+														geometry.update(this.levelFile.textIntro);
+														geometry.computeBoundingBox();
+
+														var material = new THREE.RawShaderMaterial(sdfShader({
+
+																map: texture,
+																side: THREE.DoubleSide,
+																transparent: true,
+																color: 'rgb(0, 0, 0)'
+
+														}));
+
+														this.textIntro = new THREE.Mesh(geometry, material);
+														this.infoScene.add(this.textIntro);
+														this.textIntro.material.extensions.derivatives = true;
+														this.textIntro.renderOrder = 6;
+														geometry.computeBoundingSphere();
+														this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
+														this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+														this.textIntro.rotation.x = Math.PI;
+														this.textIntro.scale.set(0.0025, 0.0025, 0.0025);
+												}
+										}.bind(this));
+								}
+						}.bind(this));
 
 						// Add base elements.
 						// Add the scale square in the background.
@@ -5955,7 +6680,7 @@ var LevelCore = exports.LevelCore = function () {
 
 								static: true,
 								manualMode: false,
-								renderOrder: 1000,
+								renderOrder: 0,
 
 								shaders: {
 
@@ -6000,9 +6725,9 @@ var LevelCore = exports.LevelCore = function () {
 										0: {
 
 												enabled: true,
-												position: vec3.fromValues(0, 0, -0.1),
-												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(2.0, 2.0, 1.0)
+												position: [0, 0, 0],
+												rotation: [0, 0, 0],
+												scale: [2, 2, 1]
 
 										}
 
@@ -6192,8 +6917,8 @@ var LevelCore = exports.LevelCore = function () {
 
 										0: {
 
-												enabled: true,
-												position: vec3.fromValues(0, 0, 0),
+												enabled: false,
+												position: vec3.fromValues(0, 10, 0),
 												rotation: vec3.fromValues(0.0, 0.0, 0.0),
 												scale: vec3.fromValues(0.12, 0.12, 1.0),
 												velocity: vec3.create(),
@@ -6205,12 +6930,53 @@ var LevelCore = exports.LevelCore = function () {
 								}
 
 						});
+
+						// Add lines
+
+						this.onLoad(function () {
+
+								var linesData = this.getLinesData();
+
+								this.linesGeometry = new THREE.BufferGeometry();
+								this.linesGeometry.setIndex(new THREE.BufferAttribute(new Uint32Array(linesData.index), 1));
+								this.linesGeometry.index.dynamic = true;
+								this.linesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(linesData.position), 3));
+								this.linesGeometry.attributes.position.dynamic = true;
+								this.linesGeometry.addAttribute('lineNormal', new THREE.BufferAttribute(new Float32Array(linesData.lineNormal), 2));
+								this.linesGeometry.attributes.lineNormal.dynamic = true;
+								this.linesGeometry.addAttribute('lineMiter', new THREE.BufferAttribute(new Float32Array(linesData.lineMiter), 1));
+								this.linesGeometry.attributes.lineMiter.dynamic = true;
+								this.linesGeometry.addAttribute('lineOpacity', new THREE.BufferAttribute(new Float32Array(linesData.lineOpacity), 1));
+								this.linesGeometry.attributes.lineOpacity.dynamic = true;
+
+								var m = new THREE.ShaderMaterial({
+
+										vertexShader: _shaderHelper.shaderHelper.line.vertex,
+										fragmentShader: _shaderHelper.shaderHelper.line.fragment,
+										side: THREE.DoubleSide,
+
+										uniforms: {
+
+												diffuse: { value: [0, 0, 0] },
+												thickness: { value: 0.017 }
+
+										},
+
+										transparent: true
+
+								});
+
+								this.lines = new THREE.Mesh(this.linesGeometry, m);
+								this.lines.renderOrder = 2;
+								this.infoScene.add(this.lines);
+						}.bind(this));
 				}
 		}, {
 				key: 'addElement',
 				value: function addElement(_name, _element) {
 						var _this = this;
 
+						this.addLoadingObject();
 						this.elementToLoad++;
 
 						var textureUrl = _element.texture;
@@ -6268,21 +7034,34 @@ var LevelCore = exports.LevelCore = function () {
 
 										// Update vertices
 
-										for (var _i = 0; _i < quad.vertices.length; _i++) {
+										// HAAAACKKKKKKK
 
-												vertices.push(quad.vertices[_i]);
+										if (_name == 'planets') {
+
+												for (var _i = 0; _i < quad.vertices.length; _i += 3) {
+
+														vertices.push(quad.vertices[_i + 0]);
+														vertices.push(quad.vertices[_i + 1]);
+														vertices.push(instance.scale[0]);
+												}
+										} else {
+
+												for (var _i2 = 0; _i2 < quad.vertices.length; _i2++) {
+
+														vertices.push(quad.vertices[_i2]);
+												}
 										}
 
 										// Update uvs
 
-										for (var _i2 = 0; _i2 < quad.uvs.length; _i2++) {
+										for (var _i3 = 0; _i3 < quad.uvs.length; _i3++) {
 
-												uvs.push(quad.uvs[_i2]);
+												uvs.push(quad.uvs[_i3]);
 										}
 
 										// Update colors
 
-										for (var _i3 = 0; _i3 < 4; _i3++) {
+										for (var _i4 = 0; _i4 < 4; _i4++) {
 
 												colors.push(instance.color[0]);
 												colors.push(instance.color[1]);
@@ -6328,6 +7107,7 @@ var LevelCore = exports.LevelCore = function () {
 
 												this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
 												this.gameElements[_name].instances = _gameObjectInstances;
+												this.objectOnLoad(_name);
 										}.bind(this));
 								}).bind(this)(_name, _element, gameObjectInstances);
 						} else {
@@ -6407,6 +7187,7 @@ var LevelCore = exports.LevelCore = function () {
 
 																this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
 																this.gameElements[_name].instances = _gameObjectInstances;
+																this.objectOnLoad(_name);
 														}.bind(this));
 												}).bind(_this)(_name, _element, gameObjectInstances);
 										};
@@ -6424,7 +7205,17 @@ var LevelCore = exports.LevelCore = function () {
 												// The transform will happen on the gpu to optimize the render loop.
 
 												var maxInstancesNum = _element.maxInstancesNum;
-												var geometryData = this.getDataGeometryFromNum(maxInstancesNum);
+												var geometryData = null;
+
+												if (_element.buildFromInstances) {
+
+														geometryData = this.getDataGeometryFromInstances(Object.keys(_element.instances).map(function (key) {
+																return _element.instances[key];
+														}));
+												} else {
+
+														geometryData = this.getDataGeometryFromNum(maxInstancesNum);
+												}
 
 												var _geometry = new THREE.BufferGeometry();
 
@@ -6499,6 +7290,7 @@ var LevelCore = exports.LevelCore = function () {
 
 																this.gameElements[_name].mainGeometry = this.gameElements[_name].meshes[0].geometry;
 																this.gameElements[_name].instances = _gameObjectInstances;
+																this.objectOnLoad(_name);
 														}.bind(this));
 												}).bind(this)(_name, _element, gameObjectInstances);
 										}
@@ -6686,42 +7478,51 @@ var LevelCore = exports.LevelCore = function () {
 
 						for (var i = _instances.length - 1; i >= 0; i--) {
 
+								var instance = _instances[i];
+
+								// Set default variables if missing.
+
+								instance.position = instance.position || vec3.fromValues(0.0, 0.0, 0.0);
+								instance.rotation = instance.rotation || vec3.fromValues(0.0, 0.0, 0.0);
+								instance.scale = instance.scale || vec3.fromValues(1.0, 1.0, 1.0);
+								instance.color = instance.color || vec4.fromValues(1.0, 1.0, 1.0, 1.0);
+
 								// Update the indices
 
-								for (var j = this.genericQuad.indices.length - 1; j >= 0; j--) {
+								for (var j = 0; j < this.genericQuad.indices.length; j++) {
 
 										indices.push(this.genericQuad.indices[j] + vertices.length / 3);
 								}
 
 								// Update vertices
 
-								for (var _j4 = this.genericQuad.vertices.length - 1; _j4 >= 0; _j4 -= 3) {
+								for (var _j4 = 0; _j4 < this.genericQuad.vertices.length; _j4 += 3) {
 
-										vertices.push(this.genericQuad.vertices[_j4 - 0]);
-										vertices.push(this.genericQuad.vertices[_j4 - 1]);
-										vertices.push(_instances[i].scale[1]); // Hack pass scale y
+										vertices.push(this.genericQuad.vertices[_j4 + 0]);
+										vertices.push(this.genericQuad.vertices[_j4 + 1]);
+										vertices.push(_instances[i].scale[1]); // Hack pass the y scale
 								}
 
 								// Update uvs
 
-								for (var _j5 = this.genericQuad.uvs.length - 1; _j5 >= 0; _j5--) {
+								for (var _j5 = 0; _j5 < this.genericQuad.uvs.length; _j5++) {
 
 										uvs.push(this.genericQuad.uvs[_j5]);
 								}
 
 								// Update colors
 
-								for (var _j6 = 3; _j6 >= 0; _j6--) {
+								for (var _j6 = 0; _j6 < 4; _j6++) {
 
-										colors.push(_instances[i].color[0]);
-										colors.push(_instances[i].color[1]);
-										colors.push(_instances[i].color[2]);
-										colors.push(_instances[i].color[3]);
+										colors.push(instance.color[0]);
+										colors.push(instance.color[1]);
+										colors.push(instance.color[2]);
+										colors.push(instance.color[3]);
 
-										transform.push(_instances[i].position[0]);
-										transform.push(_instances[i].position[1]);
-										transform.push(_instances[i].scale[0]);
-										transform.push(_instances[i].rotation[2]);
+										transform.push(instance.position[0]);
+										transform.push(instance.position[1]);
+										transform.push(instance.scale[0]);
+										transform.push(instance.rotation[2] || 0);
 								}
 						}
 
@@ -6732,6 +7533,142 @@ var LevelCore = exports.LevelCore = function () {
 								colors: colors,
 								uvs: uvs,
 								transform: transform
+
+						};
+				}
+		}, {
+				key: 'getLinesData',
+				value: function getLinesData() {
+
+						var linesIndices = [];
+						var linesPositions = [];
+						var linesNormals = [];
+						var linesMiters = [];
+						var linesOpacities = [];
+
+						for (var element in this.gameElements) {
+
+								if (this.gameElements[element].drawInfos) {
+
+										var maxInstancesNum = this.gameElements[element].maxInstancesNum || 0;
+										var instances = this.gameElements[element].instances;
+
+										for (var i = 0; i < maxInstancesNum; i++) {
+
+												var lPoints = null;
+												var opacity = 0;
+
+												if (i < instances.length) {
+
+														var iPos2 = [instances[i].position[0], instances[i].position[1]];
+														var tPos2 = [-1, 1];
+														var cPos2 = [0, 0];
+														lPoints = this.quadratic(iPos2, cPos2, tPos2, 0);
+														opacity = instances[i].color[3];
+												} else {
+
+														var _iPos = [0.0, 0.0];
+														var _tPos = [0, 0];
+														var _cPos = [0, 0];
+														lPoints = this.quadratic(_iPos, _cPos, _tPos, 0);
+												}
+
+												var lGeom = this.generateLine(lPoints);
+
+												for (var j = 0; j < lGeom.index.length; j++) {
+
+														linesIndices.push(lGeom.index[j] + linesPositions.length / 3);
+												}
+
+												for (var _j7 = 0; _j7 < lGeom.position.length; _j7++) {
+
+														linesPositions.push(lGeom.position[_j7]);
+												}
+
+												for (var _j8 = 0; _j8 < lGeom.lineNormal.length; _j8++) {
+
+														linesNormals.push(lGeom.lineNormal[_j8]);
+												}
+
+												for (var _j9 = 0; _j9 < lGeom.lineMiter.length; _j9++) {
+
+														linesMiters.push(lGeom.lineMiter[_j9]);
+														linesOpacities.push(opacity);
+												}
+										}
+								}
+						}
+
+						return {
+
+								index: linesIndices,
+								position: linesPositions,
+								lineNormal: linesNormals,
+								lineMiter: linesMiters,
+								lineOpacity: linesOpacities
+
+						};
+				}
+		}, {
+				key: 'generateLine',
+				value: function generateLine(path, closed) {
+
+						path = path || [];
+						var normals = getNormals(path, closed);
+						var indexCount = Math.max(0, (path.length - 1) * 6);
+
+						var count = path.length * 2;
+						var attrPosition = new Float32Array(count * 3);
+						var attrNormal = new Float32Array(count * 2);
+						var attrMiter = new Float32Array(count);
+						var attrIndex = new Uint32Array(indexCount);
+
+						var index = 0;
+						var c = 0;
+						var dIndex = 0;
+						var indexArray = attrIndex;
+
+						path.forEach(function (point, pointIndex, list) {
+
+								var i = index;
+								indexArray[c++] = i / 3 + 0;
+								indexArray[c++] = i / 3 + 1;
+								indexArray[c++] = i / 3 + 2;
+								indexArray[c++] = i / 3 + 2;
+								indexArray[c++] = i / 3 + 1;
+								indexArray[c++] = i / 3 + 3;
+
+								attrPosition[index++] = point[0];
+								attrPosition[index++] = point[1];
+								attrPosition[index++] = 0;
+								attrPosition[index++] = point[0];
+								attrPosition[index++] = point[1];
+								attrPosition[index++] = 0;
+						});
+
+						var nIndex = 0;
+						var mIndex = 0;
+
+						normals.forEach(function (n) {
+
+								var norm = n[0];
+								var miter = n[1];
+
+								attrNormal[nIndex++] = norm[0];
+								attrNormal[nIndex++] = norm[1];
+								attrNormal[nIndex++] = norm[0];
+								attrNormal[nIndex++] = norm[1];
+
+								attrMiter[mIndex++] = -miter;
+								attrMiter[mIndex++] = miter;
+						});
+
+						return {
+
+								position: attrPosition,
+								lineNormal: attrNormal,
+								lineMiter: attrMiter,
+								index: attrIndex
 
 						};
 				}
@@ -7037,15 +7974,61 @@ var LevelCore = exports.LevelCore = function () {
 						}
 				}
 		}, {
+				key: 'addLoadingObject',
+				value: function addLoadingObject() {
+
+						this.loadObjects++;
+				}
+		}, {
+				key: 'objectOnLoad',
+				value: function objectOnLoad(_string) {
+
+						this.loadObjects--;
+
+						if (_string) {
+
+								console.log('loaded: ' + _string);
+						}
+
+						if (this.loadObjects == 0) {
+
+								console.log('\n*** Level loaded ***\n ');
+
+								this.levelLoaded = true;
+								if (this.onLoadCallback) {
+
+										for (var i = 0; i < this.onLoadCallback.length; i++) {
+
+												this.onLoadCallback[i]();
+										}
+								}
+						}
+				}
+		}, {
+				key: 'onLoad',
+				value: function onLoad(_callback) {
+
+						if (!this.onLoadCallback) this.onLoadCallback = [];
+						this.onLoadCallback.push(_callback);
+				}
+		}, {
 				key: 'update',
 				value: function update() {
 
 						// Update the screens.
 
+						if (this.scanScreen.position.x >= this.getWorldRight() * 1.8) this.scanScreenClosed = true;else this.scanScreenClosed = false;
+
+						if (this.scanScreen.position.x <= 0.5) this.scanScreenOpened = true;else this.scanScreenOpened = false;
+
 						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.2;
 						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.2;
 						this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight();
 						this.scanScreenButton.position.y = this.scanScreen.position.y;
+
+						if (this.infoScreen.position.x <= this.getWorldLeft() * 1.8) this.infoScreenClosed = true;else this.infoScreenClosed = false;
+
+						if (this.infoScreen.position.x >= -0.5) this.infoScreenOpened = true;else this.infoScreenOpened = false;
 
 						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.2;
 						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.2;
@@ -7064,7 +8047,7 @@ var LevelCore = exports.LevelCore = function () {
 
 												var instances = this.gameElements[elementName].instances;
 
-												for (var i = 0; i < instances.length; i++) {
+												for (var i = instances.length - 1; i >= 0; i--) {
 
 														var instance = instances[i];
 
@@ -7090,43 +8073,56 @@ var LevelCore = exports.LevelCore = function () {
 
 												var geometry = element.mainGeometry;
 
-												for (var _i4 = maxInstancesNum; _i4 >= 0; _i4--) {
+												for (var _i5 = maxInstancesNum; _i5 >= 0; _i5--) {
 
-														if (_i4 < _instances4.length) {
+														if (_i5 < _instances4.length) {
 
-																if (!_instances4[_i4].isDead()) {
+																if (!_instances4[_i5].isDead()) {
 
-																		_instances4[_i4].update();
+																		_instances4[_i5].update();
 
-																		for (var _j7 = 0; _j7 < 4; _j7++) {
+																		for (var _j10 = 0; _j10 < 4; _j10++) {
 
-																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 0] = _instances4[_i4].position[0];
-																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 1] = _instances4[_i4].position[1];
-																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 2] = _instances4[_i4].scale[0];
-																				geometry.attributes.transform.array[_i4 * 16 + _j7 * 4 + 3] = _instances4[_i4].rotation[2];
+																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 0] = _instances4[_i5].position[0];
+																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 1] = _instances4[_i5].position[1];
 
-																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 0] = _instances4[_i4].color[0];
-																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 1] = _instances4[_i4].color[1];
-																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 2] = _instances4[_i4].color[2];
-																				geometry.attributes.rgbaColor.array[_i4 * 16 + _j7 * 4 + 3] = _instances4[_i4].color[3];
+																				geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 3] = _instances4[_i5].rotation[2];
+
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 0] = _instances4[_i5].color[0];
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 1] = _instances4[_i5].color[1];
+																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].color[2];
+
+																				// Hack pass the sign along with the scale & color alpha
+
+																				if (_instances4[_i5].name == 'gravityChargeParticle') {
+
+																						// console.log(instances[ i ].charge);
+																						var s = Math.sign(_instances4[_i5].charge);
+																						if (s == 0) s = 1;
+																						geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].scale[0] * s;
+																				} else {
+
+																						geometry.attributes.transform.array[_i5 * 16 + _j10 * 4 + 2] = _instances4[_i5].scale[0];
+																						geometry.attributes.rgbaColor.array[_i5 * 16 + _j10 * 4 + 3] = _instances4[_i5].color[3];
+																				}
 																		}
 																} else {
 
-																		_instances4.splice(_i4, 1);
+																		_instances4.splice(_i5, 1);
 																}
 														} else {
 
-																for (var _j8 = 0; _j8 < 4; _j8++) {
+																for (var _j11 = 0; _j11 < 4; _j11++) {
 
-																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 0] = 0;
-																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 1] = 0;
-																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 2] = 0;
-																		geometry.attributes.transform.array[_i4 * 16 + _j8 * 4 + 3] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 0] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 1] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = 0;
+																		geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 3] = 0;
 
-																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 0] = 0;
-																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 1] = 0;
-																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 2] = 0;
-																		geometry.attributes.rgbaColor.array[_i4 * 16 + _j8 * 4 + 3] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 0] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 1] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 2] = 0;
+																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 3] = 0;
 																}
 														}
 												}
@@ -7141,12 +8137,31 @@ var LevelCore = exports.LevelCore = function () {
 
 										var _instances5 = this.gameElements[elementName].instances;
 
-										for (var _i5 = 0; _i5 < _instances5.length; _i5++) {
+										for (var _i6 = 0; _i6 < _instances5.length; _i6++) {
 
-												_instances5[_i5].update();
+												_instances5[_i6].update();
 										}
 								}
 						}
+
+						// Update lines
+
+						var linesData = this.getLinesData();
+
+						this.linesGeometry.index.array = new Uint32Array(linesData.index);
+						this.linesGeometry.index.needsUpdate = true;
+
+						this.linesGeometry.attributes.position.array = new Float32Array(linesData.position);
+						this.linesGeometry.attributes.position.needsUpdate = true;
+
+						this.linesGeometry.attributes.lineNormal.array = new Float32Array(linesData.lineNormal);
+						this.linesGeometry.attributes.lineNormal.needsUpdate = true;
+
+						this.linesGeometry.attributes.lineMiter.array = new Float32Array(linesData.lineMiter);
+						this.linesGeometry.attributes.lineMiter.needsUpdate = true;
+
+						this.linesGeometry.attributes.lineOpacity.array = new Float32Array(linesData.lineOpacity);
+						this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
 				}
 		}, {
 				key: 'reloadLevel',
@@ -7205,20 +8220,45 @@ var LevelCore = exports.LevelCore = function () {
 						this.onWinCallback = _callback;
 				}
 		}, {
+				key: 'updateRenderer',
+				value: function updateRenderer() {
+
+						this.renderer.clearDepth();
+						this.renderer.clear();
+						this.renderer.render(this.mainScene, this.mainCamera);
+						this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+						this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
+						this.renderer.clearDepth();
+						this.renderer.render(this.screensScene, this.mainCamera);
+				}
+		}, {
 				key: 'render',
 				value: function render() {
 
 						this.renderer.clearDepth();
 						this.renderer.clear();
+
+						// if ( !this.scanScreenOpened && !this.infoScreenOpened ) {
+
 						this.renderer.render(this.mainScene, this.mainCamera);
+
+						// }
 
 						// Render to scan target
 
+						// if ( !this.scanScreenClosed && !this.infoScreenOpened ) {
+
 						this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+
+						// }
 
 						// Render to info target
 
+						// if ( !this.infoScreenClosed ) {
+
 						this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
+
+						// }
 
 						this.renderer.clearDepth();
 						this.renderer.render(this.screensScene, this.mainCamera);
@@ -7256,7 +8296,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":55,"./library":49,"./shaderHelper":50,"load-bmfont":15,"three-bmfont-text":24}],43:[function(require,module,exports){
+},{"../utils":68,"./library":62,"./shaderHelper":63,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":24,"polyline-normals":33,"three-bmfont-text":35,"three-bmfont-text/shaders/msdf":38,"three-bmfont-text/shaders/sdf":39,"three-line-2d":41,"three-line-2d/shaders/basic":42}],56:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7284,7 +8324,7 @@ var Obstacle = exports.Obstacle = function (_PhysicalElement) {
 	return Obstacle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],44:[function(require,module,exports){
+},{"./PhysicalElement":58}],57:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7335,7 +8375,7 @@ var Particle = exports.Particle = function (_PhysicalElement) {
 		return Particle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],45:[function(require,module,exports){
+},{"./PhysicalElement":58}],58:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7394,7 +8434,7 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 
 			if (!this.enabled) return;
 
-			this.acceleration = this.mulScal(this.acceleration, this.deltaTime / 16);
+			// this.acceleration = this.mulScal ( this.acceleration, this.deltaTime / 16 );
 			this.velocity = this.add(this.velocity, this.acceleration);
 			this.velocity = this.mulScal(this.velocity, this.drag);
 
@@ -7461,7 +8501,7 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 	return PhysicalElement;
 }(_ElementCore2.ElementCore);
 
-},{"./ElementCore":39}],46:[function(require,module,exports){
+},{"./ElementCore":52}],59:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7527,7 +8567,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 		return Planet;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"../utils":55,"./PhysicalElement":45}],47:[function(require,module,exports){
+},{"../utils":68,"./PhysicalElement":58}],60:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7579,7 +8619,7 @@ var Player = exports.Player = function (_PhysicalElement) {
 		return Player;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],48:[function(require,module,exports){
+},{"./PhysicalElement":58}],61:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -7646,7 +8686,7 @@ var Text = exports.Text = function (_PhysicalElement) {
 		return Text;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":45}],49:[function(require,module,exports){
+},{"./PhysicalElement":58}],62:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7685,7 +8725,7 @@ var library = {
 
 exports.library = library;
 
-},{"./BlackMatter":35,"./ElectricParticle":37,"./ElectricPlanetParticle":38,"./Obstacle":43,"./Particle":44,"./PhysicalElement":45,"./Planet":46,"./Player":47}],50:[function(require,module,exports){
+},{"./BlackMatter":48,"./ElectricParticle":50,"./ElectricPlanetParticle":51,"./Obstacle":56,"./Particle":57,"./PhysicalElement":58,"./Planet":59,"./Player":60}],63:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7698,22 +8738,6 @@ var shaderHelper = {
 						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
-
-			},
-
-			blackMatter: {
-
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
-
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
-
-			},
-
-			blackMatterScan: {
-
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
-
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -7765,9 +8789,35 @@ var shaderHelper = {
 
 			},
 
+			// Gravity
+
+			blackMatter: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			blackMatterScan: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			blackMatterInfo: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.2 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.1, abs ( sdfDist - t ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
 			planet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
@@ -7775,17 +8825,17 @@ var shaderHelper = {
 
 			scanPlanet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = 0.94;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.05, f_Scale - 0.08, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
 			infoPlanet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = 0.94;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -7821,35 +8871,29 @@ var shaderHelper = {
 
 			},
 
+			// Electric
+
 			electricCharge: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * f_Color.a;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
 			electricChargeScan: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.04 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( sdfDist - t ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
 			electricChargeInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat w = 0.043 / f_Scale;\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.2, abs ( sdfDist - t ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( maxTargetCenter, maxTargetCenter - 0.05, cDist );\n\n\t\t\t}\n\n\t\t"
-
-			},
-
-			electricPlanet: {
-
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
-
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -7860,6 +8904,58 @@ var shaderHelper = {
 						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
 
 			},
+
+			obstacle: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			obstacleScan: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.7 );\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( f_Scale.x - 0.015, f_Scale.x - 0.000, x ) + smoothstep ( f_Scale.y - 0.015, f_Scale.y - 0.000, y );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			obstacleInfo: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\tgl_FragColor.a += smoothstep ( f_Scale.x - 0.020, f_Scale.x - 0.01, x ) + smoothstep ( f_Scale.y - 0.020, f_Scale.y - 0.01, y );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			// Gravity Electric
+
+			electricPlanet: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricParticlePlanetScan: {
+
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.3 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			electricParticlePlanetInfo: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\tf_Sign = sign ( transform.z );\n\n\t\t\t\tif ( sign ( rgbaColor.a ) >= 0.0 ) f_Zero = 1.0;\n\t\t\t\telse f_Zero = 0.0;\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 1.6 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.08;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			// General
 
 			grid: {
 
@@ -7894,13 +8990,21 @@ var shaderHelper = {
 						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
+
+			line: {
+
+						vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( diffuse, f_Opacity );\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.1, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
+
 			}
 
 };
 
 exports.shaderHelper = shaderHelper;
 
-},{}],51:[function(require,module,exports){
+},{}],64:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8018,10 +9122,7 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityLevel.GravityLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile),
-						onStart: _onStart || function () {
-							console.log('Level Started');
-						}
+						levelFile: (0, _utils.clone)(_levelFile)
 
 					});
 
@@ -8032,10 +9133,7 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _ElectricLevel.ElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile),
-						onStart: _onStart || function () {
-							console.log('Level Started');
-						}
+						levelFile: (0, _utils.clone)(_levelFile)
 
 					});
 
@@ -8046,15 +9144,20 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityElectricLevel.GravityElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile),
-						onStart: _onStart || function () {
-							console.log('Level Started');
-						}
+						levelFile: (0, _utils.clone)(_levelFile)
 
 					});
 
 					break;
 
+			}
+
+			if (this.currentLevel) {
+
+				this.currentLevel.onLoad(function () {
+
+					if (_onStart) _onStart();
+				});
 			}
 		}
 	}, {
@@ -8088,7 +9191,7 @@ var GameManager = exports.GameManager = function () {
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":36,"./GameElements/GravityElectricLevel":40,"./GameElements/GravityLevel":41,"./utils":55}],52:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":49,"./GameElements/GravityElectricLevel":53,"./GameElements/GravityLevel":54,"./utils":68}],65:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -8153,13 +9256,11 @@ var _levels = require("./levels");
 
 								(0, _utils.addEvent)(levelElement, 'click', function () {
 
-										gameManager.startLevel(_levels.levels[file][level]);
-
-										setTimeout(function () {
+										gameManager.startLevel(_levels.levels[file][level], function () {
 
 												menu.classList.add('hidden');
 												activePage.classList.remove('active');
-										}, 700);
+										});
 								});
 						};
 
@@ -8221,8 +9322,6 @@ var _levels = require("./levels");
 				var renderer = new THREE.WebGLRenderer({ alpha: true });
 				var gl = renderer.getContext();
 
-				console.log(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS));
-
 				var devicePixelRatio = window.devicePixelRatio;
 				if (devicePixelRatio > 1.5) {
 
@@ -8251,7 +9350,6 @@ var _levels = require("./levels");
 						var pos = vec2.fromValues(event.clientX, event.clientY);
 						gameManager.onClick(vec2.fromValues(event.clientX, event.clientY));
 						lastPos = pos;
-						// gameManager.update ();
 				});
 
 				// Mouse
@@ -8336,11 +9434,13 @@ var _levels = require("./levels");
 
 				// Debug
 
-				menu.classList.add('hidden');
-				activePage.classList.remove('active');
-				// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
+				gameManager.startLevel(_levels.levels['gravity'][0], function () {
+
+						menu.classList.add('hidden');
+						activePage.classList.remove('active');
+				});
 				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-				gameManager.startLevel(_levels.levels['gravityElectric'][0]);
+				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 				function update() {
 
@@ -8370,7 +9470,7 @@ var _levels = require("./levels");
 		init();
 })();
 
-},{"./GameManager":51,"./levels":53,"./resourcesList":54,"./utils":55}],53:[function(require,module,exports){
+},{"./GameManager":64,"./levels":66,"./resourcesList":67,"./utils":68}],66:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -8383,7 +9483,7 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity',
-
+																		textIntro: 'G\n\n----------\n\nTry to change the vehicle\'s trajectory by placing objects along it\'s road.\n\nJust drag on the screen to counterbalance the attractive forces emitted by the big circles.\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -8392,6 +9492,10 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 4,
 
 																														shaders: {
 
@@ -8409,6 +9513,7 @@ var levels = {
 																																				scan: {
 
 																																										name: 'scanPlanet',
+																																										blanding: 'NormalBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8435,7 +9540,8 @@ var levels = {
 																																										radius: 4,
 																																										mass: 1000000,
 																																										scale: [1.8, 1.8, 1.8],
-																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1],
+																																										rotation: [0, 0, 0]
 
 																																				}
 
@@ -8450,7 +9556,9 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														individual: false,
-																														maxInstancesNum: 400,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
 
 																														shaders: {
 
@@ -8476,7 +9584,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8505,6 +9613,8 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 1,
+																														drawInfos: true,
 
 																														shaders: {
 
@@ -8600,7 +9710,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8609,7 +9719,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8638,6 +9748,7 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 1,
 
 																														shaders: {
 
@@ -8733,7 +9844,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8742,7 +9853,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8771,6 +9882,7 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 1,
 
 																														shaders: {
 
@@ -8856,7 +9968,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8865,7 +9977,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8989,7 +10101,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -8998,7 +10110,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'blackMatter',
+																																										name: 'blackMatterInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9022,6 +10134,7 @@ var levels = {
 												0: {
 
 																		chapter: 'electric',
+																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
 
 																		elements: {
 
@@ -9031,6 +10144,7 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 2,
 
 																														shaders: {
 
@@ -9038,7 +10152,7 @@ var levels = {
 
 																																				normal: {
 
-																																										name: 'planet',
+																																										name: 'electricCharge',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9047,7 +10161,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'scanPlanet',
+																																										name: 'electricChargeScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9056,7 +10170,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'infoPlanet',
+																																										name: 'electricChargeInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9065,20 +10179,7 @@ var levels = {
 
 																														},
 
-																														instances: {
-
-																																				// 1: {
-
-																																				//     position: [ 0, -1.0, 0.0 ],
-																																				//     radius: 2,
-																																				//     charge: 0,
-																																				//     scale: [ 0.8, 0.8, 0.1 ],
-																																				//     rotation: [ 0, 0, Math.PI * -0.25],
-																																				//     color: [ 0.9, 0.1, 0.1, 1 ],
-
-																																				// },
-
-																														}
+																														instances: {}
 
 																								},
 
@@ -9090,6 +10191,7 @@ var levels = {
 																														transparent: true,
 																														individual: false,
 																														maxInstancesNum: 20,
+																														renderOrder: 2,
 
 																														shaders: {
 
@@ -9107,7 +10209,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'scanPlanet',
+																																										name: 'electricChargeScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9116,7 +10218,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'infoPlanet',
+																																										name: 'electricChargeInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9132,9 +10234,13 @@ var levels = {
 																								obstacles: {
 
 																														elementType: 'Obstacle',
-																														static: true,
+																														static: false,
 																														manualMode: false,
 																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
+																														renderOrder: 2,
 
 																														shaders: {
 
@@ -9142,7 +10248,7 @@ var levels = {
 
 																																				normal: {
 
-																																										name: 'planet',
+																																										name: 'obstacle',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
 																																										uniforms: {}
@@ -9151,16 +10257,15 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'scanPlanet',
+																																										name: 'obstacleScan',
 																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
 																																										uniforms: {}
 
 																																				},
 
 																																				infos: {
 
-																																										name: 'infoPlanet',
+																																										name: 'obstacleInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
 																																										uniforms: {}
@@ -9228,6 +10333,7 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity-electric',
+																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
 
 																		elements: {
 
@@ -9238,6 +10344,7 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														enableUpdate: true,
+																														renderOrder: 2,
 
 																														shaders: {
 
@@ -9306,6 +10413,7 @@ var levels = {
 																														transparent: true,
 																														individual: false,
 																														maxInstancesNum: 200,
+																														renderOrder: 3,
 
 																														shaders: {
 
@@ -9323,7 +10431,7 @@ var levels = {
 
 																																				scan: {
 
-																																										name: 'electricChargeScan',
+																																										name: 'electricParticlePlanetScan',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9332,7 +10440,7 @@ var levels = {
 
 																																				infos: {
 
-																																										name: 'electricChargeInfo',
+																																										name: 'electricParticlePlanetInfo',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9375,7 +10483,7 @@ var levels = {
 
 exports.levels = levels;
 
-},{}],54:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -9422,7 +10530,7 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],55:[function(require,module,exports){
+},{}],68:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9668,4 +10776,4 @@ function clone(obj) {
     throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
-},{}]},{},[52]);
+},{}]},{},[65]);

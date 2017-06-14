@@ -1,7 +1,7 @@
 
 @font-face {
     font-family: 'GT-America-Regular';
-	src: url('../resources/fonts/EtterCI-Book.woff') format('woff');
+	src: url('../resources/fonts/GT-America-Regular.woff2') format('woff2');
 	font-weight: normal;
 	font-style: normal;
 }
@@ -111,7 +111,7 @@ html, body {
 #back-button {
 
 	position: fixed;
-	top: 50px;
+	top: 0;
 	left: 0;
 	height: 50px;
 	width: 50px;

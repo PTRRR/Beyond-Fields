@@ -68,14 +68,12 @@ import { levels } from "./levels";
 				
 				addEvent ( levelElement, 'click', function () {
 
-					gameManager.startLevel ( levels[ file ][ level ] );
-
-					setTimeout ( function () {
+					gameManager.startLevel ( levels[ file ][ level ], function () {
 
 						menu.classList.add ( 'hidden' );
 						activePage.classList.remove ( 'active' );
 
-					}, 700 );
+					} );
 
 				} );
 
@@ -137,8 +135,6 @@ import { levels } from "./levels";
 		let renderer = new THREE.WebGLRenderer( { alpha: true } );
 		let gl = renderer.getContext ();
 
-		console.log(gl.getParameter ( gl.MAX_VERTEX_UNIFORM_VECTORS ));
-
 		let devicePixelRatio = window.devicePixelRatio;
 		if ( devicePixelRatio > 1.5 ) {
 
@@ -168,7 +164,6 @@ import { levels } from "./levels";
 			let pos = vec2.fromValues ( event.clientX, event.clientY );
 			gameManager.onClick ( vec2.fromValues ( event.clientX, event.clientY ) );
 			lastPos = pos;
-			// gameManager.update ();
 
 		} );
 
@@ -263,11 +258,14 @@ import { levels } from "./levels";
 
 		// Debug
 
-		menu.classList.add ( 'hidden' );
-		activePage.classList.remove ( 'active' );
-		// gameManager.startLevel ( levels[ 'gravity' ][ 0 ] );
+		gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
+
+			menu.classList.add ( 'hidden' );
+			activePage.classList.remove ( 'active' );
+
+		} );
 		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-		gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
 		function update () {
 

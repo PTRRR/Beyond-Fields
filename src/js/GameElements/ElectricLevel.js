@@ -24,7 +24,7 @@ export class ElectricLevel extends LevelCore {
 		// Build scan background
 
 		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
-		this.scanGeometry = new THREE.PlaneGeometry ( 1, 1, 300, 300 );
+		this.scanGeometry = new THREE.PlaneGeometry ( 1, 1, 150, 150 );
 		this.scanMaterial = new THREE.ShaderMaterial ( {
 
 			vertexShader: shaderHelper.equipotentialLines.vertex,
@@ -37,11 +37,12 @@ export class ElectricLevel extends LevelCore {
 				numCharges: { value: 0 },
 				charges: { value: [ 0, 0, 0 ] },
 
-			}
+			},
 
 		} );
 
 		this.scanMesh = new THREE.Mesh ( this.scanGeometry, this.scanMaterial );
+		this.scanMesh.renderOrder = 0;
 		this.scanMesh.scale.set ( maxScale, maxScale, 1.0 );
 		this.scanScene.add ( this.scanMesh );
 		this.scanMaterial.extensions.derivatives = true;
@@ -128,8 +129,7 @@ export class ElectricLevel extends LevelCore {
 				case 'center':
 
 					this.currentInstance.element.targetPosition = mouse;
-					this.currentInstance.element.targetRadius = 0;
-					this.d
+					// this.currentInstance.element.targetRadius = 0;
 
 				break;
 
@@ -148,6 +148,15 @@ export class ElectricLevel extends LevelCore {
 
 	}
 
+	onResize () {
+
+		super.onResize ();
+
+		let maxScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 2 : this.getWorldTop () * 2;
+		this.scanMesh.scale.set ( maxScale, maxScale, 1.0 );
+
+	}
+
 	update () {
 
 		// Check if all is loaded.
@@ -156,6 +165,7 @@ export class ElectricLevel extends LevelCore {
 
 			if ( Object.keys( this.gameElements ).length == this.elementToLoad ) {
 
+				this.updateRenderer ();
 				this.ready = true;
 				this.resetPlayer ();
 				// this.start = this.getInstanceByName ( 'goals', 'top' );

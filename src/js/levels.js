@@ -5,7 +5,7 @@ let levels = {
 		0: {
 
 			chapter: 'gravity',
-
+			textIntro: 'G\n\n----------\n\nTry to change the vehicle\'s trajectory by placing objects along it\'s road.\n\nJust drag on the screen to counterbalance the attractive forces emitted by the big circles.\n\nClick to start',
 			elements: {
 
 				planets: {
@@ -14,6 +14,10 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 4,
 
 					shaders: {
 
@@ -31,6 +35,7 @@ let levels = {
 						scan: {
 
 							name: 'scanPlanet',
+							blanding: 'NormalBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -59,6 +64,7 @@ let levels = {
                             mass: 1000000,
                             scale: [ 1.8, 1.8, 1.8 ],
                             color: [ 255/255, 222/255, 40/255, 1 ],
+                            rotation: [ 0, 0, 0 ],
 
                         },
 
@@ -73,7 +79,9 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					individual: false,
-					maxInstancesNum: 400,
+					maxInstancesNum: 108,
+					renderOrder: 3,
+					drawInfos: true,
 
 					shaders: {
 
@@ -99,7 +107,7 @@ let levels = {
 
 						infos: {
 
-							name: 'blackMatter',
+							name: 'blackMatterInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -129,6 +137,8 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 1,
+					drawInfos: true,
 
 					shaders: {
 
@@ -225,7 +235,7 @@ let levels = {
 
 						scan: {
 
-							name: 'blackMatter',
+							name: 'blackMatterScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -234,7 +244,7 @@ let levels = {
 
 						infos: {
 
-							name: 'blackMatter',
+							name: 'blackMatterInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -264,6 +274,7 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 1,
 
 					shaders: {
 
@@ -360,7 +371,7 @@ let levels = {
 
 						scan: {
 
-							name: 'blackMatter',
+							name: 'blackMatterScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -369,7 +380,7 @@ let levels = {
 
 						infos: {
 
-							name: 'blackMatter',
+							name: 'blackMatterInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -400,6 +411,7 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 1,
 
 					shaders: {
 
@@ -486,7 +498,7 @@ let levels = {
 
 						scan: {
 
-							name: 'blackMatter',
+							name: 'blackMatterScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -495,7 +507,7 @@ let levels = {
 
 						infos: {
 
-							name: 'blackMatter',
+							name: 'blackMatterInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -621,7 +633,7 @@ let levels = {
 
 						scan: {
 
-							name: 'blackMatter',
+							name: 'blackMatterScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -630,7 +642,7 @@ let levels = {
 
 						infos: {
 
-							name: 'blackMatter',
+							name: 'blackMatterInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -655,6 +667,7 @@ let levels = {
 		0: {
 
 			chapter: 'electric',
+			textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
 
 			elements: {
 
@@ -664,6 +677,7 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 2,
 
 					shaders: {
 
@@ -671,7 +685,7 @@ let levels = {
 
 						normal: {
 
-							name: 'planet',
+							name: 'electricCharge',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -680,7 +694,7 @@ let levels = {
 
 						scan: {
 
-							name: 'scanPlanet',
+							name: 'electricChargeScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -689,7 +703,7 @@ let levels = {
 
 						infos: {
 
-							name: 'infoPlanet',
+							name: 'electricChargeInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -699,20 +713,7 @@ let levels = {
 					},
 
 
-					instances: {
-
-                        // 1: {
-
-                        //     position: [ 0, -1.0, 0.0 ],
-                        //     radius: 2,
-                        //     charge: 0,
-                        //     scale: [ 0.8, 0.8, 0.1 ],
-                        //     rotation: [ 0, 0, Math.PI * -0.25],
-                        //     color: [ 0.9, 0.1, 0.1, 1 ],
-
-                        // },
-
-					}
+					instances: {}
 
 				},
 
@@ -724,6 +725,7 @@ let levels = {
 					transparent: true,
 					individual: false,
 					maxInstancesNum: 20,
+					renderOrder: 2,
 
 					shaders: {
 
@@ -741,7 +743,7 @@ let levels = {
 
 						scan: {
 
-							name: 'scanPlanet',
+							name: 'electricChargeScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -750,7 +752,7 @@ let levels = {
 
 						infos: {
 
-							name: 'infoPlanet',
+							name: 'electricChargeInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -767,9 +769,13 @@ let levels = {
 				obstacles: {
 
 					elementType: 'Obstacle',
-					static: true,
+					static: false,
 					manualMode: false,
 					transparent: true,
+					individual: false,
+					maxInstancesNum: 2,
+					buildFromInstances: true,
+					renderOrder: 2,
 
 					shaders: {
 
@@ -777,7 +783,7 @@ let levels = {
 
 						normal: {
 
-							name: 'planet',
+							name: 'obstacle',
 							transparent: true,
 							textureUrl: './resources/textures/generic_obstacle_sdf.png',
 							uniforms: {},
@@ -786,16 +792,15 @@ let levels = {
 
 						scan: {
 
-							name: 'scanPlanet',
+							name: 'obstacleScan',
 							transparent: true,
-							textureUrl: './resources/textures/generic_obstacle_sdf.png',
 							uniforms: {},
 
 						},
 
 						infos: {
 
-							name: 'infoPlanet',
+							name: 'obstacleInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_obstacle_sdf.png',
 							uniforms: {},
@@ -864,6 +869,7 @@ let levels = {
 		0: {
 
 			chapter: 'gravity-electric',
+			textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
 
 			elements: {
 
@@ -874,6 +880,7 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					enableUpdate: true,
+					renderOrder: 2,
 
 					shaders: {
 
@@ -943,6 +950,7 @@ let levels = {
 					transparent: true,
 					individual: false,
 					maxInstancesNum: 200,
+					renderOrder: 3,
 
 					shaders: {
 
@@ -960,7 +968,7 @@ let levels = {
 
 						scan: {
 
-							name: 'electricChargeScan',
+							name: 'electricParticlePlanetScan',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -969,7 +977,7 @@ let levels = {
 
 						infos: {
 
-							name: 'electricChargeInfo',
+							name: 'electricParticlePlanetInfo',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},

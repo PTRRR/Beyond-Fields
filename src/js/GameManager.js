@@ -109,7 +109,6 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
-					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
 
@@ -121,7 +120,6 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
-					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
 
@@ -133,11 +131,20 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
-					onStart: _onStart || function () { console.log ( 'Level Started' ) },
 
 				} );
 
 			break;
+
+		}
+
+		if ( this.currentLevel ) {
+
+			this.currentLevel.onLoad ( function () {
+
+				if ( _onStart ) _onStart ();
+
+			} );
 
 		}
 

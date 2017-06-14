@@ -1,8 +1,19 @@
 import { Float32Concat } from '../utils';
 import { shaderHelper } from './shaderHelper';
 import { library } from './library';
-let bmfont = require ( 'three-bmfont-text' );
+
+// Import some npm libs
+
+let sdfShader = require('three-bmfont-text/shaders/sdf');
+let msdfShader = require('three-bmfont-text/shaders/msdf');
+let bmfontGeometry = require ( 'three-bmfont-text' );
 let bmfontLoader = require ( 'load-bmfont' );
+
+let bezier = require('adaptive-bezier-curve');
+let quadratic = require('adaptive-quadratic-curve');
+let line = require('three-line-2d')(THREE);
+let basicShader = require('three-line-2d/shaders/basic')(THREE);
+let getNormals = require('polyline-normals');
 
 export class LevelCore {
 
@@ -22,6 +33,9 @@ export class LevelCore {
 
 		// Core elements
 
+		this.loadObjects = 0;
+		this.levelLoaded = false;
+		this.levelStarted = false;
 		this.levelIsReady = false;
 		this.elementToLoad = 0;
 		this.levelFile = _options.levelFile;
@@ -68,6 +82,8 @@ export class LevelCore {
 		this.scanSceneRenderTarget = new THREE.WebGLRenderTarget ( this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false } );
 		
 		this.scanScreenTargetPosition = new THREE.Vector3 ( 0, 0, 0 );
+		this.scanScreenClosed = true;
+		this.scanScreenOpened = false;
 		this.scanScreen = new THREE.Mesh ( this.quadGeometry, this.screenMaterial.clone () );
 		this.scanScreen.material.uniforms.texture.value = this.scanSceneRenderTarget.texture;
 
@@ -86,6 +102,8 @@ export class LevelCore {
 		this.infoSceneRenderTarget = new THREE.WebGLRenderTarget ( this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false } );
 
 		this.infoScreenTargetPosition = new THREE.Vector3 ( 0, 0, 0 );
+		this.infoScreenClosed = true;
+		this.infoScreenOpened = false;
 		this.infoScreen = new THREE.Mesh ( this.quadGeometry, this.screenMaterial.clone() );
 		this.infoScreen.material.uniforms.texture.value = this.infoSceneRenderTarget.texture;
 
@@ -101,26 +119,16 @@ export class LevelCore {
 
 		// Render all scenes once the get right matrices.
 
+		this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+		this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
 		this.renderer.render ( this.mainScene, this.mainCamera );
-		this.renderer.render ( this.scanScene, this.mainCamera );
-		this.renderer.render ( this.infoScene, this.mainCamera );
 
-		// test
+		// Declare objects for drawing lines
 
-		this.testDerivative = new THREE.Mesh ( new THREE.PlaneGeometry ( 1, 1 ), new THREE.ShaderMaterial ( {
-
-			vertexShader: shaderHelper.testDerivative.vertex,
-			fragmentShader: shaderHelper.testDerivative.fragment,
-			transparent: true,
-
-		} ) );
-
-		this.testDerivative.position.set ( 0.0, 0.0, 1 );
-		this.testDerivative.scale.set ( 3.0, 3.0, 0.1 );
-		this.testDerivative.material.extensions.derivatives = true;
-		// this.mainScene.add ( this.testDerivative );
-
-		// console.log(this.testDerivative);
+		this.line = line;
+		this.bezier = bezier;
+		this.quadratic = quadratic;
+		this.basicShader = basicShader;
 
 		// Objects
 
@@ -173,6 +181,13 @@ export class LevelCore {
 	}
 
 	onDown ( _position ) {
+
+		if ( !this.levelStarted ) {
+
+			this.levelStarted = true;
+			// this.infoScreenTargetPosition.x = this.getWorldLeft () * 2.0;
+
+		}
 
 		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
 		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
@@ -246,17 +261,92 @@ export class LevelCore {
 
 		// Update screns size & position.
 
-		this.scanScreenTargetPosition.set ( 0.0, 0.0, 0.0 );
+		this.scanScreenTargetPosition.set ( this.getWorldRight () * 2.0, 0.0, 0.0 );
 		this.scanScreen.position.set ( this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z );
 
 		this.scanScreen.scale.x = this.getWorldRight () * 2.0;
 		this.scanScreen.scale.y = this.getWorldTop () * 2.0;
 
-		this.infoScreenTargetPosition.set ( this.getWorldLeft () * 2.0, 0.0, 0.0 );
+		this.infoScreenTargetPosition.set ( 0.0, 0.0, 0.0 );
 		this.infoScreen.position.set ( this.infoScreenTargetPosition.x, this.infoScreenTargetPosition.y, this.infoScreenTargetPosition.z );
 
 		this.infoScreen.scale.x = this.getWorldRight () * 2.0;
 		this.infoScreen.scale.y = this.getWorldTop () * 2.0;
+
+		// Load a font that will be used for font rendering in the level.
+
+		this.addLoadingObject ();
+		bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
+
+
+			if ( err ) {
+
+				console.error( err );
+
+			} else {
+
+				this.addLoadingObject ();
+				this.objectOnLoad ( 'fnt' );
+
+				let textureLoader = new THREE.TextureLoader ();
+				textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
+
+					this.objectOnLoad ( 'font texture' );
+
+					// Check if an intro text is specified in the level file.
+
+					if ( this.levelFile.textIntro ) {
+
+						this.textBackgroundMaterial = new THREE.MeshBasicMaterial ( {
+
+							color: 'rgb( 128, 128, 128 )',
+							opacity: 0.9,
+							transparent: true,
+
+						} );
+
+						this.textBackground = new THREE.Mesh ( this.quadGeometry, this.textBackgroundMaterial );
+						this.textBackground.renderOrder = 5;
+						this.textBackground.scale.set ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, 3 );
+						this.infoScene.add ( this.textBackground );
+
+						let geometry = bmfontGeometry ( {
+
+							width: 1000,
+							align: 'center',
+							font: font
+
+						} );
+
+						geometry.update ( this.levelFile.textIntro );
+						geometry.computeBoundingBox ();
+
+						var material = new THREE.RawShaderMaterial( sdfShader ( {
+						  	
+						  	map: texture,
+						  	side: THREE.DoubleSide,
+						  	transparent: true,
+						  	color: 'rgb(0, 0, 0)',
+
+						} ) );
+
+						this.textIntro = new THREE.Mesh ( geometry, material );
+						this.infoScene.add ( this.textIntro );
+						this.textIntro.material.extensions.derivatives = true;
+						this.textIntro.renderOrder = 6;
+						geometry.computeBoundingSphere ();
+						this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
+						this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+						this.textIntro.rotation.x = Math.PI;
+						this.textIntro.scale.set ( 0.0025, 0.0025, 0.0025 );
+
+					}
+
+				}.bind ( this ) );
+
+			} 
+
+		}.bind ( this ) );
 
 		// Add base elements.
 		// Add the scale square in the background.
@@ -265,7 +355,7 @@ export class LevelCore {
 
 			static: true,
 			manualMode: false,
-			renderOrder: 1000,
+			renderOrder: 0,
 
 			shaders: {
 
@@ -310,9 +400,9 @@ export class LevelCore {
 				0: {
 
 					enabled: true,
-					position: vec3.fromValues ( 0, 0, -0.1 ),
-					rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
-					scale: vec3.fromValues ( 2.0, 2.0, 1.0 ),
+					position: [ 0, 0, 0 ],
+					rotation: [ 0, 0, 0 ],
+					scale: [ 2, 2, 1 ],
 
 				}
 
@@ -504,8 +594,8 @@ export class LevelCore {
 
 				0: {
 
-					enabled: true,
-					position: vec3.fromValues ( 0, 0, 0 ),
+					enabled: false,
+					position: vec3.fromValues ( 0, 10, 0 ),
 					rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
 					scale: vec3.fromValues ( 0.12, 0.12, 1.0 ),
 					velocity: vec3.create(),
@@ -518,10 +608,52 @@ export class LevelCore {
 
 		} );
 
+		// Add lines
+
+		this.onLoad ( function () {
+
+			let linesData = this.getLinesData ();
+
+			this.linesGeometry = new THREE.BufferGeometry ();
+			this.linesGeometry.setIndex ( new THREE.BufferAttribute ( new Uint32Array ( linesData.index ), 1 ) );
+			this.linesGeometry.index.dynamic = true;
+			this.linesGeometry.addAttribute ( 'position', new THREE.BufferAttribute ( new Float32Array ( linesData.position ), 3 ) );
+			this.linesGeometry.attributes.position.dynamic = true;
+			this.linesGeometry.addAttribute ( 'lineNormal', new THREE.BufferAttribute ( new Float32Array ( linesData.lineNormal ), 2 ) );
+			this.linesGeometry.attributes.lineNormal.dynamic = true;
+			this.linesGeometry.addAttribute ( 'lineMiter', new THREE.BufferAttribute ( new Float32Array ( linesData.lineMiter ), 1 ) );
+			this.linesGeometry.attributes.lineMiter.dynamic = true;
+			this.linesGeometry.addAttribute ( 'lineOpacity', new THREE.BufferAttribute ( new Float32Array ( linesData.lineOpacity ), 1 ) );
+			this.linesGeometry.attributes.lineOpacity.dynamic = true;
+
+			let m = new THREE.ShaderMaterial ( {
+
+				vertexShader: shaderHelper.line.vertex,
+				fragmentShader: shaderHelper.line.fragment,
+				side: THREE.DoubleSide,
+
+				uniforms: {
+
+					diffuse: { value: [ 0, 0, 0 ] },
+					thickness: { value: 0.017 },
+
+				},
+
+				transparent: true,
+
+			} );
+
+			this.lines = new THREE.Mesh ( this.linesGeometry, m );
+			this.lines.renderOrder = 2;
+			this.infoScene.add ( this.lines );
+
+		}.bind ( this ) );
+
 	}
 
 	addElement ( _name, _element ) {
 
+		this.addLoadingObject ();
 		this.elementToLoad ++;
 
 		let textureUrl = _element.texture;
@@ -582,9 +714,25 @@ export class LevelCore {
 
 				// Update vertices
 
-				for ( let i = 0; i < quad.vertices.length; i ++ ) {
+				// HAAAACKKKKKKK
 
-					vertices.push ( quad.vertices[ i ] );
+				if ( _name == 'planets' ) {
+
+					for ( let i = 0; i < quad.vertices.length; i += 3 ) {
+
+						vertices.push ( quad.vertices[ i + 0 ] );
+						vertices.push ( quad.vertices[ i + 1 ] );
+						vertices.push ( instance.scale[ 0 ] );
+
+					}
+
+				} else {
+
+					for ( let i = 0; i < quad.vertices.length; i ++ ) {
+
+						vertices.push ( quad.vertices[ i ] );
+
+					}
 
 				}
 
@@ -647,6 +795,7 @@ export class LevelCore {
 
 					this.gameElements[ _name ].mainGeometry = this.gameElements[ _name ].meshes[ 0 ].geometry;
 					this.gameElements[ _name ].instances = _gameObjectInstances;
+					this.objectOnLoad ( _name );
 
 				}.bind ( this ) );
 
@@ -732,6 +881,7 @@ export class LevelCore {
 
 							this.gameElements[ _name ].mainGeometry = this.gameElements[ _name ].meshes[ 0 ].geometry;
 							this.gameElements[ _name ].instances = _gameObjectInstances;
+							this.objectOnLoad ( _name );
 
 						}.bind ( this ) );
 
@@ -749,7 +899,17 @@ export class LevelCore {
 				// The transform will happen on the gpu to optimize the render loop.
 
 				let maxInstancesNum = _element.maxInstancesNum;
-				let geometryData = this.getDataGeometryFromNum ( maxInstancesNum );
+				let geometryData = null;
+
+				if ( _element.buildFromInstances ) {
+
+					geometryData = this.getDataGeometryFromInstances ( Object.keys ( _element.instances ).map( key => _element.instances[ key ] ) );
+
+				} else {
+
+					geometryData = this.getDataGeometryFromNum ( maxInstancesNum );
+
+				}
 
 				let geometry = new THREE.BufferGeometry ();
 
@@ -828,6 +988,7 @@ export class LevelCore {
 
 						this.gameElements[ _name ].mainGeometry = this.gameElements[ _name ].meshes[ 0 ].geometry;
 						this.gameElements[ _name ].instances = _gameObjectInstances;
+						this.objectOnLoad ( _name );
 
 					}.bind ( this ) );
 
@@ -1039,9 +1200,18 @@ export class LevelCore {
 
 		for ( let i = _instances.length - 1; i >= 0; i -- ) {
 
+			let instance = _instances[ i ];
+
+			// Set default variables if missing.
+
+			instance.position = instance.position || vec3.fromValues ( 0.0, 0.0, 0.0 );
+			instance.rotation = instance.rotation || vec3.fromValues ( 0.0, 0.0, 0.0 );
+			instance.scale = instance.scale || vec3.fromValues ( 1.0, 1.0, 1.0 );
+			instance.color = instance.color || vec4.fromValues ( 1.0, 1.0, 1.0, 1.0 );
+
 			// Update the indices
 
-			for ( let j = this.genericQuad.indices.length - 1; j >= 0; j -- ) {
+			for ( let j = 0; j < this.genericQuad.indices.length; j ++ ) {
 
 				indices.push ( this.genericQuad.indices[ j ] + vertices.length / 3 );
 
@@ -1049,17 +1219,17 @@ export class LevelCore {
 
 			// Update vertices
 
-			for ( let j = this.genericQuad.vertices.length - 1; j >= 0; j -= 3 ) {
+			for ( let j = 0; j < this.genericQuad.vertices.length; j += 3 ) {
 
-				vertices.push ( this.genericQuad.vertices[ j - 0 ] );
-				vertices.push ( this.genericQuad.vertices[ j - 1 ] );
-				vertices.push ( _instances[ i ].scale[ 1 ] ); // Hack pass scale y
+				vertices.push ( this.genericQuad.vertices[ j + 0 ] );
+				vertices.push ( this.genericQuad.vertices[ j + 1 ] );
+				vertices.push ( _instances[ i ].scale[ 1 ] ); // Hack pass the y scale
 
 			}
 
 			// Update uvs
 
-			for ( let j = this.genericQuad.uvs.length - 1; j >= 0; j -- ) {
+			for ( let j = 0; j < this.genericQuad.uvs.length; j ++ ) {
 
 				uvs.push ( this.genericQuad.uvs[ j ] );
 
@@ -1067,17 +1237,17 @@ export class LevelCore {
 
 			// Update colors
 
-			for ( let j = 3; j >= 0; j -- ) {
+			for ( let j = 0; j < 4; j ++ ) {
 
-				colors.push ( _instances[ i ].color[ 0 ] );
-				colors.push ( _instances[ i ].color[ 1 ] );
-				colors.push ( _instances[ i ].color[ 2 ] );
-				colors.push ( _instances[ i ].color[ 3 ] );
+				colors.push ( instance.color[ 0 ] );
+				colors.push ( instance.color[ 1 ] );
+				colors.push ( instance.color[ 2 ] );
+				colors.push ( instance.color[ 3 ] );
 
-				transform.push ( _instances[ i ].position[ 0 ] );
-				transform.push ( _instances[ i ].position[ 1 ] );
-				transform.push ( _instances[ i ].scale[ 0 ] );
-				transform.push ( _instances[ i ].rotation[ 2 ] );
+				transform.push ( instance.position[ 0 ] );
+				transform.push ( instance.position[ 1 ] );
+				transform.push ( instance.scale[ 0 ] );
+				transform.push ( instance.rotation[ 2 ] || 0 );
 
 			}
 
@@ -1092,6 +1262,153 @@ export class LevelCore {
 			transform: transform,
 
 		}
+
+	}
+
+	getLinesData () {
+
+		let linesIndices = [];
+		let linesPositions = [];
+		let linesNormals = [];
+		let linesMiters = [];
+		let linesOpacities = [];
+
+		for ( let element in this.gameElements ) {
+
+			if ( this.gameElements[ element ].drawInfos ) {
+				
+				let maxInstancesNum = this.gameElements[ element ].maxInstancesNum || 0;
+				let instances = this.gameElements[ element ].instances;
+
+				for ( let i = 0; i < maxInstancesNum; i ++ ) {
+
+					let lPoints = null;
+					let opacity = 0;
+
+					if ( i < instances.length ) {
+
+						let iPos2 = [ instances[ i ].position[ 0 ], instances[ i ].position[ 1 ] ];
+						let tPos2 = [ -1, 1 ];
+						let cPos2 = [ 0, 0 ];
+						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
+						opacity = instances[ i ].color[ 3 ];
+
+					} else {
+
+						let iPos2 = [ 0.0, 0.0 ];
+						let tPos2 = [ 0, 0 ];
+						let cPos2 = [ 0, 0 ];
+						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
+
+					}
+
+					let lGeom = this.generateLine ( lPoints );
+
+					for ( let j = 0; j < lGeom.index.length; j ++ ) {
+
+						linesIndices.push ( lGeom.index[ j ] + linesPositions.length / 3 );
+
+					}
+
+					for ( let j = 0; j < lGeom.position.length; j ++ ) {
+
+						linesPositions.push ( lGeom.position[ j ] );
+
+					}
+
+					for ( let j = 0; j < lGeom.lineNormal.length; j ++ ) {
+
+						linesNormals.push ( lGeom.lineNormal[ j ] );
+
+					}
+
+					for ( let j = 0; j < lGeom.lineMiter.length; j ++ ) {
+
+						linesMiters.push ( lGeom.lineMiter[ j ] );
+						linesOpacities.push ( opacity );
+
+					}
+
+				} 
+
+			}
+
+		}
+
+		return {
+
+			index: linesIndices,
+			position: linesPositions,
+			lineNormal: linesNormals,
+			lineMiter: linesMiters,
+			lineOpacity: linesOpacities,
+
+		}
+
+	}
+
+	generateLine ( path, closed ) {
+
+		path = path || [];
+	    let normals = getNormals ( path, closed );
+	    let indexCount = Math.max ( 0, ( path.length - 1 ) * 6 );
+
+	    let count = path.length * 2;
+	    let attrPosition = new Float32Array ( count * 3 );
+	    let attrNormal = new Float32Array ( count * 2 );
+	    let attrMiter = new Float32Array ( count );
+	    let attrIndex = new Uint32Array ( indexCount );
+
+	    let index = 0;
+	    let c = 0;
+	    let dIndex = 0;
+	    let indexArray = attrIndex;
+
+	    path.forEach ( function ( point, pointIndex, list ) {
+
+	      	let i = index;
+	      	indexArray[ c++ ] = i / 3 + 0;
+	      	indexArray[ c++ ] = i / 3 + 1;
+	      	indexArray[ c++ ] = i / 3 + 2;
+	      	indexArray[ c++ ] = i / 3 + 2;
+	      	indexArray[ c++ ] = i / 3 + 1;
+	      	indexArray[ c++ ] = i / 3 + 3;
+	
+	      	attrPosition[ index++ ] = point[ 0 ];
+	      	attrPosition[ index++ ] = point[ 1 ];
+	      	attrPosition[ index++ ] = 0;
+	      	attrPosition[ index++ ] = point[ 0 ];
+	      	attrPosition[ index++ ] = point[ 1 ];
+	      	attrPosition[ index++ ] = 0;
+
+	    });
+
+	    let nIndex = 0;
+	    let mIndex = 0;
+
+	    normals.forEach ( function ( n ) {
+
+	      	let norm = n[ 0 ];
+	      	let miter = n[ 1 ];
+
+	      	attrNormal[ nIndex++ ] = norm[ 0 ];
+	      	attrNormal[ nIndex++ ] = norm[ 1 ];
+	      	attrNormal[ nIndex++ ] = norm[ 0 ];
+	      	attrNormal[ nIndex++ ] = norm[ 1 ];
+
+	      	attrMiter[ mIndex++ ] = -miter;
+	      	attrMiter[ mIndex++ ] = miter;
+
+	    });
+
+	    return {
+
+	    	position: attrPosition,
+	    	lineNormal: attrNormal,
+	    	lineMiter: attrMiter,
+	    	index: attrIndex,
+
+	    }
 
 	}
 
@@ -1233,7 +1550,8 @@ export class LevelCore {
         var spriteMaterial = new THREE.SpriteMaterial( { map: texture, useScreenCoordinates: false } );
         var sprite = new THREE.Sprite( spriteMaterial );
         sprite.scale.set(0.5 * fontsize, 0.25 * fontsize, 0.75 * fontsize);
-        return sprite;  
+        return sprite; 
+
     }
 
 	sign ( p1, p2,  p3 ){
@@ -1406,14 +1724,68 @@ export class LevelCore {
 
 	}
 
+	addLoadingObject () {
+
+		this.loadObjects ++;
+
+	}
+
+	objectOnLoad ( _string ) {
+
+		this.loadObjects --;
+
+		if ( _string ) {
+
+			console.log ( 'loaded: ' + _string );
+
+		}
+
+		if ( this.loadObjects == 0 ) {
+
+			console.log('\n*** Level loaded ***\n ');
+
+			this.levelLoaded = true;
+			if ( this.onLoadCallback ) {
+
+				for ( let i = 0; i < this.onLoadCallback.length; i ++ ) {
+
+					this.onLoadCallback[ i ]();
+
+				}
+
+			}
+
+		}
+
+	}
+
+	onLoad ( _callback ) {
+
+		if ( !this.onLoadCallback ) this.onLoadCallback = [];
+		this.onLoadCallback.push ( _callback );
+
+	}
+
 	update () {
 
 		// Update the screens.
+
+		if ( this.scanScreen.position.x >= this.getWorldRight () * 1.8 ) this.scanScreenClosed = true;
+		else this.scanScreenClosed = false;
+
+		if ( this.scanScreen.position.x <= 0.5 ) this.scanScreenOpened = true;
+		else this.scanScreenOpened = false;
 
 		this.scanScreen.position.x += ( this.scanScreenTargetPosition.x - this.scanScreen.position.x ) * 0.2;
 		this.scanScreen.position.y += ( this.scanScreenTargetPosition.y - this.scanScreen.position.y ) * 0.2;
 		this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight ();
 		this.scanScreenButton.position.y = this.scanScreen.position.y;
+
+		if ( this.infoScreen.position.x <= this.getWorldLeft () * 1.8 ) this.infoScreenClosed = true;
+		else this.infoScreenClosed = false;
+
+		if ( this.infoScreen.position.x >= -0.5 ) this.infoScreenOpened = true;
+		else this.infoScreenOpened = false;
 
 		this.infoScreen.position.x += ( this.infoScreenTargetPosition.x - this.infoScreen.position.x ) * 0.2;
 		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.2;
@@ -1432,7 +1804,7 @@ export class LevelCore {
 
 					let instances = this.gameElements[ elementName ].instances;
 
-					for ( let i = 0; i < instances.length; i ++ ) {
+					for ( let i = instances.length - 1; i >= 0 ; i -- ) {
 
 						let instance = instances[ i ];
 
@@ -1475,13 +1847,28 @@ export class LevelCore {
 
 									geometry.attributes.transform.array[ i * 16 + j * 4 + 0 ] = instances[ i ].position[ 0 ];
 									geometry.attributes.transform.array[ i * 16 + j * 4 + 1 ] = instances[ i ].position[ 1 ];
-									geometry.attributes.transform.array[ i * 16 + j * 4 + 2 ] = instances[ i ].scale[ 0 ];
+
 									geometry.attributes.transform.array[ i * 16 + j * 4 + 3 ] = instances[ i ].rotation[ 2 ];
 
 									geometry.attributes.rgbaColor.array[ i * 16 + j * 4 + 0 ] = instances[ i ].color[ 0 ];
 									geometry.attributes.rgbaColor.array[ i * 16 + j * 4 + 1 ] = instances[ i ].color[ 1 ];
 									geometry.attributes.rgbaColor.array[ i * 16 + j * 4 + 2 ] = instances[ i ].color[ 2 ];
-									geometry.attributes.rgbaColor.array[ i * 16 + j * 4 + 3 ] = instances[ i ].color[ 3 ];
+
+									// Hack pass the sign along with the scale & color alpha
+
+									if ( instances[ i ].name == 'gravityChargeParticle' ) {
+
+										// console.log(instances[ i ].charge);
+										let s = Math.sign ( instances[ i ].charge );
+										if ( s == 0 ) s = 1;
+										geometry.attributes.transform.array[ i * 16 + j * 4 + 2 ] = instances[ i ].scale[ 0 ] * s;
+
+									} else {
+
+										geometry.attributes.transform.array[ i * 16 + j * 4 + 2 ] = instances[ i ].scale[ 0 ];
+										geometry.attributes.rgbaColor.array[ i * 16 + j * 4 + 3 ] = instances[ i ].color[ 3 ];
+
+									}
 
 								}
 
@@ -1533,6 +1920,25 @@ export class LevelCore {
 			}
 
 		}
+
+		// Update lines
+
+		let linesData = this.getLinesData ();
+
+		this.linesGeometry.index.array = new Uint32Array ( linesData.index );
+		this.linesGeometry.index.needsUpdate = true;
+
+		this.linesGeometry.attributes.position.array = new Float32Array ( linesData.position );
+		this.linesGeometry.attributes.position.needsUpdate = true;
+
+		this.linesGeometry.attributes.lineNormal.array = new Float32Array ( linesData.lineNormal );
+		this.linesGeometry.attributes.lineNormal.needsUpdate = true;
+
+		this.linesGeometry.attributes.lineMiter.array = new Float32Array ( linesData.lineMiter );
+		this.linesGeometry.attributes.lineMiter.needsUpdate = true;
+
+		this.linesGeometry.attributes.lineOpacity.array = new Float32Array ( linesData.lineOpacity );
+		this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
 
 	}
 
@@ -1595,19 +2001,44 @@ export class LevelCore {
 
 	}
 
-	render () {
+	updateRenderer () {
 
 		this.renderer.clearDepth();
 		this.renderer.clear ();
 		this.renderer.render ( this.mainScene, this.mainCamera );
+		this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+		this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
+		this.renderer.clearDepth();
+		this.renderer.render( this.screensScene, this.mainCamera );
+
+	}
+
+	render () {
+
+		this.renderer.clearDepth();
+		this.renderer.clear ();
+
+		// if ( !this.scanScreenOpened && !this.infoScreenOpened ) {
+
+			this.renderer.render ( this.mainScene, this.mainCamera );
+			
+		// }
 
 		// Render to scan target
 
-		this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+		// if ( !this.scanScreenClosed && !this.infoScreenOpened ) {
+
+			this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+
+		// }
 
 		// Render to info target
 
-		this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
+		// if ( !this.infoScreenClosed ) {
+
+			this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
+			
+		// }
 
 		this.renderer.clearDepth();
 		this.renderer.render( this.screensScene, this.mainCamera );
