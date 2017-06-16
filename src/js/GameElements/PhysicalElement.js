@@ -28,14 +28,17 @@ export class PhysicalElement extends ElementCore {
 
 	}
 
-	update () {
+	update ( _deltaTime ) {
 
 		super.update ();
 
+		_deltaTime = _deltaTime || 16.0;
+
 		if ( !this.enabled ) return;
 
-		// this.acceleration = this.mulScal ( this.acceleration, this.deltaTime / 16 );
+		// this.acceleration = this.mulScal ( this.acceleration, _deltaTime );
 		this.velocity = this.add ( this.velocity, this.acceleration );
+		this.velocity = this.mulScal ( this.velocity, _deltaTime * 0.063 );
 		this.velocity = this.mulScal ( this.velocity, this.drag );
 		
 		if ( this.len ( this.velocity ) > this.maxSpeed ) {

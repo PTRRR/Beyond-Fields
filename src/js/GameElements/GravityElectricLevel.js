@@ -18,6 +18,7 @@ export class GravityElectricLevel extends LevelCore {
 		}
 
 		this.activePlanet = null;
+		this.canUpdateTexts = true;
 
 	}
 
@@ -157,6 +158,7 @@ export class GravityElectricLevel extends LevelCore {
 
 				this.ready = true;
 				this.gameElements.player.instances[ 0 ].mass = 1000000;
+				this.gameElements.player.instances[ 0 ].enabled = true;
 				this.resetPlayer ();
 				// this.start = this.getInstanceByName ( 'goals', 'bottom' );
 				// this.arrival = this.getInstanceByName ( 'goals', 'top' );
@@ -182,7 +184,7 @@ export class GravityElectricLevel extends LevelCore {
 		// main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position ) && this.arrivedInGame ) this.resetPlayer ();
+		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
 		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -318,6 +320,99 @@ export class GravityElectricLevel extends LevelCore {
 
 		}
 
+		if ( !this.infoScreenOpened ) return;
+
+		if ( this.canUpdateTexts ) {
+
+			this.canUpdateTexts = false;
+			this.updateTexts ();
+			setTimeout ( function () {
+
+				this.canUpdateTexts = true;
+
+			}.bind ( this ), 5 );
+
+		}
+
+	}
+
+	updateTexts () {
+
+		if ( !this.textsGeometry ) return;
+
+		let player = this.gameElements.player.instances[ 0 ];
+		let points = this.gameElements.planets.textPoints;
+
+		let indices = [];
+		let positions = [];
+		let uvs = [];
+
+		let modelMatrix = mat4.create ();
+
+		let planetPoints = this.gameElements.planets.textPoints;
+
+		for ( let pp in planetPoints ) {
+
+			let point = planetPoints[ pp ].point;
+			let instances = planetPoints[ pp ].instances;
+
+			let totalForce = 0;
+			let totalMass = 0;
+
+			for ( let i = 0; i < instances.length; i ++ ) {
+
+				totalForce += vec3.length ( this.computeGravityForce ( instances[ i ], player ) );
+				totalMass += instances[ i ].mass;
+
+			}
+
+
+			let textData = this.textsGeometry.getTextData ( totalMass + ' kg\n' + ( Math.floor ( totalForce * 100 ) / 100 ) + ' N' );
+			
+			mat4.identity ( modelMatrix );
+			mat4.translate ( modelMatrix, modelMatrix, [ point[ 0 ] - textData.width * 0.0025 * 0.5, -point[ 1 ] + 0.1 + textData.height * 0.0025, 0 ] );
+			mat4.scale ( modelMatrix, modelMatrix, vec3.fromValues ( 0.0025, 0.0025, 0.0025 ) );
+
+			for ( let j = 0; j < textData.indices.length; j ++ ) {
+
+				indices.push ( textData.indices[ j ] + positions.length / 2 );
+
+			}
+
+			for ( let j = 0; j < textData.positions.length; j += 2 ) {
+
+				let v = [ textData.positions[ j + 0 ], textData.positions[ j + 1 ], 0 ];
+				vec3.transformMat4 ( v, v, modelMatrix );
+
+				positions.push ( v[ 0 ] );
+				positions.push ( v[ 1 ] );
+
+			}
+
+			for ( let j = 0; j < textData.uvs.length; j ++ ) {
+
+				uvs.push ( textData.uvs[ j ]);
+
+			}
+
+		}
+
+		if ( positions.length > 0 ) {
+
+			this.dynamicBuffer.index ( this.textsGeometry, indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', uvs, 2);
+
+		} else {
+
+			let textData = this.textsGeometry.getTextData ( '' );
+
+			this.dynamicBuffer.index ( this.textsGeometry, textData.indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', textData.positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', textData.uvs, 2);
+
+		}
+
 	}
 
 	// Build the charges contained in the planets.
@@ -329,7 +424,7 @@ export class GravityElectricLevel extends LevelCore {
 		for ( let i = 0; i < planets.length; i ++ ) {
 
 			let planet = planets[ i ];
-			let layers = [ 1, 5, 10, 20, 20 ];
+			let layers = planet.particles;
 
 			for ( let j = 0; j < layers.length; j ++ ) {
 
@@ -434,7 +529,7 @@ export class GravityElectricLevel extends LevelCore {
 
 		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldBottom () - 0.1, 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
-		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 2, 30, 0 ] ); 
+		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 2, 10000, 0 ] ); 
 
 	}
 

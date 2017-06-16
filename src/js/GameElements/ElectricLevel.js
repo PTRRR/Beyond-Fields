@@ -47,11 +47,19 @@ export class ElectricLevel extends LevelCore {
 		this.scanScene.add ( this.scanMesh );
 		this.scanMaterial.extensions.derivatives = true;
 
+		this.canUpdateTexts = true;
+
 	}
 
 	build () {
 
 		super.build ();
+
+		this.onLoad ( function () {
+
+			console.log(this.gameElements);
+
+		}.bind ( this ) );
 
 	}
 
@@ -167,12 +175,12 @@ export class ElectricLevel extends LevelCore {
 
 				this.updateRenderer ();
 				this.ready = true;
-				this.resetPlayer ();
 				// this.start = this.getInstanceByName ( 'goals', 'top' );
 				// this.arrival = this.getInstanceByName ( 'goals', 'bottom' );
 				this.arrivedInGame = false;
 				this.gameElements.player.instances[ 0 ].mass = 400;
-				this.resetPlayer();
+				this.gameElements.player.instances[ 0 ].enabled = true;
+				this.resetPlayer ();
 
 			} else {
 
@@ -187,7 +195,7 @@ export class ElectricLevel extends LevelCore {
 		// main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position, 0.2 ) && this.arrivedInGame ) this.resetPlayer ();
+		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
 		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -218,10 +226,16 @@ export class ElectricLevel extends LevelCore {
 		// Fixed charges
 
 		let fixedCharges = this.gameElements.fixedCharges.instances;
+		let chargesUniform = [];
 
 		for ( let i = 0; i < fixedCharges.length; i ++ ) {
 
 			let charge = fixedCharges[ i ];
+
+			chargesUniform.push ( charge.position[ 0 ] );
+			chargesUniform.push ( charge.position[ 1 ] );
+			chargesUniform.push ( Math.abs ( charge.charge / charge.maxCharge ) * charge.sign );
+
 			let dist = vec3.length ( vec3.sub ( vec3.create(), charge.position, player.position ) );
 
 			if ( dist < charge.radius ) {
@@ -239,7 +253,6 @@ export class ElectricLevel extends LevelCore {
 
 		// Charges
 
-		let chargesUniform = [];
 		let charges = this.gameElements.charges.instances;
 
 		for ( let i = 0; i < charges.length; i ++ ) {
@@ -335,6 +348,154 @@ export class ElectricLevel extends LevelCore {
 
 		}
 
+		// Update texts
+
+		if ( !this.infoScreenOpened ) return;
+
+		if ( this.canUpdateTexts ) {
+
+			this.canUpdateTexts = false;
+			this.updateTexts ();
+			setTimeout ( function () {
+
+				this.canUpdateTexts = true;
+
+			}.bind ( this ), 5 );
+
+		}
+
+	}
+
+	updateTexts () {
+
+		if ( !this.textsGeometry ) return;
+
+		let player = this.gameElements.player.instances[ 0 ];
+		let points = this.gameElements.charges.textPoints;
+
+		let indices = [];
+		let positions = [];
+		let uvs = [];
+
+		let modelMatrix = mat4.create ();
+
+		let fixedChargesPoints = this.gameElements.fixedCharges.textPoints;
+
+		for ( let pp in fixedChargesPoints ) {
+
+			let point = fixedChargesPoints[ pp ].point;
+			let instances = fixedChargesPoints[ pp ].instances;
+
+			let totalForce = 0;
+			let totalMass = 0;
+			let hack = false;
+
+			for ( let i = 0; i < instances.length; i ++ ) {
+
+				totalForce += vec3.length ( this.computeElectricForce ( instances[ i ], player ) );
+				totalMass += instances[ i ].mass;
+
+				if ( instances[ i ].hack ) hack = true;
+
+			}
+
+
+			let textData = this.textsGeometry.getTextData ( totalMass + ' kg\n' + ( Math.floor ( totalForce * 100 ) / 100 ) + ' N' );
+			
+			mat4.identity ( modelMatrix );
+			mat4.translate ( modelMatrix, modelMatrix, [ point[ 0 ] - textData.width * 0.0025 * 0.5, -point[ 1 ] + 0.1 + textData.height * 0.0025, 0 ] );
+			mat4.scale ( modelMatrix, modelMatrix, vec3.fromValues ( 0.0025, 0.0025, 0.0025 ) );
+
+			if ( !hack ) {
+
+				for ( let j = 0; j < textData.indices.length; j ++ ) {
+
+					indices.push ( textData.indices[ j ] + positions.length / 2 );
+
+				}
+
+				for ( let j = 0; j < textData.positions.length; j += 2 ) {
+
+					let v = [ textData.positions[ j + 0 ], textData.positions[ j + 1 ], 0 ];
+					vec3.transformMat4 ( v, v, modelMatrix );
+
+					positions.push ( v[ 0 ] );
+					positions.push ( v[ 1 ] );
+
+				}
+
+				for ( let j = 0; j < textData.uvs.length; j ++ ) {
+
+					uvs.push ( textData.uvs[ j ]);
+
+				}
+
+			}
+
+		}
+
+		for ( let p in points ) {
+
+			let point = points[ p ].point;
+			let instances = points[ p ].instances;
+
+			let totalForce = 0;
+			let totalMass = 0;
+
+			for ( let i = 0; i < instances.length; i ++ ) {
+
+				totalForce += vec3.length ( this.computeElectricForce ( instances[ i ], player ) );
+				totalMass += instances[ i ].mass;
+
+			}
+
+
+			let textData = this.textsGeometry.getTextData ( Math.floor ( totalMass ) + ' kg\n' + ( Math.floor ( totalForce * 100 ) / 100 ) + ' N' );
+			
+			mat4.identity ( modelMatrix );
+			mat4.translate ( modelMatrix, modelMatrix, [ point[ 0 ] - textData.width * 0.0025 * 0.5, -point[ 1 ] - 0.1, 0 ] );
+			mat4.scale ( modelMatrix, modelMatrix, vec3.fromValues ( 0.0025, 0.0025, 0.0025 ) );
+
+			for ( let j = 0; j < textData.indices.length; j ++ ) {
+
+				indices.push ( textData.indices[ j ] + positions.length / 2 );
+
+			}
+
+			for ( let j = 0; j < textData.positions.length; j += 2 ) {
+
+				let v = [ textData.positions[ j + 0 ], textData.positions[ j + 1 ], 0 ];
+				vec3.transformMat4 ( v, v, modelMatrix );
+
+				positions.push ( v[ 0 ] );
+				positions.push ( v[ 1 ] );
+
+			}
+
+			for ( let j = 0; j < textData.uvs.length; j ++ ) {
+
+				uvs.push ( textData.uvs[ j ]);
+
+			}
+
+		}
+
+		if ( positions.length > 0 ) {
+
+			this.dynamicBuffer.index ( this.textsGeometry, indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', uvs, 2);
+
+		} else {
+
+			let textData = this.textsGeometry.getTextData ( '' );
+
+			this.dynamicBuffer.index ( this.textsGeometry, textData.indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', textData.positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', textData.uvs, 2);
+
+		}
+
 	}
 
 	checkCharges ( _position ) {
@@ -398,9 +559,9 @@ export class ElectricLevel extends LevelCore {
 
 	resetPlayer () {
 
-		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldTop () * 1.03, 0 );
+		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldTop (), 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
-		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 1, -5, 0 ] ); 
+		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 10, -10, 0 ] ); 
 
 	}
 

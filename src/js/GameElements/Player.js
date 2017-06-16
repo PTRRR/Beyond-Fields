@@ -17,7 +17,6 @@ export class Player extends PhysicalElement {
 		super.update ();
 
 		// console.log(obj);
-		
 
 		this.scale[ 1 ] = this.length + vec3.length ( this.velocity ) * 1 ;
 		this.rotation[ 2 ] = Math.atan2 ( this.velocity[ 1 ], this.velocity[ 0 ] ) - Math.PI * 0.5;

@@ -75,21 +75,21 @@ export class GameManager {
 
 	}
 
-	update () {
+	update ( _deltaTime ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.update ();
+			this.currentLevel.update ( _deltaTime );
 			
 		}
 
 	}
 
-	render ()  {
+	render ( _deltaTime )  {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.render ();
+			this.currentLevel.render ( _deltaTime );
 
 		}
 

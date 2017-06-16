@@ -3,6 +3,10 @@ import { GameManager } from "./GameManager";
 import { addEvent } from "./utils";
 import { levels } from "./levels";
 
+// Loop utility
+
+let loop = require ( 'raf-loop' );
+
 ( function () {
 
 	function init () {
@@ -150,7 +154,7 @@ import { levels } from "./levels";
 
 		let stats = new Stats();
 		stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-		document.body.appendChild( stats.dom );
+		// document.body.appendChild( stats.dom );
 
 		// Events
 
@@ -258,41 +262,63 @@ import { levels } from "./levels";
 
 		// Debug
 
-		gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
+		// gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
 
-			menu.classList.add ( 'hidden' );
-			activePage.classList.remove ( 'active' );
+		// 	setTimeout ( function () {
+
+		// 		menu.classList.add ( 'hidden' );
+		// 		activePage.classList.remove ( 'active' );
+
+		// 	}, 200 );
+
+		// } );
+
+		// gameManager.startLevel ( levels[ 'electric' ][ 3 ], function () {
+
+		// 	setTimeout ( function () {
+
+		// 		menu.classList.add ( 'hidden' );
+		// 		activePage.classList.remove ( 'active' );
+
+		// 	}, 200 );
+
+		// } );
+
+		gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ], function () {
+
+			setTimeout ( function () {
+
+				menu.classList.add ( 'hidden' );
+				activePage.classList.remove ( 'active' );
+
+			}, 200 );
 
 		} );
 		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
 		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
-		function update () {
+		function update ( _deltaTime ) {
 
-			gameManager.update ();
+			gameManager.update ( _deltaTime );
 
 		}
 
-		function render () {
+		function render ( _deltaTime ) {
 			
-			gameManager.render ();
+			gameManager.render ( _deltaTime );
 
 		}
 
-		function mainLoop () {
+		var mainLoop = loop ( function ( deltaTime ) {
 
 			stats.begin ();
 
-			update ();
-			render ();
+			update ( deltaTime );
+			render ( deltaTime );
 
 			stats.end ();
 
-			requestAnimationFrame ( mainLoop );
-
-		}
-
-		requestAnimationFrame ( mainLoop );		
+		} ).start ();
 
 	}
 

@@ -51,14 +51,19 @@ export class GravityLevel extends LevelCore {
 		// Blackmatter
 
 		this.canDraw = true;
-		
+		this.canUpdateTexts = true;
+
 	}
 
 	build () {
 
 		super.build ();
 
-		
+		this.onLoad ( function () {
+
+			this.render ();
+
+		}.bind ( this ) );
 
 	}
 
@@ -146,7 +151,7 @@ export class GravityLevel extends LevelCore {
 
 	}
 
-	update () {
+	update ( _deltaTime ) {
 
 		// Check if all is loaded.
 
@@ -167,11 +172,11 @@ export class GravityLevel extends LevelCore {
 
 			}
 
-		}
+		};
 
 		// Here all the objects's geometries are updated.
 
-		super.update ();
+		super.update ( _deltaTime );
 
 		// Main player
 
@@ -243,37 +248,37 @@ export class GravityLevel extends LevelCore {
 
 			}
 
-			for ( let j = 0; j < playerParticles.length; j ++ ) {
+			// for ( let j = 0; j < playerParticles.length; j ++ ) {
 
-				let particle = playerParticles[ j ];
+			// 	let particle = playerParticles[ j ];
 
-				let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
-				let distToPlanet = vec3.length ( dirToPlanet );
-				let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
-				let force = null;
+			// 	let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
+			// 	let distToPlanet = vec3.length ( dirToPlanet );
+			// 	let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
+			// 	let force = null;
 
-				if ( distToPlanet < minDistToPlanet ) {
+			// 	if ( distToPlanet < minDistToPlanet ) {
 
-					let mag = ( minDistToPlanet - distToPlanet ) * 50;
-					vec3.normalize ( distToPlanet, distToPlanet );
-					force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
+			// 		let mag = ( minDistToPlanet - distToPlanet ) * 50;
+			// 		vec3.normalize ( distToPlanet, distToPlanet );
+			// 		force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
 
-				} else {
+			// 	} else {
 
-					force = this.computeGravityAttraction ( planet, particle );
+			// 		force = this.computeGravityAttraction ( planet, particle );
 
-					if ( vec3.length ( force ) > 1 ) {
+			// 		if ( vec3.length ( force ) > 1 ) {
 
-						vec3.normalize ( force, force );
-						vec3.scale ( force, force, 1 );
+			// 			vec3.normalize ( force, force );
+			// 			vec3.scale ( force, force, 1 );
 
-					}
+			// 		}
 					
-				}
+			// 	}
 
-				particle.applyForce ( force );
+			// 	particle.applyForce ( force );
 
-			}
+			// }
 
 		}
 
@@ -304,7 +309,7 @@ export class GravityLevel extends LevelCore {
 
 		// Update FX particles
 
-		for ( let i = 0; i < 2; i ++ ) {
+		for ( let i = 0; i < 1; i ++ ) {
 
 			let instance = this.addInstanceOf ( 'playerParticles', {
 
@@ -320,6 +325,147 @@ export class GravityLevel extends LevelCore {
 			} );
 
 			instance.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30 ) );
+
+		}
+
+		if ( !this.infoScreenOpened ) return;
+
+		// Update text
+
+		if ( this.canUpdateTexts ) {
+
+			this.canUpdateTexts = false;
+			this.updateTexts ();
+			setTimeout ( function () {
+
+				this.canUpdateTexts = true;
+
+			}.bind ( this ), 5 );
+
+		}
+
+	}
+
+	updateTexts () {
+
+		if ( !this.textsGeometry ) return;
+
+		let player = this.gameElements.player.instances[ 0 ];
+		let points = this.gameElements.blackMatter.textPoints;
+
+		let indices = [];
+		let positions = [];
+		let uvs = [];
+
+		let modelMatrix = mat4.create ();
+
+		let planetPoints = this.gameElements.planets.textPoints;
+
+		for ( let pp in planetPoints ) {
+
+			let point = planetPoints[ pp ].point;
+			let instances = planetPoints[ pp ].instances;
+
+			let totalForce = 0;
+			let totalMass = 0;
+
+			for ( let i = 0; i < instances.length; i ++ ) {
+
+				totalForce += vec3.length ( this.computeGravityAttraction ( instances[ i ], player ) );
+				totalMass += instances[ i ].mass;
+
+			}
+
+
+			let textData = this.textsGeometry.getTextData ( totalMass + ' kg\n' + ( Math.floor ( totalForce * 100 ) / 100 ) + ' N' );
+			
+			mat4.identity ( modelMatrix );
+			mat4.translate ( modelMatrix, modelMatrix, [ point[ 0 ] - textData.width * 0.0025 * 0.5, -point[ 1 ] + 0.1 + textData.height * 0.0025, 0 ] );
+			mat4.scale ( modelMatrix, modelMatrix, vec3.fromValues ( 0.0025, 0.0025, 0.0025 ) );
+
+			for ( let j = 0; j < textData.indices.length; j ++ ) {
+
+				indices.push ( textData.indices[ j ] + positions.length / 2 );
+
+			}
+
+			for ( let j = 0; j < textData.positions.length; j += 2 ) {
+
+				let v = [ textData.positions[ j + 0 ], textData.positions[ j + 1 ], 0 ];
+				vec3.transformMat4 ( v, v, modelMatrix );
+
+				positions.push ( v[ 0 ] );
+				positions.push ( v[ 1 ] );
+
+			}
+
+			for ( let j = 0; j < textData.uvs.length; j ++ ) {
+
+				uvs.push ( textData.uvs[ j ]);
+
+			}
+
+		}
+
+		for ( let p in points ) {
+
+			let point = points[ p ].point;
+			let instances = points[ p ].instances;
+
+			let totalForce = 0;
+			let totalMass = 0;
+
+			for ( let i = 0; i < instances.length; i ++ ) {
+
+				totalForce += vec3.length ( this.computeGravityAttraction ( instances[ i ], player ) );
+				totalMass += instances[ i ].mass;
+
+			}
+
+
+			let textData = this.textsGeometry.getTextData ( Math.floor ( totalMass ) + ' kg\n' + ( Math.floor ( totalForce * 100 ) / 100 ) + ' N' );
+			
+			mat4.identity ( modelMatrix );
+			mat4.translate ( modelMatrix, modelMatrix, [ point[ 0 ] - textData.width * 0.0025 * 0.5, -point[ 1 ] - 0.1, 0 ] );
+			mat4.scale ( modelMatrix, modelMatrix, vec3.fromValues ( 0.0025, 0.0025, 0.0025 ) );
+
+			for ( let j = 0; j < textData.indices.length; j ++ ) {
+
+				indices.push ( textData.indices[ j ] + positions.length / 2 );
+
+			}
+
+			for ( let j = 0; j < textData.positions.length; j += 2 ) {
+
+				let v = [ textData.positions[ j + 0 ], textData.positions[ j + 1 ], 0 ];
+				vec3.transformMat4 ( v, v, modelMatrix );
+
+				positions.push ( v[ 0 ] );
+				positions.push ( v[ 1 ] );
+
+			}
+
+			for ( let j = 0; j < textData.uvs.length; j ++ ) {
+
+				uvs.push ( textData.uvs[ j ]);
+
+			}
+
+		}
+
+		if ( positions.length > 0 ) {
+
+			this.dynamicBuffer.index ( this.textsGeometry, indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', uvs, 2);
+
+		} else {
+
+			let textData = this.textsGeometry.getTextData ( '' );
+
+			this.dynamicBuffer.index ( this.textsGeometry, textData.indices, 1 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'position', textData.positions, 2 );
+			this.dynamicBuffer.attr ( this.textsGeometry, 'uv', textData.uvs, 2);
 
 		}
 

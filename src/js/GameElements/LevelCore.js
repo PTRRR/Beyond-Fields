@@ -4,16 +4,17 @@ import { library } from './library';
 
 // Import some npm libs
 
-let sdfShader = require('three-bmfont-text/shaders/sdf');
-let msdfShader = require('three-bmfont-text/shaders/msdf');
+let sdfShader = require ( 'three-bmfont-text/shaders/sdf' );
+let msdfShader = require ( 'three-bmfont-text/shaders/msdf' );
 let bmfontGeometry = require ( 'three-bmfont-text' );
 let bmfontLoader = require ( 'load-bmfont' );
 
-let bezier = require('adaptive-bezier-curve');
-let quadratic = require('adaptive-quadratic-curve');
-let line = require('three-line-2d')(THREE);
-let basicShader = require('three-line-2d/shaders/basic')(THREE);
-let getNormals = require('polyline-normals');
+let bezier = require ( 'adaptive-bezier-curve' );
+let quadratic = require ( 'adaptive-quadratic-curve' );
+let line = require ( 'three-line-2d' )( THREE );
+let basicShader = require ( 'three-line-2d/shaders/basic' )( THREE );
+let getNormals = require ( 'polyline-normals' );
+let dynamicBuffer = require ( 'three-buffer-vertex-data' );
 
 export class LevelCore {
 
@@ -148,6 +149,7 @@ export class LevelCore {
 		this.bezier = bezier;
 		this.quadratic = quadratic;
 		this.basicShader = basicShader;
+		this.dynamicBuffer = dynamicBuffer;
 
 		// Objects
 
@@ -204,7 +206,10 @@ export class LevelCore {
 		if ( !this.levelStarted ) {
 
 			this.levelStarted = true;
-			// this.infoScreenTargetPosition.x = this.getWorldLeft () * 2.0;
+			
+			// If there is a text intro remove it.
+
+			this.removeTextIntro ();
 
 		}
 
@@ -214,10 +219,6 @@ export class LevelCore {
 		this.glMouse = vec2.clone ( _position );
 		this.updateMouseWorld ( this.mouse );
 		this.activeScreen = this.checkButtons ();
-
-		// If there is a text intro remove it.
-
-		this.removeTextIntro ();
 
 	}
 
@@ -282,7 +283,7 @@ export class LevelCore {
 
 		// Update screns size & position.
 
-		this.scanScreenTargetPosition.set ( this.getWorldRight () * 2.0, 0.0, 0.0 );
+		this.scanScreenTargetPosition.set ( 0.0, 0.0, 0.0 );
 		this.scanScreen.position.set ( this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z );
 
 		this.scanScreen.scale.x = this.getWorldRight () * 2.0;
@@ -315,55 +316,79 @@ export class LevelCore {
 					this.objectOnLoad ( 'font texture' );
 
 					// Check if an intro text is specified in the level file.
+					// Text intro.
 
-					if ( this.levelFile.textIntro ) {
+					this.textBackgroundMaterial = new THREE.MeshBasicMaterial ( {
 
-						this.textBackgroundMaterial = new THREE.MeshBasicMaterial ( {
+						color: 'rgb( 128, 128, 128 )',
+						opacity: 0.9,
+						transparent: true,
 
-							color: 'rgb( 128, 128, 128 )',
-							opacity: 0.9,
-							transparent: true,
+					} );
 
-						} );
+					this.textBackground = new THREE.Mesh ( this.quadGeometry, this.textBackgroundMaterial );
+					this.textBackground.material.alphaTarget = 0.9;
+					this.textBackground.renderOrder = 5;
+					this.textBackground.scale.set ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, 3 );
+					this.infoScene.add ( this.textBackground );
 
-						this.textBackground = new THREE.Mesh ( this.quadGeometry, this.textBackgroundMaterial );
-						this.textBackground.material.alphaTarget = 0.9;
-						this.textBackground.renderOrder = 5;
-						this.textBackground.scale.set ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, 3 );
-						this.infoScene.add ( this.textBackground );
+					let geometry = bmfontGeometry ( {
 
-						let geometry = bmfontGeometry ( {
+						width: 1000,
+						align: 'center',
+						font: font
 
-							width: 1000,
-							align: 'center',
-							font: font
+					} );
 
-						} );
+					geometry.update ( this.levelFile.textIntro || '' );
+					geometry.computeBoundingBox ();
 
-						geometry.update ( this.levelFile.textIntro );
-						geometry.computeBoundingBox ();
+					var material = new THREE.RawShaderMaterial( sdfShader ( {
+					  	
+					  	map: texture,
+					  	side: THREE.DoubleSide,
+					  	transparent: true,
+					  	color: 'rgb(0, 0, 0)',
 
-						var material = new THREE.RawShaderMaterial( sdfShader ( {
-						  	
-						  	map: texture,
-						  	side: THREE.DoubleSide,
-						  	transparent: true,
-						  	color: 'rgb(0, 0, 0)',
+					} ) );
 
-						} ) );
+					this.textIntro = new THREE.Mesh ( geometry, material );
+					this.textIntro.material.alphaTarget = 1.0;
+					this.infoScene.add ( this.textIntro );
+					this.textIntro.renderOrder = 6;
+					geometry.computeBoundingSphere ();
+					this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
+					this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+					this.textIntro.rotation.x = Math.PI;
+					this.textIntro.scale.set ( 0.0025, 0.0025, 0.0025 );
 
-						this.textIntro = new THREE.Mesh ( geometry, material );
-						this.textIntro.material.alphaTarget = 1.0;
-						this.infoScene.add ( this.textIntro );
-						this.textIntro.material.extensions.derivatives = true;
-						this.textIntro.renderOrder = 6;
-						geometry.computeBoundingSphere ();
-						this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
-						this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
-						this.textIntro.rotation.x = Math.PI;
-						this.textIntro.scale.set ( 0.0025, 0.0025, 0.0025 );
+					// Texts
 
-					}
+					this.textsGeometry = bmfontGeometry ( {
+
+						font: font,
+						align: 'center',
+
+					} );
+
+					this.textsGeometry.update ( 'Pietro' );
+
+					this.textsMaterial = new THREE.RawShaderMaterial ( sdfShader ( {
+
+						map: texture,
+					  	side: THREE.DoubleSide,
+					  	transparent: true,
+					  	color: 'rgb(0, 0, 0)',
+
+					} ) );
+
+					this.texts = new THREE.Mesh ( this.textsGeometry, this.textsMaterial );
+					this.texts.rotation.x = Math.PI;
+					this.texts.renderOrder = 3;
+					// this.texts.scale.set ( 0.0025, 0.0025, 0.0025 );
+					this.infoScene.add ( this.texts );
+
+					this.render ();
 
 				}.bind ( this ) );
 
@@ -593,18 +618,11 @@ export class LevelCore {
 
 				},
 
-				scan: {
-
-					name: 'player',
-					transparent: true,
-					textureUrl: './resources/textures/generic_circle_sdf.png',
-					uniforms: {},
-
-				},
+				scan: null,
 
 				infos: {
 
-					name: 'player',
+					name: 'playerInfo',
 					transparent: true,
 					textureUrl: './resources/textures/generic_circle_sdf.png',
 					uniforms: {},
@@ -633,7 +651,7 @@ export class LevelCore {
 
 		// Build a base grid to draw infos.
 
-		this.baseGridX = 9;
+		this.baseGridX = 7;
 		this.baseGridY = 20;
 
 		let gridGeometry = new THREE.PlaneBufferGeometry ( this.getWorldRight () * 2.0, this.getWorldTop () * 2.0, this.baseGridX - 1, this.baseGridY - 1 );
@@ -645,7 +663,7 @@ export class LevelCore {
 		} );
 
 		let gridDebug = new THREE.Mesh ( gridGeometry, gridMaterialDebug );
-		this.infoScene.add ( gridDebug );
+		// this.infoScene.add ( gridDebug );
 		this.baseGrid = gridGeometry.attributes.position.array;
 
 		// Add lines
@@ -686,6 +704,27 @@ export class LevelCore {
 			this.lines = new THREE.Mesh ( this.linesGeometry, m );
 			this.lines.renderOrder = 2;
 			this.infoScene.add ( this.lines );
+
+			// Render all once when oll is loaded.
+
+			setTimeout ( function () {
+
+
+
+			this.update (); // force update.
+
+			this.renderer.clearDepth();
+			this.renderer.clear ();
+
+			this.renderer.render ( this.mainScene, this.mainCamera );
+			this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+			this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
+
+			this.renderer.clearDepth();
+			this.renderer.render( this.screensScene, this.mainCamera );
+			}.bind ( this ), 0 );
+			
+
 
 		}.bind ( this ) );
 
@@ -1327,6 +1366,11 @@ export class LevelCore {
 
 				}
 
+				// Create or overide an object to store where the text should be located
+
+				this.gameElements[ element ].textPoints = {};
+				let pointObjectIndex = 0;
+
 				let instances = this.gameElements[ element ].instances;
 
 				for ( let i = 0; i < maxInstancesNum; i ++ ) {
@@ -1343,19 +1387,39 @@ export class LevelCore {
 
 						if ( mainInfoPointIndex !== undefined && infoPointIndex === undefined ) {
 
-							let numPerPoint = Math.floor ( this.baseGridY / instances.length );
+							let numPerPoint = Math.floor ( this.baseGridX / instances.length );
+							let attachedInstances = [];
 
-							for ( let j = 0; j < this.baseGridY; j ++ ) {
+							for ( let j = 0; j < this.baseGridX; j ++ ) {
 
-								let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
+								
+								// let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
+								let fI = j;
+
+								if ( fI == 0 ) fI = 1;
+
+								let index = fI * 3 + ( this.baseGridX ) * 3 * mainInfoPointIndex;
 								let point = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
-								let dY = Math.abs ( iPos2[ 1 ] - point[ 1 ] );
 
-								if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
+								let dY = Math.abs ( iPos2[ 1 ] - point[ 1 ] );
+								let dX = Math.abs ( iPos2[ 0 ] - point[ 0 ] );
+
+								// if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
+
+								// 	tPos2 = point;
+								// 	if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
+								// 	this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
+								// 	break;
+									
+								// }
+
+								if ( dX < this.getWorldRight () / ( this.baseGridX - 1.0 ) ) {
 
 									tPos2 = point;
+									if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
+									this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
 									break;
-									
+
 								}
 
 							}
@@ -1366,9 +1430,14 @@ export class LevelCore {
 							let index = infoPointIndex * 3;
 							tPos2 = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
 
+							if ( !this.gameElements[ element ].textPoints[ i ] ) this.gameElements[ element ].textPoints[ index ] = { point: tPos2, instances: [] };
+							this.gameElements[ element ].textPoints[ index ].instances.push ( instances[ i ] );
+
 						} else {
 
-							tPos2 = [ this.baseGrid[ infoPointIndex * 3 + 0 ], this.baseGrid[ infoPointIndex * 3 + 1 ] ];
+							tPos2 = [ this.baseGrid[ 0 * 3 + 0 ], this.baseGrid[ 0 * 3 + 1 ] ];
+							if ( !this.gameElements[ element ].textPoints[ i ] ) this.gameElements[ element ].textPoints[ index ] = { point: tPos2, instances: [] };
+							this.gameElements[ element ].textPoints[ 0 ].instances.push ( instances[ 0 ] );
 
 						}
 
@@ -1830,6 +1899,7 @@ export class LevelCore {
 			console.log('\n*** Level loaded ***\n ');
 
 			this.levelLoaded = true;
+
 			if ( this.onLoadCallback ) {
 
 				for ( let i = 0; i < this.onLoadCallback.length; i ++ ) {
@@ -1851,9 +1921,9 @@ export class LevelCore {
 
 	}
 
-	update () {
+	update ( _deltaTime, _forceUpdate ) {
 
-		if ( !this.levelLoaded ) return;
+		if ( !this.levelLoaded && !_forceUpdate ) return;
 
 		// Update the screens.
 
@@ -1863,8 +1933,8 @@ export class LevelCore {
 		if ( this.scanScreen.position.x <= 0.5 ) this.scanScreenOpened = true;
 		else this.scanScreenOpened = false;
 
-		this.scanScreen.position.x += ( this.scanScreenTargetPosition.x - this.scanScreen.position.x ) * 0.2;
-		this.scanScreen.position.y += ( this.scanScreenTargetPosition.y - this.scanScreen.position.y ) * 0.2;
+		this.scanScreen.position.x += ( this.scanScreenTargetPosition.x - this.scanScreen.position.x ) * 0.1;
+		this.scanScreen.position.y += ( this.scanScreenTargetPosition.y - this.scanScreen.position.y ) * 0.1;
 		this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight ();
 		this.scanScreenButton.position.y = this.scanScreen.position.y;
 
@@ -1874,8 +1944,8 @@ export class LevelCore {
 		if ( this.infoScreen.position.x >= -0.5 ) this.infoScreenOpened = true;
 		else this.infoScreenOpened = false;
 
-		this.infoScreen.position.x += ( this.infoScreenTargetPosition.x - this.infoScreen.position.x ) * 0.2;
-		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.2;
+		this.infoScreen.position.x += ( this.infoScreenTargetPosition.x - this.infoScreen.position.x ) * 0.1;
+		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.1;
 		this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight ();
 		this.infoScreenButton.position.y = this.infoScreen.position.y;
 
@@ -1897,7 +1967,7 @@ export class LevelCore {
 
 						if ( !instance.isDead () ) {
 
-							instance.update ();
+							instance.update ( _deltaTime );
 
 							for ( let j = 0; j < element.meshes.length; j ++ ) {
 								
@@ -1928,7 +1998,7 @@ export class LevelCore {
 							
 							if ( !instances[ i ].isDead() ) {
 
-								instances[ i ].update ();
+								instances[ i ].update ( _deltaTime );
 
 								for ( let j = 0; j < 4; j ++ ) {
 
@@ -2000,7 +2070,7 @@ export class LevelCore {
 
 				for ( let i = 0; i < instances.length; i ++ ) {
 
-					instances[ i ].update ();
+					instances[ i ].update ( _deltaTime );
 
 				}
 
@@ -2014,6 +2084,8 @@ export class LevelCore {
 		if ( this.textIntro ) this.textIntro.material.uniforms.opacity.value += ( this.textIntro.material.alphaTarget - this.textIntro.material.uniforms.opacity.value ) * 0.1;
 
 		// Update lines
+
+		if ( this.infoScreenClosed ) return;
 
 		let linesData = this.getLinesData ();
 
@@ -2035,6 +2107,18 @@ export class LevelCore {
 	}
 
 	removeTextIntro () {
+
+		setTimeout ( function () {
+
+			this.infoScreenTargetPosition.x = this.getWorldLeft () * 2;
+
+		}.bind ( this ), 1000 );
+
+		setTimeout ( function () {
+
+			this.scanScreenTargetPosition.x = this.getWorldRight () * 2;
+
+		}.bind ( this ), 1800 );
 
 		if ( this.textIntro ) this.textIntro.material.alphaTarget = 0;
 		if ( this.textBackground ) this.textBackground.material.alphaTarget = 0;
@@ -2117,27 +2201,27 @@ export class LevelCore {
 		this.renderer.clearDepth();
 		this.renderer.clear ();
 
-		// if ( !this.scanScreenOpened && !this.infoScreenOpened ) {
+		if ( !this.scanScreenOpened && !this.infoScreenOpened ) {
 
 			this.renderer.render ( this.mainScene, this.mainCamera );
 			
-		// }
+		}
 
 		// Render to scan target
 
-		// if ( !this.scanScreenClosed && !this.infoScreenOpened ) {
+		if ( !this.scanScreenClosed && !this.infoScreenOpened ) {
 
 			this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
 
-		// }
+		}
 
 		// Render to info target
 
-		// if ( !this.infoScreenClosed ) {
+		if ( !this.infoScreenClosed ) {
 
 			this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
 			
-		// }
+		}
 
 		this.renderer.clearDepth();
 		this.renderer.render( this.screensScene, this.mainCamera );

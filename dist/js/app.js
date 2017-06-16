@@ -2174,7 +2174,7 @@ function numberIsNaN (obj) {
   return obj !== obj // eslint-disable-line no-self-compare
 }
 
-},{"base64-js":7,"ieee754":19}],10:[function(require,module,exports){
+},{"base64-js":7,"ieee754":20}],10:[function(require,module,exports){
 module.exports = function(dtype) {
   switch (dtype) {
     case 'int8':
@@ -2201,6 +2201,310 @@ module.exports = function(dtype) {
 }
 
 },{}],11:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
+}
+module.exports = EventEmitter;
+
+// Backwards-compat with node 0.10.x
+EventEmitter.EventEmitter = EventEmitter;
+
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
+
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
+
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function(n) {
+  if (!isNumber(n) || n < 0 || isNaN(n))
+    throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
+
+EventEmitter.prototype.emit = function(type) {
+  var er, handler, len, args, i, listeners;
+
+  if (!this._events)
+    this._events = {};
+
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error ||
+        (isObject(this._events.error) && !this._events.error.length)) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
+      } else {
+        // At least give some kind of context to the user
+        var err = new Error('Uncaught, unspecified "error" event. (' + er + ')');
+        err.context = er;
+        throw err;
+      }
+    }
+  }
+
+  handler = this._events[type];
+
+  if (isUndefined(handler))
+    return false;
+
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
+      case 1:
+        handler.call(this);
+        break;
+      case 2:
+        handler.call(this, arguments[1]);
+        break;
+      case 3:
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        args = Array.prototype.slice.call(arguments, 1);
+        handler.apply(this, args);
+    }
+  } else if (isObject(handler)) {
+    args = Array.prototype.slice.call(arguments, 1);
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++)
+      listeners[i].apply(this, args);
+  }
+
+  return true;
+};
+
+EventEmitter.prototype.addListener = function(type, listener) {
+  var m;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events)
+    this._events = {};
+
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener)
+    this.emit('newListener', type,
+              isFunction(listener.listener) ?
+              listener.listener : listener);
+
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;
+  else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);
+  else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
+
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
+    }
+
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' +
+                    'leak detected. %d listeners added. ' +
+                    'Use emitter.setMaxListeners() to increase limit.',
+                    this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
+      }
+    }
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+
+EventEmitter.prototype.once = function(type, listener) {
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
+    }
+  }
+
+  g.listener = listener;
+  this.on(type, g);
+
+  return this;
+};
+
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function(type, listener) {
+  var list, position, length, i;
+
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  if (!this._events || !this._events[type])
+    return this;
+
+  list = this._events[type];
+  length = list.length;
+  position = -1;
+
+  if (list === listener ||
+      (isFunction(list.listener) && list.listener === listener)) {
+    delete this._events[type];
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener ||
+          (list[i].listener && list[i].listener === listener)) {
+        position = i;
+        break;
+      }
+    }
+
+    if (position < 0)
+      return this;
+
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
+
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
+  }
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function(type) {
+  var key, listeners;
+
+  if (!this._events)
+    return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0)
+      this._events = {};
+    else if (this._events[type])
+      delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else if (listeners) {
+    // LIFO order
+    while (listeners.length)
+      this.removeListener(type, listeners[listeners.length - 1]);
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function(type) {
+  var ret;
+  if (!this._events || !this._events[type])
+    ret = [];
+  else if (isFunction(this._events[type]))
+    ret = [this._events[type]];
+  else
+    ret = this._events[type].slice();
+  return ret;
+};
+
+EventEmitter.prototype.listenerCount = function(type) {
+  if (this._events) {
+    var evlistener = this._events[type];
+
+    if (isFunction(evlistener))
+      return 1;
+    else if (evlistener)
+      return evlistener.length;
+  }
+  return 0;
+};
+
+EventEmitter.listenerCount = function(emitter, type) {
+  return emitter.listenerCount(type);
+};
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
+
+},{}],12:[function(require,module,exports){
 /*eslint new-cap:0*/
 var dtype = require('dtype')
 module.exports = flattenVertexData
@@ -2247,7 +2551,7 @@ function flattenVertexData (data, output, offset) {
   return output
 }
 
-},{"dtype":10}],12:[function(require,module,exports){
+},{"dtype":10}],13:[function(require,module,exports){
 var isFunction = require('is-function')
 
 module.exports = forEach
@@ -2295,7 +2599,7 @@ function forEachObject(object, iterator, context) {
     }
 }
 
-},{"is-function":22}],13:[function(require,module,exports){
+},{"is-function":23}],14:[function(require,module,exports){
 module.exports = add
 
 /**
@@ -2311,7 +2615,7 @@ function add(out, a, b) {
     out[1] = a[1] + b[1]
     return out
 }
-},{}],14:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 module.exports = dot
 
 /**
@@ -2324,7 +2628,7 @@ module.exports = dot
 function dot(a, b) {
     return a[0] * b[0] + a[1] * b[1]
 }
-},{}],15:[function(require,module,exports){
+},{}],16:[function(require,module,exports){
 module.exports = normalize
 
 /**
@@ -2346,7 +2650,7 @@ function normalize(out, a) {
     }
     return out
 }
-},{}],16:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 module.exports = set
 
 /**
@@ -2362,7 +2666,7 @@ function set(out, x, y) {
     out[1] = y
     return out
 }
-},{}],17:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 module.exports = subtract
 
 /**
@@ -2378,7 +2682,7 @@ function subtract(out, a, b) {
     out[1] = a[1] - b[1]
     return out
 }
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 (function (global){
 var win;
 
@@ -2395,7 +2699,7 @@ if (typeof window !== "undefined") {
 module.exports = win;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],19:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
   var eLen = nBytes * 8 - mLen - 1
@@ -2481,7 +2785,7 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],20:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -2506,7 +2810,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],21:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 /*!
  * Determine if an object is a Buffer
  *
@@ -2529,7 +2833,7 @@ function isSlowBuffer (obj) {
   return typeof obj.readFloatLE === 'function' && typeof obj.slice === 'function' && isBuffer(obj.slice(0, 0))
 }
 
-},{}],22:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 module.exports = isFunction
 
 var toString = Object.prototype.toString
@@ -2546,7 +2850,7 @@ function isFunction (fn) {
       fn === window.prompt))
 };
 
-},{}],23:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 var wordWrap = require('word-wrapper')
 var xtend = require('xtend')
 var number = require('as-number')
@@ -2846,7 +3150,7 @@ function findChar (array, value, start) {
   }
   return -1
 }
-},{"as-number":6,"word-wrapper":44,"xtend":47}],24:[function(require,module,exports){
+},{"as-number":6,"word-wrapper":50,"xtend":53}],25:[function(require,module,exports){
 (function (Buffer){
 var xhr = require('xhr')
 var noop = function(){}
@@ -2947,7 +3251,7 @@ function getBinaryOpts(opt) {
 }
 
 }).call(this,require("buffer").Buffer)
-},{"./lib/is-binary":25,"buffer":9,"parse-bmfont-ascii":27,"parse-bmfont-binary":28,"parse-bmfont-xml":29,"xhr":45,"xtend":47}],25:[function(require,module,exports){
+},{"./lib/is-binary":26,"buffer":9,"parse-bmfont-ascii":28,"parse-bmfont-binary":29,"parse-bmfont-xml":30,"xhr":51,"xtend":53}],26:[function(require,module,exports){
 (function (Buffer){
 var equal = require('buffer-equal')
 var HEADER = new Buffer([66, 77, 70, 3])
@@ -2958,7 +3262,7 @@ module.exports = function(buf) {
   return buf.length > 4 && equal(buf.slice(0, 4), HEADER)
 }
 }).call(this,require("buffer").Buffer)
-},{"buffer":9,"buffer-equal":8}],26:[function(require,module,exports){
+},{"buffer":9,"buffer-equal":8}],27:[function(require,module,exports){
 /*
 object-assign
 (c) Sindre Sorhus
@@ -3050,7 +3354,7 @@ module.exports = shouldUseNative() ? Object.assign : function (target, source) {
 	return to;
 };
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 module.exports = function parseBMFontAscii(data) {
   if (!data)
     throw new Error('no data provided')
@@ -3159,7 +3463,7 @@ function parseIntList(data) {
     return parseInt(val, 10)
   })
 }
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 var HEADER = [66, 77, 70]
 
 module.exports = function readBMFontBinary(buf) {
@@ -3320,7 +3624,7 @@ function readNameNT(buf, offset) {
 function readStringNT(buf, offset) {
   return readNameNT(buf, offset).toString('utf8')
 }
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var parseAttributes = require('./parse-attribs')
 var parseFromString = require('xml-parse-from-string')
 
@@ -3406,7 +3710,7 @@ function getAttribList(element) {
 function mapName(nodeName) {
   return NAME_MAP[nodeName.toLowerCase()] || nodeName
 }
-},{"./parse-attribs":30,"xml-parse-from-string":46}],30:[function(require,module,exports){
+},{"./parse-attribs":31,"xml-parse-from-string":52}],31:[function(require,module,exports){
 //Some versions of GlyphDesigner have a typo
 //that causes some bugs with parsing. 
 //Need to confirm with recent version of the software
@@ -3435,7 +3739,7 @@ function parseIntList(data) {
     return parseInt(val, 10)
   })
 }
-},{}],31:[function(require,module,exports){
+},{}],32:[function(require,module,exports){
 var trim = require('trim')
   , forEach = require('for-each')
   , isArray = function(arg) {
@@ -3467,7 +3771,47 @@ module.exports = function (headers) {
 
   return result
 }
-},{"for-each":12,"trim":43}],32:[function(require,module,exports){
+},{"for-each":13,"trim":49}],33:[function(require,module,exports){
+(function (process){
+// Generated by CoffeeScript 1.12.2
+(function() {
+  var getNanoSeconds, hrtime, loadTime, moduleLoadTime, nodeLoadTime, upTime;
+
+  if ((typeof performance !== "undefined" && performance !== null) && performance.now) {
+    module.exports = function() {
+      return performance.now();
+    };
+  } else if ((typeof process !== "undefined" && process !== null) && process.hrtime) {
+    module.exports = function() {
+      return (getNanoSeconds() - nodeLoadTime) / 1e6;
+    };
+    hrtime = process.hrtime;
+    getNanoSeconds = function() {
+      var hr;
+      hr = hrtime();
+      return hr[0] * 1e9 + hr[1];
+    };
+    moduleLoadTime = getNanoSeconds();
+    upTime = process.uptime() * 1e9;
+    nodeLoadTime = moduleLoadTime - upTime;
+  } else if (Date.now) {
+    module.exports = function() {
+      return Date.now() - loadTime;
+    };
+    loadTime = Date.now();
+  } else {
+    module.exports = function() {
+      return new Date().getTime() - loadTime;
+    };
+    loadTime = new Date().getTime();
+  }
+
+}).call(this);
+
+
+
+}).call(this,require('_process'))
+},{"_process":36}],34:[function(require,module,exports){
 var add = require('gl-vec2/add')
 var set = require('gl-vec2/set')
 var normalize = require('gl-vec2/normalize')
@@ -3501,7 +3845,7 @@ module.exports.direction = function direction(out, a, b) {
     normalize(out, out)
     return out
 }
-},{"gl-vec2/add":13,"gl-vec2/dot":14,"gl-vec2/normalize":15,"gl-vec2/set":16,"gl-vec2/subtract":17}],33:[function(require,module,exports){
+},{"gl-vec2/add":14,"gl-vec2/dot":15,"gl-vec2/normalize":16,"gl-vec2/set":17,"gl-vec2/subtract":18}],35:[function(require,module,exports){
 var util = require('polyline-miter-util')
 
 var lineA = [0, 0]
@@ -3569,7 +3913,193 @@ module.exports = function(points, closed) {
 function addNext(out, normal, length) {
     out.push([[normal[0], normal[1]], length])
 }
-},{"polyline-miter-util":32}],34:[function(require,module,exports){
+},{"polyline-miter-util":34}],36:[function(require,module,exports){
+// shim for using process in browser
+var process = module.exports = {};
+
+// cached from whatever global is present so that test runners that stub it
+// don't break things.  But we need to wrap it in a try catch in case it is
+// wrapped in strict mode code which doesn't define any globals.  It's inside a
+// function because try/catches deoptimize in certain engines.
+
+var cachedSetTimeout;
+var cachedClearTimeout;
+
+function defaultSetTimout() {
+    throw new Error('setTimeout has not been defined');
+}
+function defaultClearTimeout () {
+    throw new Error('clearTimeout has not been defined');
+}
+(function () {
+    try {
+        if (typeof setTimeout === 'function') {
+            cachedSetTimeout = setTimeout;
+        } else {
+            cachedSetTimeout = defaultSetTimout;
+        }
+    } catch (e) {
+        cachedSetTimeout = defaultSetTimout;
+    }
+    try {
+        if (typeof clearTimeout === 'function') {
+            cachedClearTimeout = clearTimeout;
+        } else {
+            cachedClearTimeout = defaultClearTimeout;
+        }
+    } catch (e) {
+        cachedClearTimeout = defaultClearTimeout;
+    }
+} ())
+function runTimeout(fun) {
+    if (cachedSetTimeout === setTimeout) {
+        //normal enviroments in sane situations
+        return setTimeout(fun, 0);
+    }
+    // if setTimeout wasn't available but was latter defined
+    if ((cachedSetTimeout === defaultSetTimout || !cachedSetTimeout) && setTimeout) {
+        cachedSetTimeout = setTimeout;
+        return setTimeout(fun, 0);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedSetTimeout(fun, 0);
+    } catch(e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't trust the global object when called normally
+            return cachedSetTimeout.call(null, fun, 0);
+        } catch(e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error
+            return cachedSetTimeout.call(this, fun, 0);
+        }
+    }
+
+
+}
+function runClearTimeout(marker) {
+    if (cachedClearTimeout === clearTimeout) {
+        //normal enviroments in sane situations
+        return clearTimeout(marker);
+    }
+    // if clearTimeout wasn't available but was latter defined
+    if ((cachedClearTimeout === defaultClearTimeout || !cachedClearTimeout) && clearTimeout) {
+        cachedClearTimeout = clearTimeout;
+        return clearTimeout(marker);
+    }
+    try {
+        // when when somebody has screwed with setTimeout but no I.E. maddness
+        return cachedClearTimeout(marker);
+    } catch (e){
+        try {
+            // When we are in I.E. but the script has been evaled so I.E. doesn't  trust the global object when called normally
+            return cachedClearTimeout.call(null, marker);
+        } catch (e){
+            // same as above but when it's a version of I.E. that must have the global object for 'this', hopfully our context correct otherwise it will throw a global error.
+            // Some versions of I.E. have different rules for clearTimeout vs setTimeout
+            return cachedClearTimeout.call(this, marker);
+        }
+    }
+
+
+
+}
+var queue = [];
+var draining = false;
+var currentQueue;
+var queueIndex = -1;
+
+function cleanUpNextTick() {
+    if (!draining || !currentQueue) {
+        return;
+    }
+    draining = false;
+    if (currentQueue.length) {
+        queue = currentQueue.concat(queue);
+    } else {
+        queueIndex = -1;
+    }
+    if (queue.length) {
+        drainQueue();
+    }
+}
+
+function drainQueue() {
+    if (draining) {
+        return;
+    }
+    var timeout = runTimeout(cleanUpNextTick);
+    draining = true;
+
+    var len = queue.length;
+    while(len) {
+        currentQueue = queue;
+        queue = [];
+        while (++queueIndex < len) {
+            if (currentQueue) {
+                currentQueue[queueIndex].run();
+            }
+        }
+        queueIndex = -1;
+        len = queue.length;
+    }
+    currentQueue = null;
+    draining = false;
+    runClearTimeout(timeout);
+}
+
+process.nextTick = function (fun) {
+    var args = new Array(arguments.length - 1);
+    if (arguments.length > 1) {
+        for (var i = 1; i < arguments.length; i++) {
+            args[i - 1] = arguments[i];
+        }
+    }
+    queue.push(new Item(fun, args));
+    if (queue.length === 1 && !draining) {
+        runTimeout(drainQueue);
+    }
+};
+
+// v8 likes predictible objects
+function Item(fun, array) {
+    this.fun = fun;
+    this.array = array;
+}
+Item.prototype.run = function () {
+    this.fun.apply(null, this.array);
+};
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+process.version = ''; // empty string to avoid regexp issues
+process.versions = {};
+
+function noop() {}
+
+process.on = noop;
+process.addListener = noop;
+process.once = noop;
+process.off = noop;
+process.removeListener = noop;
+process.removeAllListeners = noop;
+process.emit = noop;
+process.prependListener = noop;
+process.prependOnceListener = noop;
+
+process.listeners = function (name) { return [] }
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+};
+
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
+};
+process.umask = function() { return 0; };
+
+},{}],37:[function(require,module,exports){
 var dtype = require('dtype')
 var anArray = require('an-array')
 var isBuffer = require('is-buffer')
@@ -3612,7 +4142,139 @@ module.exports = function createQuadElements(array, opt) {
     }
     return indices
 }
-},{"an-array":5,"dtype":10,"is-buffer":21}],35:[function(require,module,exports){
+},{"an-array":5,"dtype":10,"is-buffer":22}],38:[function(require,module,exports){
+var inherits = require('inherits')
+var EventEmitter = require('events').EventEmitter
+var now = require('right-now')
+var raf = require('raf')
+
+module.exports = Engine
+function Engine(fn) {
+    if (!(this instanceof Engine)) 
+        return new Engine(fn)
+    this.running = false
+    this.last = now()
+    this._frame = 0
+    this._tick = this.tick.bind(this)
+
+    if (fn)
+        this.on('tick', fn)
+}
+
+inherits(Engine, EventEmitter)
+
+Engine.prototype.start = function() {
+    if (this.running) 
+        return
+    this.running = true
+    this.last = now()
+    this._frame = raf(this._tick)
+    return this
+}
+
+Engine.prototype.stop = function() {
+    this.running = false
+    if (this._frame !== 0)
+        raf.cancel(this._frame)
+    this._frame = 0
+    return this
+}
+
+Engine.prototype.tick = function() {
+    this._frame = raf(this._tick)
+    var time = now()
+    var dt = time - this.last
+    this.emit('tick', dt)
+    this.last = time
+}
+},{"events":11,"inherits":21,"raf":39,"right-now":40}],39:[function(require,module,exports){
+(function (global){
+var now = require('performance-now')
+  , root = typeof window === 'undefined' ? global : window
+  , vendors = ['moz', 'webkit']
+  , suffix = 'AnimationFrame'
+  , raf = root['request' + suffix]
+  , caf = root['cancel' + suffix] || root['cancelRequest' + suffix]
+
+for(var i = 0; !raf && i < vendors.length; i++) {
+  raf = root[vendors[i] + 'Request' + suffix]
+  caf = root[vendors[i] + 'Cancel' + suffix]
+      || root[vendors[i] + 'CancelRequest' + suffix]
+}
+
+// Some versions of FF have rAF but not cAF
+if(!raf || !caf) {
+  var last = 0
+    , id = 0
+    , queue = []
+    , frameDuration = 1000 / 60
+
+  raf = function(callback) {
+    if(queue.length === 0) {
+      var _now = now()
+        , next = Math.max(0, frameDuration - (_now - last))
+      last = next + _now
+      setTimeout(function() {
+        var cp = queue.slice(0)
+        // Clear queue here to prevent
+        // callbacks from appending listeners
+        // to the current frame's queue
+        queue.length = 0
+        for(var i = 0; i < cp.length; i++) {
+          if(!cp[i].cancelled) {
+            try{
+              cp[i].callback(last)
+            } catch(e) {
+              setTimeout(function() { throw e }, 0)
+            }
+          }
+        }
+      }, Math.round(next))
+    }
+    queue.push({
+      handle: ++id,
+      callback: callback,
+      cancelled: false
+    })
+    return id
+  }
+
+  caf = function(handle) {
+    for(var i = 0; i < queue.length; i++) {
+      if(queue[i].handle === handle) {
+        queue[i].cancelled = true
+      }
+    }
+  }
+}
+
+module.exports = function(fn) {
+  // Wrap in a new function to prevent
+  // `cancel` potentially being assigned
+  // to the native rAF function
+  return raf.call(root, fn)
+}
+module.exports.cancel = function() {
+  caf.apply(root, arguments)
+}
+module.exports.polyfill = function() {
+  root.requestAnimationFrame = raf
+  root.cancelAnimationFrame = caf
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"performance-now":33}],40:[function(require,module,exports){
+(function (global){
+module.exports =
+  global.performance &&
+  global.performance.now ? function now() {
+    return performance.now()
+  } : Date.now || function now() {
+    return +new Date
+  }
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{}],41:[function(require,module,exports){
 var createLayout = require('layout-bmfont-text')
 var inherits = require('inherits')
 var createIndices = require('quad-indices')
@@ -3703,6 +4365,61 @@ TextGeometry.prototype.update = function (opt) {
   }
 }
 
+TextGeometry.prototype.getTextData = function ( opt ) {
+
+  if (typeof opt === 'string') {
+    opt = { text: opt }
+  }
+
+  // use constructor defaults
+  opt = assign({}, this._opt, opt)
+
+  if (!opt.font) {
+    throw new TypeError('must specify a { font } in options')
+  }
+
+  this.layout = createLayout(opt)
+
+  // get vec2 texcoords
+  var flipY = opt.flipY !== false
+
+  // the desired BMFont data
+  var font = opt.font
+
+  // determine texture size from font file
+  var texWidth = font.common.scaleW
+  var texHeight = font.common.scaleH
+
+  // get visible glyphs
+  var glyphs = this.layout.glyphs.filter(function (glyph) {
+    var bitmap = glyph.data
+    return bitmap.width * bitmap.height > 0
+  })
+
+  // provide visible glyphs for convenience
+  this.visibleGlyphs = glyphs
+
+  // get common vertex data
+  var positions = vertices.positions(glyphs)
+  var uvs = vertices.uvs(glyphs, texWidth, texHeight, flipY)
+  var indices = createIndices({
+    clockwise: true,
+    type: 'uint16',
+    count: glyphs.length
+  })
+
+  return {
+
+    indices: indices,
+    positions: positions,
+    uvs: uvs,
+    width: this.layout.width,
+    height: this.layout.height,
+
+  }
+
+}
+
 TextGeometry.prototype.computeBoundingSphere = function () {
   if (this.boundingSphere === null) {
     this.boundingSphere = new THREE.Sphere()
@@ -3738,7 +4455,7 @@ TextGeometry.prototype.computeBoundingBox = function () {
   utils.computeBox(positions, bbox)
 }
 
-},{"./lib/utils":36,"./lib/vertices":37,"inherits":20,"layout-bmfont-text":23,"object-assign":26,"quad-indices":34,"three-buffer-vertex-data":40}],36:[function(require,module,exports){
+},{"./lib/utils":42,"./lib/vertices":43,"inherits":21,"layout-bmfont-text":24,"object-assign":27,"quad-indices":37,"three-buffer-vertex-data":46}],42:[function(require,module,exports){
 var itemSize = 2
 var box = { min: [0, 0], max: [0, 0] }
 
@@ -3778,7 +4495,7 @@ module.exports.computeSphere = function (positions, output) {
   output.radius = length / 2
 }
 
-},{}],37:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 module.exports.pages = function pages (glyphs) {
   var pages = new Float32Array(glyphs.length * 4 * 1)
   var i = 0
@@ -3857,7 +4574,7 @@ module.exports.positions = function positions (glyphs) {
   return positions
 }
 
-},{}],38:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 var assign = require('object-assign');
 
 module.exports = function createMSDFShader (opt) {
@@ -3918,7 +4635,7 @@ module.exports = function createMSDFShader (opt) {
   }, opt);
 };
 
-},{"object-assign":26}],39:[function(require,module,exports){
+},{"object-assign":27}],45:[function(require,module,exports){
 var assign = require('object-assign')
 
 module.exports = function createSDFShader (opt) {
@@ -3974,7 +4691,9 @@ module.exports = function createSDFShader (opt) {
       'void main() {',
       '  vec4 texColor = texture2D(map, vUv);',
       '  float alpha = aastep(texColor.a);',
-      '  gl_FragColor = vec4(color, opacity * alpha);',
+      '  gl_FragColor = vec4 ( 0.5, 0.5, 0.5, 1.0 ); ',
+      '  gl_FragColor.rgb *= 1.0 - alpha;',
+      '  gl_FragColor.a *= opacity;',
       alphaTest === 0
         ? ''
         : '  if (gl_FragColor.a < ' + alphaTest + ') discard;',
@@ -3983,7 +4702,7 @@ module.exports = function createSDFShader (opt) {
   }, opt)
 }
 
-},{"object-assign":26}],40:[function(require,module,exports){
+},{"object-assign":27}],46:[function(require,module,exports){
 var flatten = require('flatten-vertex-data')
 var warned = false;
 
@@ -4083,7 +4802,7 @@ function rebuildAttribute (attrib, data, itemSize) {
   return false
 }
 
-},{"flatten-vertex-data":11}],41:[function(require,module,exports){
+},{"flatten-vertex-data":12}],47:[function(require,module,exports){
 var inherits = require('inherits');
 var getNormals = require('polyline-normals');
 var VERTS_PER_POINT = 2;
@@ -4217,7 +4936,7 @@ module.exports = function createLineMesh (THREE) {
   return LineMesh;
 };
 
-},{"inherits":20,"polyline-normals":33}],42:[function(require,module,exports){
+},{"inherits":21,"polyline-normals":35}],48:[function(require,module,exports){
 var assign = require('object-assign');
 
 module.exports = function (THREE) {
@@ -4269,7 +4988,8 @@ module.exports = function (THREE) {
   };
 };
 
-},{"object-assign":26}],43:[function(require,module,exports){
+
+},{"object-assign":27}],49:[function(require,module,exports){
 
 exports = module.exports = trim;
 
@@ -4285,7 +5005,7 @@ exports.right = function(str){
   return str.replace(/\s*$/, '');
 };
 
-},{}],44:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 var newline = /\n/
 var newlineChar = '\n'
 var whitespace = /\s/
@@ -4413,7 +5133,7 @@ function monospace(text, start, end, width) {
         end: start+glyphs
     }
 }
-},{}],45:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 "use strict";
 var window = require("global/window")
 var isFunction = require("is-function")
@@ -4656,7 +5376,7 @@ function getXml(xhr) {
 
 function noop() {}
 
-},{"global/window":18,"is-function":22,"parse-headers":31,"xtend":47}],46:[function(require,module,exports){
+},{"global/window":19,"is-function":23,"parse-headers":32,"xtend":53}],52:[function(require,module,exports){
 module.exports = (function xmlparser() {
   //common browsers
   if (typeof self.DOMParser !== 'undefined') {
@@ -4685,7 +5405,7 @@ module.exports = (function xmlparser() {
   }
 })()
 
-},{}],47:[function(require,module,exports){
+},{}],53:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -4706,7 +5426,7 @@ function extend() {
     return target
 }
 
-},{}],48:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4767,7 +5487,7 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 		return BlackMatter;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],49:[function(require,module,exports){
+},{"./PhysicalElement":64}],55:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4834,6 +5554,8 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				_this.scanScene.add(_this.scanMesh);
 				_this.scanMaterial.extensions.derivatives = true;
 
+				_this.canUpdateTexts = true;
+
 				return _this;
 		}
 
@@ -4842,6 +5564,11 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				value: function build() {
 
 						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "build", this).call(this);
+
+						this.onLoad(function () {
+
+								console.log(this.gameElements);
+						}.bind(this));
 				}
 		}, {
 				key: "onUp",
@@ -4953,11 +5680,11 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 										this.updateRenderer();
 										this.ready = true;
-										this.resetPlayer();
 										// this.start = this.getInstanceByName ( 'goals', 'top' );
 										// this.arrival = this.getInstanceByName ( 'goals', 'bottom' );
 										this.arrivedInGame = false;
 										this.gameElements.player.instances[0].mass = 400;
+										this.gameElements.player.instances[0].enabled = true;
 										this.resetPlayer();
 								} else {
 
@@ -4970,7 +5697,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						// main player
 
 						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position, 0.2) && this.arrivedInGame) this.resetPlayer();
+						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
 						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -4999,10 +5726,16 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						// Fixed charges
 
 						var fixedCharges = this.gameElements.fixedCharges.instances;
+						var chargesUniform = [];
 
 						for (var _i = 0; _i < fixedCharges.length; _i++) {
 
 								var charge = fixedCharges[_i];
+
+								chargesUniform.push(charge.position[0]);
+								chargesUniform.push(charge.position[1]);
+								chargesUniform.push(Math.abs(charge.charge / charge.maxCharge) * charge.sign);
+
 								var dist = vec3.length(vec3.sub(vec3.create(), charge.position, player.position));
 
 								if (dist < charge.radius) {
@@ -5017,7 +5750,6 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						// Charges
 
-						var chargesUniform = [];
 						var charges = this.gameElements.charges.instances;
 
 						for (var _i2 = 0; _i2 < charges.length; _i2++) {
@@ -5103,6 +5835,137 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
 						}
+
+						// Update texts
+
+						if (!this.infoScreenOpened) return;
+
+						if (this.canUpdateTexts) {
+
+								this.canUpdateTexts = false;
+								this.updateTexts();
+								setTimeout(function () {
+
+										this.canUpdateTexts = true;
+								}.bind(this), 5);
+						}
+				}
+		}, {
+				key: "updateTexts",
+				value: function updateTexts() {
+
+						if (!this.textsGeometry) return;
+
+						var player = this.gameElements.player.instances[0];
+						var points = this.gameElements.charges.textPoints;
+
+						var indices = [];
+						var positions = [];
+						var uvs = [];
+
+						var modelMatrix = mat4.create();
+
+						var fixedChargesPoints = this.gameElements.fixedCharges.textPoints;
+
+						for (var pp in fixedChargesPoints) {
+
+								var point = fixedChargesPoints[pp].point;
+								var instances = fixedChargesPoints[pp].instances;
+
+								var totalForce = 0;
+								var totalMass = 0;
+								var hack = false;
+
+								for (var i = 0; i < instances.length; i++) {
+
+										totalForce += vec3.length(this.computeElectricForce(instances[i], player));
+										totalMass += instances[i].mass;
+
+										if (instances[i].hack) hack = true;
+								}
+
+								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+
+								mat4.identity(modelMatrix);
+								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
+								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+								if (!hack) {
+
+										for (var j = 0; j < textData.indices.length; j++) {
+
+												indices.push(textData.indices[j] + positions.length / 2);
+										}
+
+										for (var _j = 0; _j < textData.positions.length; _j += 2) {
+
+												var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+												vec3.transformMat4(v, v, modelMatrix);
+
+												positions.push(v[0]);
+												positions.push(v[1]);
+										}
+
+										for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+
+												uvs.push(textData.uvs[_j2]);
+										}
+								}
+						}
+
+						for (var p in points) {
+
+								var _point = points[p].point;
+								var _instances = points[p].instances;
+
+								var _totalForce = 0;
+								var _totalMass = 0;
+
+								for (var _i5 = 0; _i5 < _instances.length; _i5++) {
+
+										_totalForce += vec3.length(this.computeElectricForce(_instances[_i5], player));
+										_totalMass += _instances[_i5].mass;
+								}
+
+								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
+
+								mat4.identity(modelMatrix);
+								mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
+								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+								for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
+
+										indices.push(_textData.indices[_j3] + positions.length / 2);
+								}
+
+								for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
+
+										var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
+										vec3.transformMat4(_v, _v, modelMatrix);
+
+										positions.push(_v[0]);
+										positions.push(_v[1]);
+								}
+
+								for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
+
+										uvs.push(_textData.uvs[_j5]);
+								}
+						}
+
+						if (positions.length > 0) {
+
+								this.dynamicBuffer.index(this.textsGeometry, indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
+						} else {
+
+								var _textData2 = this.textsGeometry.getTextData('');
+
+								this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
+						}
 				}
 		}, {
 				key: "checkCharges",
@@ -5164,9 +6027,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				key: "resetPlayer",
 				value: function resetPlayer() {
 
-						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop() * 1.03, 0);
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop(), 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
-						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 1, -5, 0]);
+						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 10, -10, 0]);
 				}
 		}, {
 				key: "reloadLevel",
@@ -5184,7 +6047,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 		return ElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":55,"./shaderHelper":63}],50:[function(require,module,exports){
+},{"./LevelCore":61,"./shaderHelper":69}],56:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5325,7 +6188,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 		return ElectricParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],51:[function(require,module,exports){
+},{"./PhysicalElement":64}],57:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5440,7 +6303,7 @@ var ElectricPlanetParticle = exports.ElectricPlanetParticle = function (_Physica
 		return ElectricPlanetParticle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],52:[function(require,module,exports){
+},{"./PhysicalElement":64}],58:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -5515,7 +6378,7 @@ var ElementCore = exports.ElementCore = function () {
 		return ElementCore;
 }();
 
-},{}],53:[function(require,module,exports){
+},{}],59:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -5555,6 +6418,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				}
 
 				_this.activePlanet = null;
+				_this.canUpdateTexts = true;
 
 				return _this;
 		}
@@ -5694,6 +6558,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 										this.ready = true;
 										this.gameElements.player.instances[0].mass = 1000000;
+										this.gameElements.player.instances[0].enabled = true;
 										this.resetPlayer();
 										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
 										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
@@ -5716,7 +6581,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						// main player
 
 						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position) && this.arrivedInGame) this.resetPlayer();
+						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
 						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -5840,6 +6705,89 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
 						}
+
+						if (!this.infoScreenOpened) return;
+
+						if (this.canUpdateTexts) {
+
+								this.canUpdateTexts = false;
+								this.updateTexts();
+								setTimeout(function () {
+
+										this.canUpdateTexts = true;
+								}.bind(this), 5);
+						}
+				}
+		}, {
+				key: "updateTexts",
+				value: function updateTexts() {
+
+						if (!this.textsGeometry) return;
+
+						var player = this.gameElements.player.instances[0];
+						var points = this.gameElements.planets.textPoints;
+
+						var indices = [];
+						var positions = [];
+						var uvs = [];
+
+						var modelMatrix = mat4.create();
+
+						var planetPoints = this.gameElements.planets.textPoints;
+
+						for (var pp in planetPoints) {
+
+								var point = planetPoints[pp].point;
+								var instances = planetPoints[pp].instances;
+
+								var totalForce = 0;
+								var totalMass = 0;
+
+								for (var i = 0; i < instances.length; i++) {
+
+										totalForce += vec3.length(this.computeGravityForce(instances[i], player));
+										totalMass += instances[i].mass;
+								}
+
+								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+
+								mat4.identity(modelMatrix);
+								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
+								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+								for (var j = 0; j < textData.indices.length; j++) {
+
+										indices.push(textData.indices[j] + positions.length / 2);
+								}
+
+								for (var _j2 = 0; _j2 < textData.positions.length; _j2 += 2) {
+
+										var v = [textData.positions[_j2 + 0], textData.positions[_j2 + 1], 0];
+										vec3.transformMat4(v, v, modelMatrix);
+
+										positions.push(v[0]);
+										positions.push(v[1]);
+								}
+
+								for (var _j3 = 0; _j3 < textData.uvs.length; _j3++) {
+
+										uvs.push(textData.uvs[_j3]);
+								}
+						}
+
+						if (positions.length > 0) {
+
+								this.dynamicBuffer.index(this.textsGeometry, indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
+						} else {
+
+								var _textData = this.textsGeometry.getTextData('');
+
+								this.dynamicBuffer.index(this.textsGeometry, _textData.indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData.positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData.uvs, 2);
+						}
 				}
 
 				// Build the charges contained in the planets.
@@ -5853,7 +6801,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						for (var i = 0; i < planets.length; i++) {
 
 								var planet = planets[i];
-								var layers = [1, 5, 10, 20, 20];
+								var layers = planet.particles;
 
 								for (var j = 0; j < layers.length; j++) {
 
@@ -5951,7 +6899,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom() - 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
-						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 2, 30, 0]);
+						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 2, 10000, 0]);
 				}
 		}, {
 				key: "reloadLevel",
@@ -5970,11 +6918,11 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":55,"./Text":61,"./shaderHelper":63}],54:[function(require,module,exports){
+},{"./LevelCore":61,"./Text":67,"./shaderHelper":69}],60:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-		value: true
+			value: true
 });
 exports.GravityLevel = undefined;
 
@@ -5995,339 +6943,474 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 var GravityLevel = exports.GravityLevel = function (_LevelCore) {
-		_inherits(GravityLevel, _LevelCore);
+			_inherits(GravityLevel, _LevelCore);
 
-		function GravityLevel(_options) {
-				_classCallCheck(this, GravityLevel);
+			function GravityLevel(_options) {
+						_classCallCheck(this, GravityLevel);
 
-				try {
-						var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
+						try {
+									var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
 
-						_this.build();
-				} catch (e) {
+									_this.build();
+						} catch (e) {
 
-						console.error(e);
-				}
-
-				_this.ready = false;
-
-				// build a grid
-
-				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
-				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 80, 80);
-				_this.gridMaterial = new THREE.ShaderMaterial({
-
-						vertexShader: _shaderHelper.shaderHelper.grid.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
-						transparent: true,
-
-						uniforms: {
-
-								mainAlpha: { value: 1.0 },
-								gridSubdivisions: { value: 60 },
-								numMasses: { value: 0 },
-								masses: { value: [0, 0, 0] }
-
+									console.error(e);
 						}
 
-						// side: THREE.DoubleSide,
+						_this.ready = false;
 
-				});
+						// build a grid
 
-				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
-				_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
-				_this.grid.renderOrder = 0;
-				_this.scanScene.add(_this.grid);
-				_this.gridMaterial.extensions.derivatives = true;
+						var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
+						var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 80, 80);
+						_this.gridMaterial = new THREE.ShaderMaterial({
 
-				// Blackmatter
+									vertexShader: _shaderHelper.shaderHelper.grid.vertex,
+									fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
+									transparent: true,
 
-				_this.canDraw = true;
+									uniforms: {
 
-				return _this;
-		}
+												mainAlpha: { value: 1.0 },
+												gridSubdivisions: { value: 60 },
+												numMasses: { value: 0 },
+												masses: { value: [0, 0, 0] }
 
-		_createClass(GravityLevel, [{
-				key: "build",
-				value: function build() {
+									}
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
-				}
-		}, {
-				key: "onUp",
-				value: function onUp(_position) {
+									// side: THREE.DoubleSide,
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onUp", this).call(this, _position);
-				}
-		}, {
-				key: "onDown",
-				value: function onDown(_position) {
+						});
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDown", this).call(this, _position);
-				}
-		}, {
-				key: "onClick",
-				value: function onClick(_position) {
+						_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
+						_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
+						_this.grid.renderOrder = 0;
+						_this.scanScene.add(_this.grid);
+						_this.gridMaterial.extensions.derivatives = true;
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onClick", this).call(this, _position);
-				}
-		}, {
-				key: "onMove",
-				value: function onMove(_position) {
+						// Blackmatter
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onMove", this).call(this, _position);
-				}
-		}, {
-				key: "onDrag",
-				value: function onDrag(_position) {
+						_this.canDraw = true;
+						_this.canUpdateTexts = true;
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
+						return _this;
+			}
 
-						if (!this.activeScreen && this.canDraw) {
+			_createClass(GravityLevel, [{
+						key: "build",
+						value: function build() {
 
-								var r = rc();
-								var s = Math.random() * 0.3 + 0.2;
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
 
-								// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
+									this.onLoad(function () {
 
-								if (this.gameElements.blackMatter.instances.length < 108) {
-
-										this.addInstanceOf('blackMatter', {
-
-												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
-												scale: [s, s, s],
-												color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
-												rotation: [0, 0, Math.random() * Math.PI * 2],
-												mass: 20000,
-												drag: 0.95,
-												lifeSpan: Math.random() * 4000 + 6000,
-												canDye: true,
-												targetLinePosition: [-2.0, 2.0, 0.0]
-
-										});
-								}
+												this.render();
+									}.bind(this));
 						}
+			}, {
+						key: "onUp",
+						value: function onUp(_position) {
 
-						if (this.canDraw) {
-
-								this.canDraw = false;
-
-								setTimeout(function () {
-
-										this.canDraw = true;
-								}.bind(this), 100);
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onUp", this).call(this, _position);
 						}
+			}, {
+						key: "onDown",
+						value: function onDown(_position) {
 
-						function rc() {
-
-								return (Math.random() - 0.5) * 0.07;
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDown", this).call(this, _position);
 						}
-				}
-		}, {
-				key: "onResize",
-				value: function onResize() {
+			}, {
+						key: "onClick",
+						value: function onClick(_position) {
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
-
-						var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
-						this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1.0);
-				}
-		}, {
-				key: "update",
-				value: function update() {
-
-						// Check if all is loaded.
-
-						if (!this.ready) {
-
-								if (this.levelLoaded && this.levelStarted) {
-
-										this.ready = true;
-										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
-										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
-										this.arrivedInGame = false;
-										this.gameElements.player.instances[0].enabled = true;
-										this.resetPlayer();
-								} else {
-
-										return;
-								}
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onClick", this).call(this, _position);
 						}
+			}, {
+						key: "onMove",
+						value: function onMove(_position) {
 
-						// Here all the objects's geometries are updated.
-
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this);
-
-						// Main player
-
-						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
-						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
-						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
-
-						// Compute the gravitational field.
-						//
-						// G = 6.674 * 10-11 ( m3 kg-1 s-2 )
-						//
-						// F = G * ( m1 * m2 ) / r^2
-						//
-
-						var forceResult = vec3.create();
-
-						// Black matter
-
-						var massesUniforms = [];
-						var blackMatterInstances = this.gameElements.blackMatter.instances;
-
-						for (var i = 0; i < blackMatterInstances.length; i++) {
-
-								var bC = blackMatterInstances[i];
-								var dir = vec3.sub(vec3.create(), bC.position, player.position);
-								var dist = vec3.length(dir);
-
-								massesUniforms.push(bC.position[0]);
-								massesUniforms.push(bC.position[1]);
-								massesUniforms.push(bC.mass / bC.maxMass);
-
-								if (dist > bC.scale[0]) {
-
-										var force = this.computeGravityAttraction(bC, player);
-										vec3.add(forceResult, forceResult, force);
-								} else {
-
-										this.resetPlayer();
-								}
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onMove", this).call(this, _position);
 						}
+			}, {
+						key: "onDrag",
+						value: function onDrag(_position) {
 
-						// Planets & particles
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
 
-						var playerParticles = this.gameElements.playerParticles.instances;
-						var planetsInstances = this.gameElements.planets.instances;
+									if (!this.activeScreen && this.canDraw) {
 
-						for (var _i = 0; _i < planetsInstances.length; _i++) {
+												var r = rc();
+												var s = Math.random() * 0.3 + 0.2;
 
-								var planet = planetsInstances[_i];
-								var _dir = vec3.sub(vec3.create(), planet.position, player.position);
-								var _dist = vec3.length(_dir);
+												// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
 
-								massesUniforms.push(planet.position[0]);
-								massesUniforms.push(planet.position[1]);
-								massesUniforms.push(planet.mass / planet.maxMass * 2.0);
+												if (this.gameElements.blackMatter.instances.length < 108) {
 
-								if (_dist > planet.scale[0]) {
+															this.addInstanceOf('blackMatter', {
 
-										var _force = this.computeGravityAttraction(planet, player);
-										vec3.add(forceResult, forceResult, _force);
-								} else {
+																		position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
+																		scale: [s, s, s],
+																		color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
+																		rotation: [0, 0, Math.random() * Math.PI * 2],
+																		mass: 20000,
+																		drag: 0.95,
+																		lifeSpan: Math.random() * 4000 + 6000,
+																		canDye: true,
+																		targetLinePosition: [-2.0, 2.0, 0.0]
 
-										this.resetPlayer();
-								}
-
-								for (var j = 0; j < playerParticles.length; j++) {
-
-										var particle = playerParticles[j];
-
-										var dirToPlanet = vec3.sub(vec3.create(), planet.position, particle.position);
-										var distToPlanet = vec3.length(dirToPlanet);
-										var minDistToPlanet = planet.scale[0] + particle.scale[0] - 0.01;
-										var _force2 = null;
-
-										if (distToPlanet < minDistToPlanet) {
-
-												var mag = (minDistToPlanet - distToPlanet) * 50;
-												vec3.normalize(distToPlanet, distToPlanet);
-												_force2 = vec3.scale(dirToPlanet, dirToPlanet, -mag);
-										} else {
-
-												_force2 = this.computeGravityAttraction(planet, particle);
-
-												if (vec3.length(_force2) > 1) {
-
-														vec3.normalize(_force2, _force2);
-														vec3.scale(_force2, _force2, 1);
+															});
 												}
-										}
+									}
 
-										particle.applyForce(_force2);
-								}
+									if (this.canDraw) {
+
+												this.canDraw = false;
+
+												setTimeout(function () {
+
+															this.canDraw = true;
+												}.bind(this), 100);
+									}
+
+									function rc() {
+
+												return (Math.random() - 0.5) * 0.07;
+									}
 						}
+			}, {
+						key: "onResize",
+						value: function onResize() {
 
-						// Update the grid in the scan scene.
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
 
-						if (massesUniforms.length > 0) {
-
-								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
-								this.gridMaterial.uniforms.masses.value = massesUniforms;
+									var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
+									this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1.0);
 						}
+			}, {
+						key: "update",
+						value: function update(_deltaTime) {
 
-						for (var _j = 0; _j < playerParticles.length; _j++) {
+									// Check if all is loaded.
 
-								var _particle = playerParticles[_j];
+									if (!this.ready) {
 
-								var _dir2 = vec3.sub(vec3.create(), player.position, _particle.position);
-								var _dist2 = vec3.length(_dir2);
+												if (this.levelLoaded && this.levelStarted) {
 
-								vec3.normalize(_dir2, _dir2);
-								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
+															this.ready = true;
+															// this.start = this.getInstanceByName ( 'goals', 'bottom' );
+															// this.arrival = this.getInstanceByName ( 'goals', 'top' );
+															this.arrivedInGame = false;
+															this.gameElements.player.instances[0].enabled = true;
+															this.resetPlayer();
+												} else {
 
-								_particle.applyForce(_dir2);
+															return;
+												}
+									};
+
+									// Here all the objects's geometries are updated.
+
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this, _deltaTime);
+
+									// Main player
+
+									var player = this.gameElements.player.instances[0];
+									if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
+									// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
+									// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+
+									// Compute the gravitational field.
+									//
+									// G = 6.674 * 10-11 ( m3 kg-1 s-2 )
+									//
+									// F = G * ( m1 * m2 ) / r^2
+									//
+
+									var forceResult = vec3.create();
+
+									// Black matter
+
+									var massesUniforms = [];
+									var blackMatterInstances = this.gameElements.blackMatter.instances;
+
+									for (var i = 0; i < blackMatterInstances.length; i++) {
+
+												var bC = blackMatterInstances[i];
+												var dir = vec3.sub(vec3.create(), bC.position, player.position);
+												var dist = vec3.length(dir);
+
+												massesUniforms.push(bC.position[0]);
+												massesUniforms.push(bC.position[1]);
+												massesUniforms.push(bC.mass / bC.maxMass);
+
+												if (dist > bC.scale[0]) {
+
+															var force = this.computeGravityAttraction(bC, player);
+															vec3.add(forceResult, forceResult, force);
+												} else {
+
+															this.resetPlayer();
+												}
+									}
+
+									// Planets & particles
+
+									var playerParticles = this.gameElements.playerParticles.instances;
+									var planetsInstances = this.gameElements.planets.instances;
+
+									for (var _i = 0; _i < planetsInstances.length; _i++) {
+
+												var planet = planetsInstances[_i];
+												var _dir = vec3.sub(vec3.create(), planet.position, player.position);
+												var _dist = vec3.length(_dir);
+
+												massesUniforms.push(planet.position[0]);
+												massesUniforms.push(planet.position[1]);
+												massesUniforms.push(planet.mass / planet.maxMass * 2.0);
+
+												if (_dist > planet.scale[0]) {
+
+															var _force = this.computeGravityAttraction(planet, player);
+															vec3.add(forceResult, forceResult, _force);
+												} else {
+
+															this.resetPlayer();
+												}
+
+												// for ( let j = 0; j < playerParticles.length; j ++ ) {
+
+												// 	let particle = playerParticles[ j ];
+
+												// 	let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
+												// 	let distToPlanet = vec3.length ( dirToPlanet );
+												// 	let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
+												// 	let force = null;
+
+												// 	if ( distToPlanet < minDistToPlanet ) {
+
+												// 		let mag = ( minDistToPlanet - distToPlanet ) * 50;
+												// 		vec3.normalize ( distToPlanet, distToPlanet );
+												// 		force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
+
+												// 	} else {
+
+												// 		force = this.computeGravityAttraction ( planet, particle );
+
+												// 		if ( vec3.length ( force ) > 1 ) {
+
+												// 			vec3.normalize ( force, force );
+												// 			vec3.scale ( force, force, 1 );
+
+												// 		}
+
+												// 	}
+
+												// 	particle.applyForce ( force );
+
+												// }
+									}
+
+									// Update the grid in the scan scene.
+
+									if (massesUniforms.length > 0) {
+
+												this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+												this.gridMaterial.uniforms.masses.value = massesUniforms;
+									}
+
+									for (var j = 0; j < playerParticles.length; j++) {
+
+												var particle = playerParticles[j];
+
+												var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
+												var _dist2 = vec3.length(_dir2);
+
+												vec3.normalize(_dir2, _dir2);
+												vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
+
+												particle.applyForce(_dir2);
+									}
+
+									player.applyForce(forceResult);
+
+									// Update FX particles
+
+									for (var _i2 = 0; _i2 < 1; _i2++) {
+
+												var instance = this.addInstanceOf('playerParticles', {
+
+															enabled: Math.random() > 0.05 ? true : false,
+															position: vec3.clone(player.position),
+															canDye: true,
+															lifeSpan: Math.random() * 1000 + 1000,
+															drag: 0.95,
+															mass: Math.random() * 100 + 200,
+															initialRadius: Math.random() * 0.06 + 0.03,
+															velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+
+												});
+
+												instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
+									}
+
+									if (!this.infoScreenOpened) return;
+
+									// Update text
+
+									if (this.canUpdateTexts) {
+
+												this.canUpdateTexts = false;
+												this.updateTexts();
+												setTimeout(function () {
+
+															this.canUpdateTexts = true;
+												}.bind(this), 5);
+									}
 						}
+			}, {
+						key: "updateTexts",
+						value: function updateTexts() {
 
-						player.applyForce(forceResult);
+									if (!this.textsGeometry) return;
 
-						// Update FX particles
+									var player = this.gameElements.player.instances[0];
+									var points = this.gameElements.blackMatter.textPoints;
 
-						for (var _i2 = 0; _i2 < 2; _i2++) {
+									var indices = [];
+									var positions = [];
+									var uvs = [];
 
-								var instance = this.addInstanceOf('playerParticles', {
+									var modelMatrix = mat4.create();
 
-										enabled: Math.random() > 0.05 ? true : false,
-										position: vec3.clone(player.position),
-										canDye: true,
-										lifeSpan: Math.random() * 1000 + 1000,
-										drag: 0.95,
-										mass: Math.random() * 100 + 200,
-										initialRadius: Math.random() * 0.06 + 0.03,
-										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+									var planetPoints = this.gameElements.planets.textPoints;
 
-								});
+									for (var pp in planetPoints) {
 
-								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
+												var point = planetPoints[pp].point;
+												var instances = planetPoints[pp].instances;
+
+												var totalForce = 0;
+												var totalMass = 0;
+
+												for (var i = 0; i < instances.length; i++) {
+
+															totalForce += vec3.length(this.computeGravityAttraction(instances[i], player));
+															totalMass += instances[i].mass;
+												}
+
+												var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+
+												mat4.identity(modelMatrix);
+												mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
+												mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+												for (var j = 0; j < textData.indices.length; j++) {
+
+															indices.push(textData.indices[j] + positions.length / 2);
+												}
+
+												for (var _j = 0; _j < textData.positions.length; _j += 2) {
+
+															var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+															vec3.transformMat4(v, v, modelMatrix);
+
+															positions.push(v[0]);
+															positions.push(v[1]);
+												}
+
+												for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+
+															uvs.push(textData.uvs[_j2]);
+												}
+									}
+
+									for (var p in points) {
+
+												var _point = points[p].point;
+												var _instances = points[p].instances;
+
+												var _totalForce = 0;
+												var _totalMass = 0;
+
+												for (var _i3 = 0; _i3 < _instances.length; _i3++) {
+
+															_totalForce += vec3.length(this.computeGravityAttraction(_instances[_i3], player));
+															_totalMass += _instances[_i3].mass;
+												}
+
+												var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
+
+												mat4.identity(modelMatrix);
+												mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
+												mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+												for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
+
+															indices.push(_textData.indices[_j3] + positions.length / 2);
+												}
+
+												for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
+
+															var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
+															vec3.transformMat4(_v, _v, modelMatrix);
+
+															positions.push(_v[0]);
+															positions.push(_v[1]);
+												}
+
+												for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
+
+															uvs.push(_textData.uvs[_j5]);
+												}
+									}
+
+									if (positions.length > 0) {
+
+												this.dynamicBuffer.index(this.textsGeometry, indices, 1);
+												this.dynamicBuffer.attr(this.textsGeometry, 'position', positions, 2);
+												this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
+									} else {
+
+												var _textData2 = this.textsGeometry.getTextData('');
+
+												this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
+												this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
+												this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
+									}
 						}
-				}
-		}, {
-				key: "computeGravityAttraction",
-				value: function computeGravityAttraction(_e1, _e2) {
+			}, {
+						key: "computeGravityAttraction",
+						value: function computeGravityAttraction(_e1, _e2) {
 
-						var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
-						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
-						var dist = vec3.length(dir);
+									var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
+									var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+									var dist = vec3.length(dir);
 
-						vec3.normalize(dir, dir);
-						var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
+									vec3.normalize(dir, dir);
+									var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
 
-						return vec3.scale(dir, dir, mag);
-				}
-		}, {
-				key: "resetPlayer",
-				value: function resetPlayer() {
+									return vec3.scale(dir, dir, mag);
+						}
+			}, {
+						key: "resetPlayer",
+						value: function resetPlayer() {
 
-						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
-						this.gameElements.player.instances[0].velocity = vec3.create();
-						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 500, 1000, 0]);
-				}
-		}, {
-				key: "render",
-				value: function render() {
+									this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
+									this.gameElements.player.instances[0].velocity = vec3.create();
+									this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 500, 1000, 0]);
+						}
+			}, {
+						key: "render",
+						value: function render() {
 
-						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
-				}
-		}]);
+									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
+						}
+			}]);
 
-		return GravityLevel;
+			return GravityLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":55,"./PhysicalElement":58,"./shaderHelper":63}],55:[function(require,module,exports){
+},{"./LevelCore":61,"./PhysicalElement":64,"./shaderHelper":69}],61:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -6357,6 +7440,7 @@ var quadratic = require('adaptive-quadratic-curve');
 var line = require('three-line-2d')(THREE);
 var basicShader = require('three-line-2d/shaders/basic')(THREE);
 var getNormals = require('polyline-normals');
+var dynamicBuffer = require('three-buffer-vertex-data');
 
 var LevelCore = exports.LevelCore = function () {
 		function LevelCore(_options) {
@@ -6490,6 +7574,7 @@ var LevelCore = exports.LevelCore = function () {
 				this.bezier = bezier;
 				this.quadratic = quadratic;
 				this.basicShader = basicShader;
+				this.dynamicBuffer = dynamicBuffer;
 
 				// Objects
 
@@ -6545,7 +7630,10 @@ var LevelCore = exports.LevelCore = function () {
 						if (!this.levelStarted) {
 
 								this.levelStarted = true;
-								// this.infoScreenTargetPosition.x = this.getWorldLeft () * 2.0;
+
+								// If there is a text intro remove it.
+
+								this.removeTextIntro();
 						}
 
 						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
@@ -6554,10 +7642,6 @@ var LevelCore = exports.LevelCore = function () {
 						this.glMouse = vec2.clone(_position);
 						this.updateMouseWorld(this.mouse);
 						this.activeScreen = this.checkButtons();
-
-						// If there is a text intro remove it.
-
-						this.removeTextIntro();
 				}
 		}, {
 				key: 'onUp',
@@ -6618,7 +7702,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Update screns size & position.
 
-						this.scanScreenTargetPosition.set(this.getWorldRight() * 2.0, 0.0, 0.0);
+						this.scanScreenTargetPosition.set(0.0, 0.0, 0.0);
 						this.scanScreen.position.set(this.scanScreenTargetPosition.x, this.scanScreenTargetPosition.y, this.scanScreenTargetPosition.z);
 
 						this.scanScreen.scale.x = this.getWorldRight() * 2.0;
@@ -6649,54 +7733,79 @@ var LevelCore = exports.LevelCore = function () {
 												this.objectOnLoad('font texture');
 
 												// Check if an intro text is specified in the level file.
+												// Text intro.
 
-												if (this.levelFile.textIntro) {
+												this.textBackgroundMaterial = new THREE.MeshBasicMaterial({
 
-														this.textBackgroundMaterial = new THREE.MeshBasicMaterial({
+														color: 'rgb( 128, 128, 128 )',
+														opacity: 0.9,
+														transparent: true
 
-																color: 'rgb( 128, 128, 128 )',
-																opacity: 0.9,
-																transparent: true
+												});
 
-														});
+												this.textBackground = new THREE.Mesh(this.quadGeometry, this.textBackgroundMaterial);
+												this.textBackground.material.alphaTarget = 0.9;
+												this.textBackground.renderOrder = 5;
+												this.textBackground.scale.set(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, 3);
+												this.infoScene.add(this.textBackground);
 
-														this.textBackground = new THREE.Mesh(this.quadGeometry, this.textBackgroundMaterial);
-														this.textBackground.material.alphaTarget = 0.9;
-														this.textBackground.renderOrder = 5;
-														this.textBackground.scale.set(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, 3);
-														this.infoScene.add(this.textBackground);
+												var geometry = bmfontGeometry({
 
-														var geometry = bmfontGeometry({
+														width: 1000,
+														align: 'center',
+														font: font
 
-																width: 1000,
-																align: 'center',
-																font: font
+												});
 
-														});
+												geometry.update(this.levelFile.textIntro || '');
+												geometry.computeBoundingBox();
 
-														geometry.update(this.levelFile.textIntro);
-														geometry.computeBoundingBox();
+												var material = new THREE.RawShaderMaterial(sdfShader({
 
-														var material = new THREE.RawShaderMaterial(sdfShader({
+														map: texture,
+														side: THREE.DoubleSide,
+														transparent: true,
+														color: 'rgb(0, 0, 0)'
 
-																map: texture,
-																side: THREE.DoubleSide,
-																transparent: true,
-																color: 'rgb(0, 0, 0)'
+												}));
 
-														}));
+												this.textIntro = new THREE.Mesh(geometry, material);
+												this.textIntro.material.alphaTarget = 1.0;
+												this.infoScene.add(this.textIntro);
+												this.textIntro.renderOrder = 6;
+												geometry.computeBoundingSphere();
+												this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
+												this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+												this.textIntro.rotation.x = Math.PI;
+												this.textIntro.scale.set(0.0025, 0.0025, 0.0025);
 
-														this.textIntro = new THREE.Mesh(geometry, material);
-														this.textIntro.material.alphaTarget = 1.0;
-														this.infoScene.add(this.textIntro);
-														this.textIntro.material.extensions.derivatives = true;
-														this.textIntro.renderOrder = 6;
-														geometry.computeBoundingSphere();
-														this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
-														this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
-														this.textIntro.rotation.x = Math.PI;
-														this.textIntro.scale.set(0.0025, 0.0025, 0.0025);
-												}
+												// Texts
+
+												this.textsGeometry = bmfontGeometry({
+
+														font: font,
+														align: 'center'
+
+												});
+
+												this.textsGeometry.update('Pietro');
+
+												this.textsMaterial = new THREE.RawShaderMaterial(sdfShader({
+
+														map: texture,
+														side: THREE.DoubleSide,
+														transparent: true,
+														color: 'rgb(0, 0, 0)'
+
+												}));
+
+												this.texts = new THREE.Mesh(this.textsGeometry, this.textsMaterial);
+												this.texts.rotation.x = Math.PI;
+												this.texts.renderOrder = 3;
+												// this.texts.scale.set ( 0.0025, 0.0025, 0.0025 );
+												this.infoScene.add(this.texts);
+
+												this.render();
 										}.bind(this));
 								}
 						}.bind(this));
@@ -6921,18 +8030,11 @@ var LevelCore = exports.LevelCore = function () {
 
 										},
 
-										scan: {
-
-												name: 'player',
-												transparent: true,
-												textureUrl: './resources/textures/generic_circle_sdf.png',
-												uniforms: {}
-
-										},
+										scan: null,
 
 										infos: {
 
-												name: 'player',
+												name: 'playerInfo',
 												transparent: true,
 												textureUrl: './resources/textures/generic_circle_sdf.png',
 												uniforms: {}
@@ -6961,7 +8063,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Build a base grid to draw infos.
 
-						this.baseGridX = 9;
+						this.baseGridX = 7;
 						this.baseGridY = 20;
 
 						var gridGeometry = new THREE.PlaneBufferGeometry(this.getWorldRight() * 2.0, this.getWorldTop() * 2.0, this.baseGridX - 1, this.baseGridY - 1);
@@ -6973,7 +8075,7 @@ var LevelCore = exports.LevelCore = function () {
 						});
 
 						var gridDebug = new THREE.Mesh(gridGeometry, gridMaterialDebug);
-						this.infoScene.add(gridDebug);
+						// this.infoScene.add ( gridDebug );
 						this.baseGrid = gridGeometry.attributes.position.array;
 
 						// Add lines
@@ -7014,6 +8116,23 @@ var LevelCore = exports.LevelCore = function () {
 								this.lines = new THREE.Mesh(this.linesGeometry, m);
 								this.lines.renderOrder = 2;
 								this.infoScene.add(this.lines);
+
+								// Render all once when oll is loaded.
+
+								setTimeout(function () {
+
+										this.update(); // force update.
+
+										this.renderer.clearDepth();
+										this.renderer.clear();
+
+										this.renderer.render(this.mainScene, this.mainCamera);
+										this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+										this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
+
+										this.renderer.clearDepth();
+										this.renderer.render(this.screensScene, this.mainCamera);
+								}.bind(this), 0);
 						}.bind(this));
 				}
 		}, {
@@ -7604,6 +8723,11 @@ var LevelCore = exports.LevelCore = function () {
 												mainInfoPointIndex = this.gameElements[element].mainInfoPointIndex;
 										}
 
+										// Create or overide an object to store where the text should be located
+
+										this.gameElements[element].textPoints = {};
+										var pointObjectIndex = 0;
+
 										var instances = this.gameElements[element].instances;
 
 										for (var i = 0; i < maxInstancesNum; i++) {
@@ -7620,27 +8744,51 @@ var LevelCore = exports.LevelCore = function () {
 
 														if (mainInfoPointIndex !== undefined && infoPointIndex === undefined) {
 
-																var numPerPoint = Math.floor(this.baseGridY / instances.length);
+																var numPerPoint = Math.floor(this.baseGridX / instances.length);
+																var attachedInstances = [];
 
-																for (var j = 0; j < this.baseGridY; j++) {
+																for (var j = 0; j < this.baseGridX; j++) {
 
-																		var index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
-																		var point = [this.baseGrid[index + 0], this.baseGrid[index + 1]];
+																		// let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
+																		var fI = j;
+
+																		if (fI == 0) fI = 1;
+
+																		var _index = fI * 3 + this.baseGridX * 3 * mainInfoPointIndex;
+																		var point = [this.baseGrid[_index + 0], this.baseGrid[_index + 1]];
+
 																		var dY = Math.abs(iPos2[1] - point[1]);
+																		var dX = Math.abs(iPos2[0] - point[0]);
 
-																		if (dY < this.getWorldTop() / (this.baseGridY - 1.0)) {
+																		// if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
+
+																		// 	tPos2 = point;
+																		// 	if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
+																		// 	this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
+																		// 	break;
+
+																		// }
+
+																		if (dX < this.getWorldRight() / (this.baseGridX - 1.0)) {
 
 																				tPos2 = point;
+																				if (!this.gameElements[element].textPoints[j]) this.gameElements[element].textPoints[j] = { point: point, instances: [] };
+																				this.gameElements[element].textPoints[j].instances.push(instances[i]);
 																				break;
 																		}
 																}
 														} else if (infoPointIndex !== undefined) {
 
-																var _index = infoPointIndex * 3;
-																tPos2 = [this.baseGrid[_index + 0], this.baseGrid[_index + 1]];
+																var _index2 = infoPointIndex * 3;
+																tPos2 = [this.baseGrid[_index2 + 0], this.baseGrid[_index2 + 1]];
+
+																if (!this.gameElements[element].textPoints[i]) this.gameElements[element].textPoints[_index2] = { point: tPos2, instances: [] };
+																this.gameElements[element].textPoints[_index2].instances.push(instances[i]);
 														} else {
 
-																tPos2 = [this.baseGrid[infoPointIndex * 3 + 0], this.baseGrid[infoPointIndex * 3 + 1]];
+																tPos2 = [this.baseGrid[0 * 3 + 0], this.baseGrid[0 * 3 + 1]];
+																if (!this.gameElements[element].textPoints[i]) this.gameElements[element].textPoints[index] = { point: tPos2, instances: [] };
+																this.gameElements[element].textPoints[0].instances.push(instances[0]);
 														}
 
 														var dir = [(iPos2[0] - tPos2[0]) * 0.5, (iPos2[1] - tPos2[1]) * 0.5];
@@ -8078,6 +9226,7 @@ var LevelCore = exports.LevelCore = function () {
 								console.log('\n*** Level loaded ***\n ');
 
 								this.levelLoaded = true;
+
 								if (this.onLoadCallback) {
 
 										for (var i = 0; i < this.onLoadCallback.length; i++) {
@@ -8096,9 +9245,9 @@ var LevelCore = exports.LevelCore = function () {
 				}
 		}, {
 				key: 'update',
-				value: function update() {
+				value: function update(_deltaTime, _forceUpdate) {
 
-						if (!this.levelLoaded) return;
+						if (!this.levelLoaded && !_forceUpdate) return;
 
 						// Update the screens.
 
@@ -8106,8 +9255,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (this.scanScreen.position.x <= 0.5) this.scanScreenOpened = true;else this.scanScreenOpened = false;
 
-						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.2;
-						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.2;
+						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.1;
+						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.1;
 						this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight();
 						this.scanScreenButton.position.y = this.scanScreen.position.y;
 
@@ -8115,8 +9264,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (this.infoScreen.position.x >= -0.5) this.infoScreenOpened = true;else this.infoScreenOpened = false;
 
-						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.2;
-						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.2;
+						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.1;
+						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.1;
 						this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight();
 						this.infoScreenButton.position.y = this.infoScreen.position.y;
 
@@ -8138,7 +9287,7 @@ var LevelCore = exports.LevelCore = function () {
 
 														if (!instance.isDead()) {
 
-																instance.update();
+																instance.update(_deltaTime);
 
 																for (var j = 0; j < element.meshes.length; j++) {
 
@@ -8164,7 +9313,7 @@ var LevelCore = exports.LevelCore = function () {
 
 																if (!_instances4[_i5].isDead()) {
 
-																		_instances4[_i5].update();
+																		_instances4[_i5].update(_deltaTime);
 
 																		for (var _j11 = 0; _j11 < 4; _j11++) {
 
@@ -8224,7 +9373,7 @@ var LevelCore = exports.LevelCore = function () {
 
 										for (var _i6 = 0; _i6 < _instances5.length; _i6++) {
 
-												_instances5[_i6].update();
+												_instances5[_i6].update(_deltaTime);
 										}
 								}
 						}
@@ -8235,6 +9384,8 @@ var LevelCore = exports.LevelCore = function () {
 						if (this.textIntro) this.textIntro.material.uniforms.opacity.value += (this.textIntro.material.alphaTarget - this.textIntro.material.uniforms.opacity.value) * 0.1;
 
 						// Update lines
+
+						if (this.infoScreenClosed) return;
 
 						var linesData = this.getLinesData();
 
@@ -8256,6 +9407,16 @@ var LevelCore = exports.LevelCore = function () {
 		}, {
 				key: 'removeTextIntro',
 				value: function removeTextIntro() {
+
+						setTimeout(function () {
+
+								this.infoScreenTargetPosition.x = this.getWorldLeft() * 2;
+						}.bind(this), 1000);
+
+						setTimeout(function () {
+
+								this.scanScreenTargetPosition.x = this.getWorldRight() * 2;
+						}.bind(this), 1800);
 
 						if (this.textIntro) this.textIntro.material.alphaTarget = 0;
 						if (this.textBackground) this.textBackground.material.alphaTarget = 0;
@@ -8335,27 +9496,24 @@ var LevelCore = exports.LevelCore = function () {
 						this.renderer.clearDepth();
 						this.renderer.clear();
 
-						// if ( !this.scanScreenOpened && !this.infoScreenOpened ) {
+						if (!this.scanScreenOpened && !this.infoScreenOpened) {
 
-						this.renderer.render(this.mainScene, this.mainCamera);
-
-						// }
+								this.renderer.render(this.mainScene, this.mainCamera);
+						}
 
 						// Render to scan target
 
-						// if ( !this.scanScreenClosed && !this.infoScreenOpened ) {
+						if (!this.scanScreenClosed && !this.infoScreenOpened) {
 
-						this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
-
-						// }
+								this.renderer.render(this.scanScene, this.mainCamera, this.scanSceneRenderTarget);
+						}
 
 						// Render to info target
 
-						// if ( !this.infoScreenClosed ) {
+						if (!this.infoScreenClosed) {
 
-						this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
-
-						// }
+								this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
+						}
 
 						this.renderer.clearDepth();
 						this.renderer.render(this.screensScene, this.mainCamera);
@@ -8393,7 +9551,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":68,"./library":62,"./shaderHelper":63,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":24,"polyline-normals":33,"three-bmfont-text":35,"three-bmfont-text/shaders/msdf":38,"three-bmfont-text/shaders/sdf":39,"three-line-2d":41,"three-line-2d/shaders/basic":42}],56:[function(require,module,exports){
+},{"../utils":74,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8421,7 +9579,7 @@ var Obstacle = exports.Obstacle = function (_PhysicalElement) {
 	return Obstacle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],57:[function(require,module,exports){
+},{"./PhysicalElement":64}],63:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8472,7 +9630,7 @@ var Particle = exports.Particle = function (_PhysicalElement) {
 		return Particle;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],58:[function(require,module,exports){
+},{"./PhysicalElement":64}],64:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8525,14 +9683,17 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 		}
 	}, {
 		key: "update",
-		value: function update() {
+		value: function update(_deltaTime) {
 
 			_get(PhysicalElement.prototype.__proto__ || Object.getPrototypeOf(PhysicalElement.prototype), "update", this).call(this);
 
+			_deltaTime = _deltaTime || 16.0;
+
 			if (!this.enabled) return;
 
-			// this.acceleration = this.mulScal ( this.acceleration, this.deltaTime / 16 );
+			// this.acceleration = this.mulScal ( this.acceleration, _deltaTime );
 			this.velocity = this.add(this.velocity, this.acceleration);
+			this.velocity = this.mulScal(this.velocity, _deltaTime * 0.063);
 			this.velocity = this.mulScal(this.velocity, this.drag);
 
 			if (this.len(this.velocity) > this.maxSpeed) {
@@ -8598,7 +9759,7 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 	return PhysicalElement;
 }(_ElementCore2.ElementCore);
 
-},{"./ElementCore":52}],59:[function(require,module,exports){
+},{"./ElementCore":58}],65:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8664,7 +9825,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 		return Planet;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"../utils":68,"./PhysicalElement":58}],60:[function(require,module,exports){
+},{"../utils":74,"./PhysicalElement":64}],66:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8707,7 +9868,6 @@ var Player = exports.Player = function (_PhysicalElement) {
 
 						// console.log(obj);
 
-
 						this.scale[1] = this.length + vec3.length(this.velocity) * 1;
 						this.rotation[2] = Math.atan2(this.velocity[1], this.velocity[0]) - Math.PI * 0.5;
 				}
@@ -8716,7 +9876,7 @@ var Player = exports.Player = function (_PhysicalElement) {
 		return Player;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],61:[function(require,module,exports){
+},{"./PhysicalElement":64}],67:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -8783,7 +9943,7 @@ var Text = exports.Text = function (_PhysicalElement) {
 		return Text;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"./PhysicalElement":58}],62:[function(require,module,exports){
+},{"./PhysicalElement":64}],68:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -8822,286 +9982,286 @@ var library = {
 
 exports.library = library;
 
-},{"./BlackMatter":48,"./ElectricParticle":50,"./ElectricPlanetParticle":51,"./Obstacle":56,"./Particle":57,"./PhysicalElement":58,"./Planet":59,"./Player":60}],63:[function(require,module,exports){
+},{"./BlackMatter":54,"./ElectricParticle":56,"./ElectricPlanetParticle":57,"./Obstacle":62,"./Particle":63,"./PhysicalElement":64,"./Planet":65,"./Player":66}],69:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-			value: true
+				value: true
 });
 var shaderHelper = {
 
-			test: {
+				test: {
 
-						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			solidQuad: {
+				solidQuad: {
 
-						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = solidColor;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = solidColor;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			simpleTexture: {
+				simpleTexture: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			coloredTexture: {
+				coloredTexture: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * solidColor;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * solidColor;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			player: {
+				player: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			playerInfo: {
+				playerInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 0.35;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.1, abs ( sdfDist - t ) );\n\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat t = 0.80;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );\n\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			playerParticles: {
+				playerParticles: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.92, 0.92, 0.92, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.4, 1.0, sdfDist ) * 0.08;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.92, 0.92, 0.92, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.4, 1.0, sdfDist ) * 0.08;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			// Gravity
+				// Gravity
 
-			blackMatter: {
+				blackMatter: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat a = ( 1.0 - f_Color.a ) * 0.1;\n\t\t\t\tgl_FragColor = vec4 ( 0.91 + a, 0.91 + a, 0.91 + a, 1.0 );\n\t\t\t\tgl_FragColor.a = 1.0;\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.95, 0.99, sdfDist );\n\n\n\n\t\t\t\t// gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			blackMatterScan: {
+				blackMatterScan: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			blackMatterInfo: {
+				blackMatterInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b * ( f_Scale);\n\n\t\t\t\tfloat w = 0.05;\n\t\t\t\tfloat t = f_Scale - 0.1 - w;\n\t\t\t\tfloat maxTargetCenter = 0.02 / f_Scale;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.5, 0.5, 0.5, 1.0 );\n\t\t\t\tgl_FragColor.rgb *= 1.0 - smoothstep ( w, w - 0.03, abs ( sdfDist - t ) );\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.1, f_Scale - 0.15, sdfDist ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.22 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.98 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			planet: {
+				planet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			scanPlanet: {
+				scanPlanet: {
 
-						vertex: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.05, f_Scale - 0.08, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.05, f_Scale - 0.08, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			infoPlanet: {
+				infoPlanet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			smoke: {
+				smoke: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.0, cDist );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.0, cDist );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			screen: {
+				screen: {
 
-						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			screenButton: {
+				screenButton: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			testDerivative: {
+				testDerivative: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\n\n\t\t\t\tfloat val = abs ( fract ( ( 1.0 - cDist ) * 20.0 ) - 0.5 ) * 2.0;\n\n\n\t\t\t\tfloat f = fwidth ( val );\n\n\t\t\t\tgl_FragColor.rgb *= smoothstep ( 0.99 * f * 1.5, 0.85 * f * 1.5, val );\n\n\n\t\t\t\t// gl_FragColor = vec4 ( f_Uv.x, f_Uv.y, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\n\n\t\t\t\tfloat val = abs ( fract ( ( 1.0 - cDist ) * 20.0 ) - 0.5 ) * 2.0;\n\n\n\t\t\t\tfloat f = fwidth ( val );\n\n\t\t\t\tgl_FragColor.rgb *= smoothstep ( 0.99 * f * 1.5, 0.85 * f * 1.5, val );\n\n\n\t\t\t\t// gl_FragColor = vec4 ( f_Uv.x, f_Uv.y, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			// Electric
+				// Electric
 
-			electricCharge: {
+				electricCharge: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			electricChargeScan: {
+				electricChargeScan: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			electricChargeInfo: {
+				electricChargeInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			equipotentialLines: {
+				equipotentialLines: {
 
-						vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			obstacle: {
+				obstacle: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			obstacleScan: {
+				obstacleScan: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.7 );\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( f_Scale.x - 0.015, f_Scale.x - 0.000, x ) + smoothstep ( f_Scale.y - 0.015, f_Scale.y - 0.000, y );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.7 );\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( f_Scale.x - 0.015, f_Scale.x - 0.000, x ) + smoothstep ( f_Scale.y - 0.015, f_Scale.y - 0.000, y );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			obstacleInfo: {
+				obstacleInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\tgl_FragColor.a += smoothstep ( f_Scale.x - 0.020, f_Scale.x - 0.01, x ) + smoothstep ( f_Scale.y - 0.020, f_Scale.y - 0.01, y );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\tgl_FragColor.a += smoothstep ( f_Scale.x - 0.020, f_Scale.x - 0.01, x ) + smoothstep ( f_Scale.y - 0.020, f_Scale.y - 0.01, y );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			// Gravity Electric
+				// Gravity Electric
 
-			electricPlanet: {
+				electricPlanet: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			electricParticlePlanetScan: {
+				electricParticlePlanetScan: {
 
-						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.3 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.3 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			electricParticlePlanetInfo: {
+				electricParticlePlanetInfo: {
 
-						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\tf_Sign = sign ( transform.z );\n\n\t\t\t\tif ( sign ( rgbaColor.a ) >= 0.0 ) f_Zero = 1.0;\n\t\t\t\telse f_Zero = 0.0;\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\tf_Sign = sign ( transform.z );\n\n\t\t\t\tif ( sign ( rgbaColor.a ) >= 0.0 ) f_Zero = 1.0;\n\t\t\t\telse f_Zero = 0.0;\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 1.6 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.08;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 1.6 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.08;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-			},
+				},
 
-			// General
+				// General
 
-			grid: {
+				grid: {
 
-						vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 108;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z, 2.0 );\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 108;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z, 2.0 );\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform float gridSubdivisions;\n\t\t\tuniform float mainAlpha;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 ) * mainAlpha;\n\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
+								fragment: "\n\t\t\tuniform float gridSubdivisions;\n\t\t\tuniform float mainAlpha;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 ) * mainAlpha;\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
 
-			indicator: {
+				indicator: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
 
-			arrival: {
+				arrival: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( 0.79, 0.8, cDist ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( 0.79, 0.8, cDist ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
 
-			departure: {
+				departure: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;\n\t\t\t\t// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;\n\t\t\t\t// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
 
-			sdfFont: {
+				sdfFont: {
 
-						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-			},
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
 
-			line: {
+				line: {
 
-						vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
+								vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
+								fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
 
-			}
+				}
 
 };
 
 exports.shaderHelper = shaderHelper;
 
-},{}],64:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9188,20 +10348,20 @@ var GameManager = exports.GameManager = function () {
 		}
 	}, {
 		key: "update",
-		value: function update() {
+		value: function update(_deltaTime) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.update();
+				this.currentLevel.update(_deltaTime);
 			}
 		}
 	}, {
 		key: "render",
-		value: function render() {
+		value: function render(_deltaTime) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.render();
+				this.currentLevel.render(_deltaTime);
 			}
 		}
 	}, {
@@ -9288,7 +10448,7 @@ var GameManager = exports.GameManager = function () {
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":49,"./GameElements/GravityElectricLevel":53,"./GameElements/GravityLevel":54,"./utils":68}],65:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":55,"./GameElements/GravityElectricLevel":59,"./GameElements/GravityLevel":60,"./utils":74}],71:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -9298,6 +10458,10 @@ var _GameManager = require("./GameManager");
 var _utils = require("./utils");
 
 var _levels = require("./levels");
+
+// Loop utility
+
+var loop = require('raf-loop');
 
 (function () {
 
@@ -9433,7 +10597,7 @@ var _levels = require("./levels");
 
 				var stats = new Stats();
 				stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-				document.body.appendChild(stats.dom);
+				// document.body.appendChild( stats.dom );
 
 				// Events
 
@@ -9531,48 +10695,74 @@ var _levels = require("./levels");
 
 				// Debug
 
-				gameManager.startLevel(_levels.levels['gravity'][0], function () {
+				// gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
 
-						menu.classList.add('hidden');
-						activePage.classList.remove('active');
+				// 	setTimeout ( function () {
+
+				// 		menu.classList.add ( 'hidden' );
+				// 		activePage.classList.remove ( 'active' );
+
+				// 	}, 200 );
+
+				// } );
+
+				// gameManager.startLevel ( levels[ 'electric' ][ 3 ], function () {
+
+				// 	setTimeout ( function () {
+
+				// 		menu.classList.add ( 'hidden' );
+				// 		activePage.classList.remove ( 'active' );
+
+				// 	}, 200 );
+
+				// } );
+
+				gameManager.startLevel(_levels.levels['gravityElectric'][0], function () {
+
+						setTimeout(function () {
+
+								menu.classList.add('hidden');
+								activePage.classList.remove('active');
+						}, 200);
 				});
 				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
 				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
 
-				function update() {
+				function update(_deltaTime) {
 
-						gameManager.update();
+						gameManager.update(_deltaTime);
 				}
 
-				function render() {
+				function render(_deltaTime) {
 
-						gameManager.render();
+						gameManager.render(_deltaTime);
 				}
 
-				function mainLoop() {
+				var mainLoop = loop(function (deltaTime) {
 
 						stats.begin();
 
-						update();
-						render();
+						update(deltaTime);
+						render(deltaTime);
 
 						stats.end();
-
-						requestAnimationFrame(mainLoop);
-				}
-
-				requestAnimationFrame(mainLoop);
+				}).start();
 		}
 
 		init();
 })();
 
-},{"./GameManager":64,"./levels":66,"./resourcesList":67,"./utils":68}],66:[function(require,module,exports){
+},{"./GameManager":70,"./levels":72,"./resourcesList":73,"./utils":74,"raf-loop":38}],72:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
 						value: true
 });
+
+var _fixedCharges, _fixedCharges2, _fixedCharges3, _fixedCharges4;
+
+function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
+
 var levels = {
 
 						gravity: {
@@ -9592,7 +10782,8 @@ var levels = {
 																														renderOrder: 1,
 																														buildFromInstances: true,
 																														drawInfos: true,
-																														maxInstancesNum: 4,
+																														maxInstancesNum: 3,
+																														textAlign: 'bottom',
 
 																														shaders: {
 
@@ -9632,11 +10823,11 @@ var levels = {
 
 																																				0: {
 
-																																										infoPointIndex: 3 * 9 + 1,
+																																										infoPointIndex: 16 * 7 + 3,
 																																										enabled: true,
 																																										position: [-2, 0, 0],
 																																										radius: 4,
-																																										mass: 1000000,
+																																										mass: 500000,
 																																										scale: [1.8, 1.8, 1.8],
 																																										color: [255 / 255, 222 / 255, 40 / 255, 1],
 																																										rotation: [0, 0, 0]
@@ -9657,7 +10848,7 @@ var levels = {
 																														maxInstancesNum: 108,
 																														renderOrder: 3,
 																														drawInfos: true,
-																														mainInfoPointIndex: 7, // 0 - 8
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -9666,6 +10857,7 @@ var levels = {
 																																				normal: {
 
 																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -9713,7 +10905,9 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														renderOrder: 1,
+																														buildFromInstances: true,
 																														drawInfos: true,
+																														maxInstancesNum: 3,
 
 																														shaders: {
 
@@ -9752,6 +10946,7 @@ var levels = {
 
 																																				1: {
 
+																																										infoPointIndex: 16 * 7 + 5,
 																																										position: [1.8, 0, 0],
 																																										radius: 2,
 																																										mass: 10000,
@@ -9762,6 +10957,7 @@ var levels = {
 
 																																				2: {
 
+																																										infoPointIndex: 16 * 7 + 3,
 																																										position: [-1.5, 1.5, 0],
 																																										radius: 2,
 																																										mass: 1000000,
@@ -9772,6 +10968,7 @@ var levels = {
 
 																																				3: {
 
+																																										infoPointIndex: 16 * 7 + 1,
 																																										position: [-1.8, -1.8, 0],
 																																										radius: 2,
 																																										mass: 100000,
@@ -9791,7 +10988,10 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														individual: false,
-																														maxInstancesNum: 400,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -9800,6 +11000,7 @@ var levels = {
 																																				normal: {
 
 																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
 																																										// blending: 'MultiplyBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -9848,6 +11049,9 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
 
 																														shaders: {
 
@@ -9886,6 +11090,7 @@ var levels = {
 
 																																				0: {
 
+																																										infoPointIndex: 16 * 7 + 3,
 																																										position: [0, 0, 0],
 																																										radius: 2,
 																																										mass: 10000,
@@ -9896,6 +11101,7 @@ var levels = {
 
 																																				1: {
 
+																																										infoPointIndex: 16 * 7 + 5,
 																																										position: [1.8, -1.8, 0],
 																																										radius: 2,
 																																										mass: 500000,
@@ -9906,6 +11112,7 @@ var levels = {
 
 																																				2: {
 
+																																										infoPointIndex: 16 * 7 + 1,
 																																										position: [-1.8, 1.8, 0],
 																																										radius: 2,
 																																										mass: 500000,
@@ -9925,7 +11132,10 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														individual: false,
-																														maxInstancesNum: 400,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -9934,6 +11144,7 @@ var levels = {
 																																				normal: {
 
 																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
 																																										// blending: 'MultiplyBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -9982,6 +11193,9 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
 
 																														shaders: {
 
@@ -10020,6 +11234,7 @@ var levels = {
 
 																																				0: {
 
+																																										infoPointIndex: 16 * 7 + 1,
 																																										position: [-2.0, 0, 0],
 																																										radius: 2,
 																																										mass: 600000,
@@ -10030,6 +11245,7 @@ var levels = {
 
 																																				1: {
 
+																																										infoPointIndex: 16 * 7 + 5,
 																																										position: [0.5, 0, 0],
 																																										radius: 2,
 																																										mass: 50000,
@@ -10049,7 +11265,10 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														individual: false,
-																														maxInstancesNum: 400,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -10058,6 +11277,7 @@ var levels = {
 																																				normal: {
 
 																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
 																																										// blending: 'MultiplyBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -10105,6 +11325,10 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
 
 																														shaders: {
 
@@ -10143,33 +11367,36 @@ var levels = {
 
 																																				0: {
 
+																																										infoPointIndex: 16 * 7 + 3,
 																																										position: [0, -1.0, 0],
 																																										radius: 2,
 																																										mass: 400000,
 																																										scale: [0.9, 0.9, 0.9],
 																																										color: [150 / 255, 150 / 255, 150 / 255, 1]
 
+																																				},
+
+																																				1: {
+
+																																										infoPointIndex: 16 * 7 + 5,
+																																										position: [1.5, 1.5, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [0.6, 0.6, 0.6],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
+
+																																				},
+
+																																				2: {
+
+																																										infoPointIndex: 16 * 7 + 1,
+																																										position: [-1.5, 1.5, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [0.6, 0.6, 0.6],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
+
 																																				}
-
-																																				// 1: {
-
-																																				//     position: [ 1.5, 1.5, 0 ],
-																																				//     radius: 2,
-																																				//     mass: 100000,
-																																				//     scale: [ 0.6, 0.6, 0.6 ],
-																																				//     color: [ 255/255, 222/255, 40/255, 1 ],
-
-																																				// },
-
-																																				// 2: {
-
-																																				//     position: [ -1.5, 1.5, 0 ],
-																																				//     radius: 2,
-																																				//     mass: 100000,
-																																				//     scale: [ 0.6, 0.6, 0.6 ],
-																																				//     color: [ 255/255, 222/255, 40/255, 1 ],
-
-																																				// },
 
 																														}
 
@@ -10182,7 +11409,10 @@ var levels = {
 																														manualMode: false,
 																														transparent: true,
 																														individual: false,
-																														maxInstancesNum: 400,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -10191,6 +11421,7 @@ var levels = {
 																																				normal: {
 
 																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
 																																										// blending: 'MultiplyBlending',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -10237,13 +11468,89 @@ var levels = {
 
 																		elements: {
 
-																								fixedCharges: {
+																								fixedCharges: (_fixedCharges = {
 
 																														elementType: 'ElectricParticle',
-																														static: true,
+																														static: false,
 																														manualMode: false,
 																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
 																														renderOrder: 2,
+																														drawInfos: true
+																								}, _defineProperty(_fixedCharges, 'maxInstancesNum', 3), _defineProperty(_fixedCharges, 'textAlign', 'bottom'), _defineProperty(_fixedCharges, 'shaders', {
+
+																														main: null,
+
+																														normal: {
+
+																																				name: 'electricCharge',
+																																				blending: 'MultiplyBlending',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														scan: {
+
+																																				name: 'electricChargeScan',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														infos: {
+
+																																				name: 'electricChargeInfo',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														}
+
+																								}), _defineProperty(_fixedCharges, 'instances', {
+
+																														0: {
+
+																																				infoPointIndex: 16 * 7 + 1,
+																																				enabled: true,
+																																				position: [-2, -2, 0],
+																																				radius: 0,
+																																				targetRadius: 0.5,
+																																				sign: -1,
+																																				mass: 500000,
+																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+
+																														},
+
+																														1: {
+
+																																				infoPointIndex: 16 * 7 + 3,
+																																				enabled: true,
+																																				position: [-2, 2, 0],
+																																				radius: 0,
+																																				targetRadius: 0.5,
+																																				sign: -1,
+																																				mass: 500000,
+																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+
+																														}
+
+																								}), _fixedCharges),
+
+																								charges: {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -10253,6 +11560,7 @@ var levels = {
 
 																																										name: 'electricCharge',
 																																										transparent: true,
+																																										blending: 'MultiplyBlending',
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
 
@@ -10282,6 +11590,123 @@ var levels = {
 
 																								},
 
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												1: {
+
+																		chapter: 'electric',
+																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+																		elements: {
+
+																								fixedCharges: (_fixedCharges2 = {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 1,
+																														renderOrder: 2,
+																														drawInfos: true
+																								}, _defineProperty(_fixedCharges2, 'maxInstancesNum', 3), _defineProperty(_fixedCharges2, 'textAlign', 'bottom'), _defineProperty(_fixedCharges2, 'shaders', {
+
+																														main: null,
+
+																														normal: {
+
+																																				name: 'electricCharge',
+																																				blending: 'MultiplyBlending',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														scan: {
+
+																																				name: 'electricChargeScan',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														infos: {
+
+																																				name: 'electricChargeInfo',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														}
+
+																								}), _defineProperty(_fixedCharges2, 'instances', {
+
+																														0: {
+
+																																				infoPointIndex: 16 * 7 + 3,
+																																				enabled: true,
+																																				position: [0, 0, 0],
+																																				radius: 0,
+																																				targetRadius: 0.6,
+																																				sign: 1,
+																																				mass: 500000,
+																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+
+																														}
+
+																								}), _fixedCharges2),
+
 																								charges: {
 
 																														elementType: 'ElectricParticle',
@@ -10290,7 +11715,154 @@ var levels = {
 																														transparent: true,
 																														individual: false,
 																														maxInstancesNum: 20,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										transparent: true,
+																																										blending: 'MultiplyBlending',
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricChargeScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricChargeInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
 																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: null,
+
+																																				infos: null
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												2: {
+
+																		chapter: 'electric',
+																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+																		elements: {
+
+																								fixedCharges: {
+
+																														elementType: 'ElectricParticle',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 1,
+																														textAlign: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: null,
+
+																																				infos: null
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										infoPointIndex: 19 * 7 + 3,
+																																										hack: true,
+																																										position: [-100, -100, 0.0],
+																																										radius: 2,
+																																										mass: 0,
+																																										scale: [1.0, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -10403,27 +11975,396 @@ var levels = {
 
 																		}
 
+												},
+
+												3: {
+
+																		chapter: 'electric',
+																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+																		elements: {
+
+																								fixedCharges: (_fixedCharges3 = {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 1,
+																														renderOrder: 2,
+																														drawInfos: true
+																								}, _defineProperty(_fixedCharges3, 'maxInstancesNum', 3), _defineProperty(_fixedCharges3, 'textAlign', 'bottom'), _defineProperty(_fixedCharges3, 'shaders', {
+
+																														main: null,
+
+																														normal: {
+
+																																				name: 'electricCharge',
+																																				blending: 'MultiplyBlending',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														scan: {
+
+																																				name: 'electricChargeScan',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														infos: {
+
+																																				name: 'electricChargeInfo',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														}
+																								}), _defineProperty(_fixedCharges3, 'instances', {
+
+																														0: {
+
+																																				infoPointIndex: 16 * 7 + 3,
+																																				enabled: true,
+																																				position: [0, 0, 0],
+																																				radius: 0,
+																																				targetRadius: 0.6,
+																																				sign: -1,
+																																				mass: 500000,
+																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+
+																														}
+
+																								}), _fixedCharges3),
+
+																								charges: {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										transparent: true,
+																																										blending: 'MultiplyBlending',
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricChargeScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricChargeInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 4,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [0, -1, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.0, 0.12, 0.1],
+																																										rotation: [0, 0, 0],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [0, 1, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [0.5, 0.12, 0.6],
+																																										rotation: [0, 0, 0],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
+												},
+
+												4: {
+
+																		chapter: 'electric',
+																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+																		elements: {
+
+																								charges: {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 20,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										transparent: true,
+																																										blending: 'MultiplyBlending',
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricChargeScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricChargeInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								fixedCharges: (_fixedCharges4 = {
+
+																														elementType: 'ElectricParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 1,
+																														renderOrder: 2,
+																														drawInfos: true
+																								}, _defineProperty(_fixedCharges4, 'maxInstancesNum', 1), _defineProperty(_fixedCharges4, 'textAlign', 'bottom'), _defineProperty(_fixedCharges4, 'shaders', {
+
+																														main: null,
+
+																														normal: {
+
+																																				name: 'electricCharge',
+																																				blending: 'MultiplyBlending',
+																																				transparent: true,
+																																				textureUrl: './resources/textures/generic_circle_sdf.png',
+																																				uniforms: {}
+
+																														},
+
+																														scan: null,
+
+																														infos: null
+																								}), _defineProperty(_fixedCharges4, 'instances', {
+
+																														0: {
+
+																																				hack: true,
+																																				infoPointIndex: 19 * 7 + 3,
+																																				enabled: true,
+																																				position: [-100, -100, 0],
+																																				radius: 0,
+																																				targetRadius: 0.6,
+																																				sign: -1,
+																																				mass: 0,
+																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+
+																														}
+
+																								}), _fixedCharges4),
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 4,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [2, -2, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [2.0, 0.12, 0.1],
+																																										rotation: [0, 0, 0],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [2, 2, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [2.0, 0.12, 0.6],
+																																										rotation: [0, 0, 0],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				3: {
+
+																																										position: [-2, -2, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [2.5, 0.12, 0.6],
+																																										rotation: [0, 0, Math.PI * 0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				4: {
+
+																																										position: [-2, 2, 0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [2.5, 0.12, 0.6],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
 												}
-
-												// 1: {
-
-
-												// },
-
-												// 2: {
-
-
-												// },
-
-												// 3: {
-
-
-												// },
-
-												// 4: {
-
-
-												// },
 
 						},
 
@@ -10442,8 +12383,11 @@ var levels = {
 																														static: true,
 																														manualMode: false,
 																														transparent: true,
-																														enableUpdate: true,
-																														renderOrder: 2,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
+																														textAlign: 'bottom',
 
 																														shaders: {
 
@@ -10480,18 +12424,22 @@ var levels = {
 
 																														instances: {
 
-																																				0: {
+																																				// 0: {
 
-																																										position: [-2, 0, 0],
-																																										radius: 4,
-																																										mass: 1000000,
-																																										scale: [1.8, 1.8, 1.8],
-																																										color: [0.7, 0.7, 0.7, 1]
+																																				// 	infoPointIndex: 16 * 7 + 2,
+																																				// 	particles: [ 1, 3, 6, 12 ],
+																																				//                       position: [ -2, 0, 0 ],
+																																				//                       radius: 4,
+																																				//                       mass: 1000000,
+																																				//                       scale: [ 1.8, 1.8, 1.8 ],
+																																				//                       color: [ 0.7, 0.7, 0.7, 1 ],
 
-																																				},
+																																				//                   },
 
 																																				1: {
 
+																																										infoPointIndex: 16 * 7 + 4,
+																																										particles: [1, 3, 6, 12],
 																																										position: [2, 0, 0],
 																																										radius: 3.5,
 																																										mass: 100000,
@@ -10582,7 +12530,7 @@ var levels = {
 
 exports.levels = levels;
 
-},{}],67:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -10629,7 +12577,7 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],68:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -10875,4 +12823,4 @@ function clone(obj) {
     throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
-},{}]},{},[65]);
+},{}]},{},[71]);

@@ -182,11 +182,10 @@ let shaderHelper = {
 				vec4 sdf = texture2D ( texture, f_Uv );
 				float sdfDist = sdf.x * sdf.y * sdf.z;
 
-				float w = 0.15;
-				float t = 0.35;
+				float t = 0.80;
 
 				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );
-				gl_FragColor.a *= smoothstep ( w, w - 0.1, abs ( sdfDist - t ) );
+				gl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );
 
 
 			}
@@ -336,8 +335,14 @@ let shaderHelper = {
 				vec4 texture =  texture2D ( texture, f_Uv );
 				float sdfDist = texture.r * texture.g * texture.b;
 
-				gl_FragColor = f_Color;
-				gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );
+				float a = ( 1.0 - f_Color.a ) * 0.1;
+				gl_FragColor = vec4 ( 0.91 + a, 0.91 + a, 0.91 + a, 1.0 );
+				gl_FragColor.a = 1.0;
+				gl_FragColor.rgb += smoothstep ( 0.95, 0.99, sdfDist );
+
+
+
+				// gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );
 
 				// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );
 				// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );
@@ -501,17 +506,19 @@ let shaderHelper = {
 
 			void main () {
 
-				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
-				vec4 texture =  texture2D ( texture, f_Uv );
-				float sdfDist = texture.r * texture.g * texture.b * ( f_Scale);
+				vec4 sdf = texture2D ( texture, f_Uv );
+				float sdfDist = sdf.x * sdf.y * sdf.z;
 
-				float w = 0.05;
-				float t = f_Scale - 0.1 - w;
-				float maxTargetCenter = 0.02 / f_Scale;
+				float w = 0.22 / ( f_Scale + 1.0 );
+				float t = 0.98 - w;
 
-				gl_FragColor = vec4 ( 0.5, 0.5, 0.5, 1.0 );
-				gl_FragColor.rgb *= 1.0 - smoothstep ( w, w - 0.03, abs ( sdfDist - t ) );
-				gl_FragColor.a *= smoothstep ( f_Scale - 0.1, f_Scale - 0.15, sdfDist ) * f_Color.a;
+				// Background
+
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );
+
+				// Outside
+
+				gl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;
 
 			}
 

@@ -17,7 +17,8 @@ let levels = {
 					renderOrder: 1,
 					buildFromInstances: true,
 					drawInfos: true,
-					maxInstancesNum: 4,
+					maxInstancesNum: 3,
+					textAlign: 'bottom',
 
 					shaders: {
 
@@ -58,11 +59,11 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 3 * 9 + 1,
+							infoPointIndex: 16 * 7 + 3,
 							enabled: true,
                             position: [ -2, 0, 0 ],
                             radius: 4,
-                            mass: 1000000,
+                            mass: 500000,
                             scale: [ 1.8, 1.8, 1.8 ],
                             color: [ 255/255, 222/255, 40/255, 1 ],
                             rotation: [ 0, 0, 0 ],
@@ -83,7 +84,7 @@ let levels = {
 					maxInstancesNum: 108,
 					renderOrder: 3,
 					drawInfos: true,
-					mainInfoPointIndex: 7, // 0 - 8
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -92,6 +93,7 @@ let levels = {
 						normal: {
 
 							name: 'blackMatter',
+							blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
@@ -140,7 +142,9 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					renderOrder: 1,
+					buildFromInstances: true,
 					drawInfos: true,
+					maxInstancesNum: 3,
 
 					shaders: {
 
@@ -180,6 +184,7 @@ let levels = {
 
 						1: {
 
+							infoPointIndex: 16 * 7 + 5,
                             position: [ 1.8, 0, 0 ],
                             radius: 2,
                             mass: 10000,
@@ -190,6 +195,7 @@ let levels = {
 
                         2: {
 
+                        	infoPointIndex: 16 * 7 + 3,
                             position: [ -1.5, 1.5, 0 ],
                             radius: 2,
                             mass: 1000000,
@@ -200,6 +206,7 @@ let levels = {
 
                         3: {
 
+                        	infoPointIndex: 16 * 7 + 1,
                             position: [ -1.8, -1.8, 0 ],
                             radius: 2,
                             mass: 100000,
@@ -219,7 +226,10 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					individual: false,
-					maxInstancesNum: 400,
+					maxInstancesNum: 108,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -228,6 +238,7 @@ let levels = {
 						normal: {
 
 							name: 'blackMatter',
+							blending: 'MultiplyBlending',
 							// blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -277,6 +288,9 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 3,
 
 					shaders: {
 
@@ -316,6 +330,7 @@ let levels = {
 
 						0: {
 
+							infoPointIndex: 16 * 7 + 3,
                             position: [ 0, 0, 0 ],
                             radius: 2,
                             mass: 10000,
@@ -326,6 +341,7 @@ let levels = {
 
                         1: {
 
+                        	infoPointIndex: 16 * 7 + 5,
                             position: [ 1.8, -1.8, 0 ],
                             radius: 2,
                             mass: 500000,
@@ -336,6 +352,7 @@ let levels = {
 
                         2: {
 
+                        	infoPointIndex: 16 * 7 + 1,
                             position: [ -1.8, 1.8, 0 ],
                             radius: 2,
                             mass: 500000,
@@ -355,7 +372,10 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					individual: false,
-					maxInstancesNum: 400,
+					maxInstancesNum: 108,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -364,6 +384,7 @@ let levels = {
 						normal: {
 
 							name: 'blackMatter',
+							blending: 'MultiplyBlending',
 							// blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -414,6 +435,9 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 3,
 
 					shaders: {
 
@@ -453,6 +477,7 @@ let levels = {
 
 						0: {
 
+							infoPointIndex: 16 * 7 + 1,
                             position: [ -2.0, 0, 0 ],
                             radius: 2,
                             mass: 600000,
@@ -463,6 +488,7 @@ let levels = {
 
                         1: {
 
+                        	infoPointIndex: 16 * 7 + 5,
                             position: [ 0.5, 0, 0 ],
                             radius: 2,
                             mass: 50000,
@@ -482,7 +508,10 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					individual: false,
-					maxInstancesNum: 400,
+					maxInstancesNum: 108,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -491,6 +520,7 @@ let levels = {
 						normal: {
 
 							name: 'blackMatter',
+							blending: 'MultiplyBlending',
 							// blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -539,6 +569,10 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
+					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 3,
 
 					shaders: {
 
@@ -578,6 +612,7 @@ let levels = {
 
 						0: {
 
+							infoPointIndex: 16 * 7 + 3,
                             position: [ 0, -1.0, 0 ],
                             radius: 2,
                             mass: 400000,
@@ -586,25 +621,27 @@ let levels = {
 
                         },
 
-                        // 1: {
+                        1: {
 
-                        //     position: [ 1.5, 1.5, 0 ],
-                        //     radius: 2,
-                        //     mass: 100000,
-                        //     scale: [ 0.6, 0.6, 0.6 ],
-                        //     color: [ 255/255, 222/255, 40/255, 1 ],
+                        	infoPointIndex: 16 * 7 + 5,
+                            position: [ 1.5, 1.5, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 0.6, 0.6, 0.6 ],
+                            color: [ 255/255, 222/255, 40/255, 1 ],
 
-                        // },
+                        },
 
-                        // 2: {
+                        2: {
 
-                        //     position: [ -1.5, 1.5, 0 ],
-                        //     radius: 2,
-                        //     mass: 100000,
-                        //     scale: [ 0.6, 0.6, 0.6 ],
-                        //     color: [ 255/255, 222/255, 40/255, 1 ],
+                        	infoPointIndex: 16 * 7 + 1,
+                            position: [ -1.5, 1.5, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 0.6, 0.6, 0.6 ],
+                            color: [ 255/255, 222/255, 40/255, 1 ],
 
-                        // },
+                        },
 
 					}
 
@@ -617,7 +654,10 @@ let levels = {
 					manualMode: false,
 					transparent: true,
 					individual: false,
-					maxInstancesNum: 400,
+					maxInstancesNum: 108,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -626,6 +666,7 @@ let levels = {
 						normal: {
 
 							name: 'blackMatter',
+							blending: 'MultiplyBlending',
 							// blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -676,10 +717,94 @@ let levels = {
 				fixedCharges: {
 
 					elementType: 'ElectricParticle',
-					static: true,
+					static: false,
 					manualMode: false,
 					transparent: true,
+					individual: false,
+					maxInstancesNum: 20,
 					renderOrder: 2,
+					drawInfos: true,
+					maxInstancesNum: 3,
+					textAlign: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							blending: 'MultiplyBlending',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {
+
+						0: {
+
+							infoPointIndex: 16 * 7 + 1,
+							enabled: true,
+                            position: [ -2, -2, 0 ],
+                            radius: 0,
+                            targetRadius: 0.5,
+                            sign: -1,
+                            mass: 500000,
+                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+
+                        },
+
+                        1: {
+
+							infoPointIndex: 16 * 7 + 3,
+							enabled: true,
+                            position: [ -2, 2, 0 ],
+                            radius: 0,
+                            targetRadius: 0.5,
+                            sign: -1,
+                            mass: 500000,
+                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+
+                        },
+
+					}
+
+				},
+
+				charges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 20,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -689,6 +814,7 @@ let levels = {
 
 							name: 'electricCharge',
 							transparent: true,
+							blending: 'MultiplyBlending',
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
 
@@ -719,6 +845,132 @@ let levels = {
 
 				},
 
+				obstacles: {
+
+					elementType: 'Obstacle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 2,
+					buildFromInstances: true,
+					renderOrder: 2,
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'obstacle',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'obstacleScan',
+							transparent: true,
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'obstacleInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {}
+
+				},
+
+			}
+
+		},
+
+		1: {
+
+			chapter: 'electric',
+			textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+			elements: {
+
+				fixedCharges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 1,
+					renderOrder: 2,
+					drawInfos: true,
+					maxInstancesNum: 3,
+					textAlign: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							blending: 'MultiplyBlending',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {
+
+						0: {
+
+							infoPointIndex: 16 * 7 + 3,
+							enabled: true,
+                            position: [ 0, 0, 0 ],
+                            radius: 0,
+                            targetRadius: 0.6,
+                            sign: 1,
+                            mass: 500000,
+                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+
+                        },
+
+					}
+
+				},
+
 				charges: {
 
 					elementType: 'ElectricParticle',
@@ -727,7 +979,157 @@ let levels = {
 					transparent: true,
 					individual: false,
 					maxInstancesNum: 20,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							transparent: true,
+							blending: 'MultiplyBlending',
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {}
+
+				},
+
+				obstacles: {
+
+					elementType: 'Obstacle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 2,
+					buildFromInstances: true,
 					renderOrder: 2,
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'obstacle',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: null,
+
+						infos: null,
+
+					},
+
+
+					instances: {}
+
+				},
+
+			}
+
+		},
+
+		2: {
+
+			chapter: 'electric',
+			textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+			elements: {
+
+				fixedCharges: {
+
+					elementType: 'ElectricParticle',
+					static: true,
+					manualMode: false,
+					transparent: true,
+					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 1,
+					textAlign: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: null,
+
+						infos: null,
+
+					},
+
+
+					instances: {
+
+						1: {
+
+							infoPointIndex: 19 * 7 + 3,
+							hack: true,
+                            position: [ -100, -100, 0.0 ],
+                            radius: 2,
+                            mass: 0,
+                            scale: [ 1.0, 0.12, 0.1 ],
+                            rotation: [ 0, 0, Math.PI * -0.25],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+					}
+
+				},
+
+				charges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 20,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -844,25 +1246,413 @@ let levels = {
 
 		},
 
-		// 1: {
+		3: {
+
+			chapter: 'electric',
+			textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+			elements: {
+
+				fixedCharges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 1,
+					renderOrder: 2,
+					drawInfos: true,
+					maxInstancesNum: 3,
+					textAlign: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							blending: 'MultiplyBlending',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+					},
 
 
-		// },
+					instances: {
 
-		// 2: {
+						0: {
+
+							infoPointIndex: 16 * 7 + 3,
+							enabled: true,
+                            position: [ 0, 0, 0 ],
+                            radius: 0,
+                            targetRadius: 0.6,
+                            sign: -1,
+                            mass: 500000,
+                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+
+                        },
+
+					}
+
+				},
+
+				charges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 20,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							transparent: true,
+							blending: 'MultiplyBlending',
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
 
 
-		// },
+					instances: {}
 
-		// 3: {
+				},
+
+				obstacles: {
+
+					elementType: 'Obstacle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 4,
+					buildFromInstances: true,
+					renderOrder: 2,
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'obstacle',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'obstacleScan',
+							transparent: true,
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'obstacleInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
 
 
-		// },
+					instances: {
 
-		// 4: {
+                        1: {
+
+                            position: [ 0, -1, 0.0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 1.0, 0.12, 0.1 ],
+                            rotation: [ 0, 0, 0],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+                        2: {
+
+                            position: [ 0, 1, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 0.5, 0.12, 0.6 ],
+                            rotation: [ 0, 0, 0],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+					}
+
+				},
+
+			}
+
+		},
+
+		4: {
+
+			chapter: 'electric',
+			textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+
+			elements: {
+
+				charges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 20,
+					renderOrder: 3,
+					drawInfos: true,
+					mainInfoPointIndex: 3, // 0 - 8
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							transparent: true,
+							blending: 'MultiplyBlending',
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'electricChargeScan',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'electricChargeInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
 
 
-		// },
+					instances: {}
+
+				},
+
+				fixedCharges: {
+
+					elementType: 'ElectricParticle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 1,
+					renderOrder: 2,
+					drawInfos: true,
+					maxInstancesNum: 1,
+					textAlign: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'electricCharge',
+							blending: 'MultiplyBlending',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: null,
+
+						infos: null,
+					},
+
+					instances: {
+
+						0: {
+
+							hack: true,
+							infoPointIndex: 19 * 7 + 3,
+							enabled: true,
+                            position: [ -100, -100, 0 ],
+                            radius: 0,
+                            targetRadius: 0.6,
+                            sign: -1,
+                            mass: 0,
+                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+
+                        },
+
+					}
+
+				},
+
+				obstacles: {
+
+					elementType: 'Obstacle',
+					static: false,
+					manualMode: false,
+					transparent: true,
+					individual: false,
+					maxInstancesNum: 4,
+					buildFromInstances: true,
+					renderOrder: 2,
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'obstacle',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'obstacleScan',
+							transparent: true,
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'obstacleInfo',
+							transparent: true,
+							textureUrl: './resources/textures/generic_obstacle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {
+
+                       1: {
+
+                            position: [ 2, -2, 0.0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 2.0, 0.12, 0.1 ],
+                            rotation: [ 0, 0, 0],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+                        2: {
+
+                            position: [ 2, 2, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 2.0, 0.12, 0.6 ],
+                            rotation: [ 0, 0, 0],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+                        3: {
+
+                            position: [ -2, -2, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 2.5, 0.12, 0.6 ],
+                            rotation: [ 0, 0, Math.PI * 0.25],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+                        4: {
+
+                            position: [ -2, 2, 0 ],
+                            radius: 2,
+                            mass: 100000,
+                            scale: [ 2.5, 0.12, 0.6 ],
+                            rotation: [ 0, 0, Math.PI * -0.25],
+                            color: [ 0.7, 0.7, 0.7, 1 ],
+
+                        },
+
+					}
+
+				},
+
+			}
+
+		},
 
 	},
 
@@ -881,8 +1671,12 @@ let levels = {
 					static: true,
 					manualMode: false,
 					transparent: true,
-					enableUpdate: true,
-					renderOrder: 2,
+					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					maxInstancesNum: 3,
+					textAlign: 'bottom',
+
 
 					shaders: {
 
@@ -920,18 +1714,22 @@ let levels = {
 
 					instances: {
 
-						0: {
+						// 0: {
 
-                            position: [ -2, 0, 0 ],
-                            radius: 4,
-                            mass: 1000000,
-                            scale: [ 1.8, 1.8, 1.8 ],
-                            color: [ 0.7, 0.7, 0.7, 1 ],
+						// 	infoPointIndex: 16 * 7 + 2,
+						// 	particles: [ 1, 3, 6, 12 ],
+      //                       position: [ -2, 0, 0 ],
+      //                       radius: 4,
+      //                       mass: 1000000,
+      //                       scale: [ 1.8, 1.8, 1.8 ],
+      //                       color: [ 0.7, 0.7, 0.7, 1 ],
 
-                        },
+      //                   },
 
                         1: {
 
+                        	infoPointIndex: 16 * 7 + 4,
+                        	particles: [ 1, 3, 6, 12 ],
                             position: [ 2, 0, 0 ],
                             radius: 3.5,
                             mass: 100000,
