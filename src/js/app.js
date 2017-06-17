@@ -1,7 +1,8 @@
 import { resourcesList } from "./resourcesList";
 import { GameManager } from "./GameManager";
-import { addEvent } from "./utils";
+import { addEvent, removeEvent } from "./utils";
 import { levels } from "./levels";
+import { IntroScene } from "./IntroScene";
 
 // Loop utility
 
@@ -48,42 +49,11 @@ let loop = require ( 'raf-loop' );
 
 		// Build GUI
 
-		let menu = document.querySelector('#menu');
-		let activePage = document.querySelector('.active');
+		let pagesStack = [];
 		let pages = document.querySelectorAll('.page');
-		let levelsPages = document.querySelectorAll('.levels');
-
-		for ( let i = 0; i < levelsPages.length; i ++ ) {
-
-			let file = levelsPages[ i ].attributes.file.value;
-
-			for ( let level in levels[ file ] ) {
-
-				let levelElement = document.createElement('div');
-				levelElement.classList.add ( 'button' );
-				let content = document.createElement('div');
-				content.classList.add ( 'content' );
-				let title = document.createElement('h2');
-				title.classList.add ( 'title' );
-				title.innerHTML = level;
-				content.appendChild ( title );
-				levelElement.appendChild ( content );
-				levelsPages[ i ].appendChild( levelElement );
-				
-				addEvent ( levelElement, 'click', function () {
-
-					gameManager.startLevel ( levels[ file ][ level ], function () {
-
-						menu.classList.add ( 'hidden' );
-						activePage.classList.remove ( 'active' );
-
-					} );
-
-				} );
-
-			}
-
-		}
+		let mainMenu = document.querySelector('#main-menu');
+		let loadingPanel = document.querySelector('#loading-panel');
+		let loadingLevelPanel = document.querySelector('#loading-level-panel');
 
 		for ( let i = 0; i < pages.length; i ++ ) {
 
@@ -91,16 +61,35 @@ let loop = require ( 'raf-loop' );
 
 			for ( let j = 0; j < buttons.length; j ++ ) {
 
-				let button = buttons[ j ];
-				button.style.height = ( 100 / buttons.length ) + "%";
+				if ( WURFL.is_mobile === true ) {
 
-				if ( button.attributes.target ) {
+					addEvent ( buttons[ j ], 'touchstart', function () {
 
-					let target = button.attributes.target.value;
+						var onTouchEnd = function () {
 
-					addEvent ( button, 'click', function () {
+							let target = this.attributes.target.value;
+							setPageActive ( document.querySelector ( '#' + target ) );
+							removeEvent ( { elem: this, event: 'touchend', handler: onTouchEnd } );
 
-						makePageActive ( target );
+						}
+
+						addEvent ( this, 'touchend', onTouchEnd );
+
+					} );
+
+				} else {
+
+					addEvent ( buttons[ j ], 'mousedown', function () {
+
+						var onMouseUp = function () {
+
+							let target = this.attributes.target.value;
+							setPageActive ( document.querySelector ( '#' + target ) );
+							removeEvent ( { elem: this, event: 'mouseup', handler: onMouseUp } );
+
+						}
+
+						addEvent ( this, 'mouseup', onMouseUp );
 
 					} );
 
@@ -110,11 +99,74 @@ let loop = require ( 'raf-loop' );
 
 		}
 
-		function makePageActive ( _target ) {
+		// setPageActive ( mainMenu );
 
-			activePage.classList.remove("active");
-			activePage = document.querySelector('#' + _target);
-			activePage.classList.add ( 'active' );
+		function setPageActive ( _page, _onTransitionEnd ) {
+
+			let activePage = document.querySelector('.page-active');
+
+			if ( activePage ) {
+
+				setPageUnactive ( activePage );
+
+			}
+
+			if ( !_page.className.match(/(?:^|\s)page-active(?!\S)/) ) {
+
+				_page.className += ' page-active';
+				
+				if ( _onTransitionEnd ) {
+
+					addEvent ( _page, 'transitionend', function () {
+
+						var onTransitionEnd = function () {
+
+							_onTransitionEnd ();
+							removeEvent ( { elem: _page, event: 'transitionend', handler: onTransitionEnd} );						
+
+						}
+
+						addEvent ( _page, 'transitionend', onTransitionEnd );
+
+					} );
+
+				}
+
+			}
+
+		}
+
+		function setPageUnactive ( _page, _onTransitionEnd ) {
+
+			if ( _page.className.match(/(?:^|\s)page-active(?!\S)/) ) {
+
+				_page.className = _page.className.replace( /(?:^|\s)page-active(?!\S)/g , '' );
+
+				if ( _onTransitionEnd ) {
+
+					var onTransitionEnd = function () {
+
+						_onTransitionEnd ();
+						removeEvent ( { elem: _page, event: 'transitionend', handler: onTransitionEnd} );						
+
+					}
+
+					addEvent ( _page, 'transitionend', onTransitionEnd );
+
+				}
+
+			}
+
+		}
+
+		function setAllPagesUnactive () {
+
+			let pages = document.querySelectorAll('.pages');
+			for ( let i = 0; i < pages.length; i ++ ) {
+
+				setPageUnactive ( page[ i ] );
+
+			}
 
 		}
 
@@ -168,6 +220,12 @@ let loop = require ( 'raf-loop' );
 			let pos = vec2.fromValues ( event.clientX, event.clientY );
 			gameManager.onClick ( vec2.fromValues ( event.clientX, event.clientY ) );
 			lastPos = pos;
+
+		} );
+
+		addEvent ( window, 'dbclick', function ( event ) {
+
+			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
 
 		} );
 
@@ -232,6 +290,12 @@ let loop = require ( 'raf-loop' );
 
 		} );
 
+		addEvent ( window, 'touchmove', function ( event ) {
+
+			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+
+		} );
+
 		addEvent ( rendererElement, 'touchmove', function ( event ) {
 
 			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
@@ -253,6 +317,7 @@ let loop = require ( 'raf-loop' );
 		addEvent ( window, 'resize', function () {
 
 			gameManager.onResize ();
+			introScene.onResize ();
 
 		} );
 		
@@ -273,7 +338,7 @@ let loop = require ( 'raf-loop' );
 
 		// } );
 
-		// gameManager.startLevel ( levels[ 'electric' ][ 3 ], function () {
+		// gameManager.startLevel ( levels[ 'electric' ][ 2 ], function () {
 
 		// 	setTimeout ( function () {
 
@@ -284,28 +349,57 @@ let loop = require ( 'raf-loop' );
 
 		// } );
 
-		gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ], function () {
+		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 3 ], function () {
+
+		// 	setTimeout ( function () {
+
+		// 		menu.classList.add ( 'hidden' );
+		// 		activePage.classList.remove ( 'active' );
+
+		// 	}, 200 );
+
+		// } );
+		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+
+		// Create intro scene
+
+		let introScene = new IntroScene ( renderer );
+		introScene.onEnd ( function () {
 
 			setTimeout ( function () {
 
-				menu.classList.add ( 'hidden' );
-				activePage.classList.remove ( 'active' );
+				setPageActive ( mainMenu );
 
-			}, 200 );
+			}, 50 );
 
 		} );
-		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+		
+		setTimeout ( function () {
+
+			setPageUnactive ( loadingPanel, function () {
+
+				setTimeout ( function () {
+
+					introScene.init ();
+
+				}, 10 );
+
+			} );
+
+		}, 500 );
 
 		function update ( _deltaTime ) {
 
 			gameManager.update ( _deltaTime );
+			introScene.update ();
 
 		}
 
 		function render ( _deltaTime ) {
 			
 			gameManager.render ( _deltaTime );
+			introScene.render ();
 
 		}
 

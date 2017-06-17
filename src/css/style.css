@@ -1,7 +1,7 @@
 
 @font-face {
-    font-family: 'GT-America-Regular';
-	src: url('../resources/fonts/GT-America-Regular.woff2') format('woff2');
+    font-family: 'Campton';
+	src: url('../resources/fonts/campton.woff') format('woff');
 	font-weight: normal;
 	font-style: normal;
 }
@@ -19,7 +19,11 @@
 	-moz-box-sizing: border-box;    /* Firefox, other Gecko */
 	box-sizing: border-box;         /* Opera/IE 8+ */
 
-	font-family: GT-America-Regular, Helvetica;
+	font-family: Campton;
+	font-size: 30px;
+	font-weight: normal;
+	color: #434343;
+	touch-action: manipulation;
 
 }
 
@@ -27,25 +31,13 @@ html, body {
 
 	margin: 0;
 	padding: 0;
+	width: 100vw;
+	height: 100vh;
 	overflow: hidden;
 
 }
 
-#main-canvas {
-
-	width: 100vw;
-	height: 100vh;
-
-}
-
-#menu {
-
-	z-index: 2;
-	position: fixed;
-	width: 100vw;
-	height: 100vh;
-	background: #7F7F7F;
-	pointer-events: auto;
+.opacity-animation: {
 
 	-webkit-transition: opacity 0.6s ease-in-out;
 	-moz-transition: opacity 0.6s ease-in-out;
@@ -54,57 +46,109 @@ html, body {
 
 }
 
-.hidden {
+#loading-panel {
 
-	opacity: 0 !important;
-	pointer-events: none !important;
+	z-index: 100;
+	background: #E6E6E6;
 
-}
-
-.active {
-
-	pointer-events: auto !important;
-	opacity: 1 !important;
+	-webkit-transition: opacity 1.0s ease-in-out;
+	-moz-transition: opacity 1.0s ease-in-out;
+	-o-transition: opacity 1.0s ease-in-out;
+	transition: opacity 1.0s ease-in-out;
 
 }
 
-.page {
-
-	position: fixed;
-	width: 100vw;
-	height: 100vh;
-	pointer-events: none;
-	opacity: 0;
-	-webkit-transition: opacity 0.5s ease-in-out;
-	-moz-transition: opacity 0.5s ease-in-out;
-	-o-transition: opacity 0.5s ease-in-out;
-	transition: opacity 0.5s ease-in-out;
-
-}
-
-.button {
-
-	border-bottom: solid 1px;
-	width: 100%;
-
-}
-
-.button .content {
-
-	position: relative;
-	width: 100%;
-	height: 100%;
-
-}
-
-.button .content .title {
+#loading-panel h1 {
 
 	position: absolute;
 	left: 50%;
 	top: 50%;
 	margin: 0;
 
+	font-size: 30px;
+
+	-webkit-transform: translate( -50%, -50% );
+	-moz-transform: translate( -50%, -50% );
+	-o-transform: translate( -50%, -50% );
 	transform: translate( -50%, -50% );
+
+}
+
+.page-active {
+
+	opacity: 1 !important;
+	pointer-events: auto !important;
+
+}
+
+.page {
+
+	position: fixed;
+	overflow: hidden;
+	touch-action: none;
+	z-index: 10;
+	left: 0;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+
+	opacity: 0;
+	pointer-events: none;
+
+	-webkit-transition: opacity 0.35s ease-in-out;
+	-moz-transition: opacity 0.35s ease-in-out;
+	-o-transition: opacity 0.35s ease-in-out;
+	transition: opacity 0.35s ease-in-out;
+
+}
+
+.page .buttons {
+
+	position: absolute;
+	left: 50%;
+	top: 50%;
+
+	-webkit-transform: translate( -50%, -50% );
+	-moz-transform: translate( -50%, -50% );
+	-o-transform: translate( -50%, -50% );
+	transform: translate( -50%, -50% );
+
+}
+
+.page .buttons .button {
+
+	text-align: center;
+	padding: 40px;
+	cursor: pointer;
+
+}
+
+.page .buttons .button:not(:last-child) {
+
+	margin-bottom: 4vh;
+	
+}
+
+.page .buttons .button h2{
+
+	margin: 0;
+	padding: 0;
+	-webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently supported by Chrome and Opera */
+
+}
+
+#main-canvas {
+
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
 
 }
 
@@ -117,6 +161,13 @@ html, body {
 	width: 50px;
 
 	margin: 10px;
+
+	opacity: 0;
+
+	-webkit-transition: opacity 0.35s ease-in-out;
+	-moz-transition: opacity 0.35s ease-in-out;
+	-o-transition: opacity 0.35s ease-in-out;
+	transition: opacity 0.35s ease-in-out;
 
 }
 
@@ -139,6 +190,8 @@ html, body {
 	height: 50px;
 	width: 50px;
 	margin: 10px;
+
+	opacity: 0;
 
 }
 

@@ -35,6 +35,7 @@ export class ElectricParticle extends PhysicalElement {
 		this.positiveColor = vec4.fromValues ( 252/255 + rCV(), 74/255 + rCV(), 50/255 + rCV(), 1.0 );
 		this.negativeColor = vec4.fromValues ( 50/255 + rCV(), 104/255 + rCV(), 252/255 + rCV(), 1.0 );
 		this.color = vec4.clone ( this.neutralColor );
+		this.alphaTarget = 1.0;
 
 		function rCV () {
 
@@ -48,16 +49,6 @@ export class ElectricParticle extends PhysicalElement {
 
 		super.update ();
 
-		if ( this.isKilled ) {
-
-			this.radius += ( 0.2 - this.radius ) * 0.005;
-			this.scale = vec3.fromValues ( this.radius, this.radius, this.radius );
-			this.color[ 3 ] = this.lifePercent;
-			return;
-
-		}
-
-
 		// Clamp scale 
 
 		if ( this.targetRadius > this.maxRadius ) {
@@ -66,12 +57,13 @@ export class ElectricParticle extends PhysicalElement {
 
 		} else if ( this.targetRadius < this.minRadius ) {
 
-			this.targetRadius = this.minRadius
+			this.targetRadius = this.minRadius;
 
 		}
 		
 		// Interpolate scale changes to make a smooth animation.
-
+		
+		this.color[ 3 ] += ( this.alphaTarget - this.color[ 3 ] ) * 0.05;
 		this.radius += ( this.targetRadius - this.radius ) * 0.1;
 		this.scale = vec3.fromValues ( this.radius, this.radius, this.radius );
 
@@ -105,19 +97,29 @@ export class ElectricParticle extends PhysicalElement {
 
 		let dir = vec3.sub ( vec3.create(), this.targetPosition, this.position );
 		vec3.scale ( dir, dir, 0.5 );
-		this.applyForce ( dir );
+		// this.applyForce ( dir );
 
 	}
 
 	kill () {
 
-		// this.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1 ) );
-		this.drag = 0.99;
-		this.enabled = true;
+		if ( this.killed ) return;
 		this.isKilled = true;
 		this.canDye = true;
-		this.lifeSpan = 300 + Math.random () * 500;
-		this.lifeLeft = this.lifeSpan;
+
+		setTimeout ( function () {
+
+			this.alphaTarget = 0;
+			this.targetRadius = this.minRadius;
+
+			setTimeout ( function () {
+
+				this.lifeLeft = 0;
+
+			}.bind ( this ), 1000 );
+
+		}.bind ( this ), Math.random () * 500 );
+
 
 	}
 

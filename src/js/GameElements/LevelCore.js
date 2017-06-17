@@ -123,15 +123,24 @@ export class LevelCore {
 
 		// this.infoScanButton = new THREE.Mesh ( this.scanScreenButton.geometry.clone (), this.scanScreenButton.material.clone () );
 
-		this.scanScreenButtonMaterial2 = this.scanScreen.material.clone ();
-		this.scanScreenButtonMaterial2.vertexShader = shaderHelper.screenButton.vertex;
-		this.scanScreenButtonMaterial2.fragmentShader = shaderHelper.screenButton.fragment;
-		this.scanScreenButtonMaterial2.uniforms.texture.value = this.scanSceneRenderTarget.texture;
-		this.scanScreenButton2 = new THREE.Mesh ( this.quadGeometry, this.scanScreenButtonMaterial2 );
-		this.scanScreenButton2.scale.set ( 0.5, 0.5, 0.5 );
+		this.circleMaterial = new THREE.ShaderMaterial ( {
 
+			vertexShader: shaderHelper.circle.vertex,
+			fragmentShader: shaderHelper.circle.fragment,
+
+			uniforms: {
+
+				diffuse: { value: [ 0, 0, 0, 1 ] },
+
+			},
+
+			transparent: true,
+
+		} );
+
+		this.scanScreenButton2 = new THREE.Mesh ( this.quadGeometry, this.circleMaterial );
+		this.scanScreenButton2.scale.set ( 0.5, 0.5, 0.5 );
 		this.infoScene.add ( this.scanScreenButton2 );
-		// this.infoScene.add ( new THREE.Mesh ( this.scanScreenButton.clone (), this.scanScreenButtonMaterial.clone () ) );
 
 		// Render all scenes once the get right matrices.
 
@@ -139,9 +148,7 @@ export class LevelCore {
 		this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
 		this.renderer.render ( this.mainScene, this.mainCamera );
 
-		// Set the second scan button after the first rendering
-
-		this.scanScreenButton2.position.set ( this.getWorldRight (), 0.0, 0.0 );
+		// Add 
 
 		// Declare objects for drawing lines
 
@@ -462,8 +469,12 @@ export class LevelCore {
 
 		this.addElement ( 'arrival', {
 
-			static: true,
+			static: false,
 			manualMode: false,
+			transparent: true,
+			individual: false,
+			maxInstancesNum: 1,
+			renderOrder: 0,
 
 			shaders: {
 
@@ -494,9 +505,9 @@ export class LevelCore {
 
 					enabled: true,
 					name: 'top',
-					position: vec3.fromValues ( 0, this.getWorldTop (), 0 ),
+					position: vec3.fromValues ( 0, this.getWorldTop () - 0.5, 0 ),
 					rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
-					scale: vec3.fromValues ( 1.0, 1.0, 0.5 ),
+					scale: vec3.fromValues ( 0.4, 0.4, 0.5 ),
 
 				},
 
@@ -504,49 +515,50 @@ export class LevelCore {
 
 		} );
 
-		this.addElement ( 'departure', {
+		// this.addElement ( 'departure', {
 
-			static: true,
-			manualMode: false,
+		// 	static: true,
+		// 	manualMode: false,
+		// 	renderOrder: 0,
 
-			shaders: {
+		// 	shaders: {
 
-				main: null,
+		// 		main: null,
 
-				normal: {
+		// 		normal: {
 
-					name: 'departure',
-					blending: 'NormalBlending',
-					uniforms: {
+		// 			name: 'departure',
+		// 			blending: 'NormalBlending',
+		// 			uniforms: {
 
-						solidColor: { value: [ 0.8, 0.8, 0.8, 1.0 ] },
+		// 				solidColor: { value: [ 0.8, 0.8, 0.8, 1.0 ] },
 
-					},
+		// 			},
 
-					transparent: true,
+		// 			transparent: true,
 
-				},
+		// 		},
 
-				scan: null,
-				infos: null,
+		// 		scan: null,
+		// 		infos: null,
 
-			},
+		// 	},
 
-			instances: {
+		// 	instances: {
 
-				0: {
+		// 		0: {
 
-					enabled: true,
-					name: 'bottom',
-					position: vec3.fromValues ( 0, this.getWorldBottom (), 0 ),
-					rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
-					scale: vec3.fromValues ( 1.0, 1.0, 0.5 ),
+		// 			enabled: true,
+		// 			name: 'bottom',
+		// 			position: vec3.fromValues ( 0, this.getWorldBottom (), 0 ),
+		// 			rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
+		// 			scale: vec3.fromValues ( 0.4, 0.4, 0.5 ),
 
-				},
+		// 		},
 
-			}
+		// 	}
 
-		} );
+		// } );
 
 		// Add level elements
 
@@ -709,22 +721,21 @@ export class LevelCore {
 
 			setTimeout ( function () {
 
+				this.update (); // force update.
 
+				this.renderer.clearDepth();
+				this.renderer.clear ();
 
-			this.update (); // force update.
+				this.renderer.render ( this.mainScene, this.mainCamera );
+				this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
+				this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
 
-			this.renderer.clearDepth();
-			this.renderer.clear ();
+				this.renderer.clearDepth();
+				this.renderer.render( this.screensScene, this.mainCamera );
 
-			this.renderer.render ( this.mainScene, this.mainCamera );
-			this.renderer.render ( this.scanScene, this.mainCamera, this.scanSceneRenderTarget );
-			this.renderer.render ( this.infoScene, this.mainCamera, this.infoSceneRenderTarget );
-
-			this.renderer.clearDepth();
-			this.renderer.render( this.screensScene, this.mainCamera );
 			}.bind ( this ), 0 );
-			
 
+			this.scanScreenButton2.position.x = this.getWorldRight ();
 
 		}.bind ( this ) );
 
@@ -1933,8 +1944,8 @@ export class LevelCore {
 		if ( this.scanScreen.position.x <= 0.5 ) this.scanScreenOpened = true;
 		else this.scanScreenOpened = false;
 
-		this.scanScreen.position.x += ( this.scanScreenTargetPosition.x - this.scanScreen.position.x ) * 0.1;
-		this.scanScreen.position.y += ( this.scanScreenTargetPosition.y - this.scanScreen.position.y ) * 0.1;
+		this.scanScreen.position.x += ( this.scanScreenTargetPosition.x - this.scanScreen.position.x ) * 0.2;
+		this.scanScreen.position.y += ( this.scanScreenTargetPosition.y - this.scanScreen.position.y ) * 0.2;
 		this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight ();
 		this.scanScreenButton.position.y = this.scanScreen.position.y;
 
@@ -1944,8 +1955,8 @@ export class LevelCore {
 		if ( this.infoScreen.position.x >= -0.5 ) this.infoScreenOpened = true;
 		else this.infoScreenOpened = false;
 
-		this.infoScreen.position.x += ( this.infoScreenTargetPosition.x - this.infoScreen.position.x ) * 0.1;
-		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.1;
+		this.infoScreen.position.x += ( this.infoScreenTargetPosition.x - this.infoScreen.position.x ) * 0.2;
+		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.2;
 		this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight ();
 		this.infoScreenButton.position.y = this.infoScreen.position.y;
 
@@ -2055,12 +2066,8 @@ export class LevelCore {
 
 					}
 
-					if ( instances.length > 0 ) {
-
-						geometry.attributes.transform.needsUpdate = true;
-						geometry.attributes.rgbaColor.needsUpdate = true;
-
-					}
+					geometry.attributes.transform.needsUpdate = true;
+					geometry.attributes.rgbaColor.needsUpdate = true;
 
 				}
 
@@ -2129,27 +2136,34 @@ export class LevelCore {
 
 	clearLevel ( _onClear ) {
 
-		while ( this.mainScene.children.length > 0 ) { 
+		setTimeout ( function () {
 
-			// this.removeObj ( this.mainScene.children[ 0 ], this.mainScene );
-		    this.mainScene.remove ( this.mainScene.children[ 0 ] ); 
+			this.renderer.clearDepth();
+			this.renderer.clear ();
 
-		}
+			while ( this.mainScene.children.length > 0 ) { 
 
-		while ( this.scanScene.children.length > 0 ) { 
+				// this.removeObj ( this.mainScene.children[ 0 ], this.mainScene );
+			    this.mainScene.remove ( this.mainScene.children[ 0 ] ); 
 
-			// this.removeObj ( this.mainScene.children[ 0 ] );
-		    this.scanScene.remove ( this.scanScene.children[ 0 ] ); 
+			}
 
-		}
+			while ( this.scanScene.children.length > 0 ) { 
 
-		while ( this.infoScene.children.length > 0 ) { 
+				// this.removeObj ( this.mainScene.children[ 0 ] );
+			    this.scanScene.remove ( this.scanScene.children[ 0 ] ); 
 
-		    this.infoScene.remove ( this.infoScene.children[ 0 ] ); 
+			}
 
-		}
+			while ( this.infoScene.children.length > 0 ) { 
 
-		if ( _onClear ) _onClear ();
+			    this.infoScene.remove ( this.infoScene.children[ 0 ] ); 
+
+			}
+
+			if ( _onClear ) _onClear ();
+
+		}.bind ( this ), 1000 );
 
 	}
 

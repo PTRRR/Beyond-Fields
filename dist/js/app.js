@@ -5567,7 +5567,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						this.onLoad(function () {
 
-								console.log(this.gameElements);
+								this.gameElements.arrival.instances[0].position[1] = this.getWorldBottom() + 0.5;
 						}.bind(this));
 				}
 		}, {
@@ -5632,7 +5632,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								var yDist = mouse[1] - this.createdInstance.position[1];
 								this.createdInstance.sign = Math.sign(yDist);
 								this.createdInstance.targetRadius = dist;
-						} else if (this.currentInstance) {
+						} else if (this.currentInstance && this.currentInstance.element.enabled) {
 
 								var dir = null;
 								var _dist = null;
@@ -5642,7 +5642,8 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 										case 'center':
 
-												this.currentInstance.element.targetPosition = mouse;
+												// this.currentInstance.element.targetPosition = mouse;
+
 												// this.currentInstance.element.targetRadius = 0;
 
 												break;
@@ -5750,11 +5751,28 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						// Charges
 
+						// Update current charge
+
+						if (this.currentInstance && this.currentInstance.type == 'center') {
+
+								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.currentInstance.element.position);
+								this.currentInstance.element.applyForce(dir);
+						}
+
 						var charges = this.gameElements.charges.instances;
 
 						for (var _i2 = 0; _i2 < charges.length; _i2++) {
 
 								var _charge = charges[_i2];
+
+								if (this.checkEdges(_charge.position, 0.2)) {
+
+										_charge.update();
+										if (!_charge.killed) {
+
+												_charge.kill();
+										}
+								}
 
 								chargesUniform.push(_charge.position[0]);
 								chargesUniform.push(_charge.position[1]);
@@ -5770,6 +5788,39 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 										var _force = this.computeElectricForce(_charge, player);
 										vec3.add(forceResult, forceResult, _force);
 								}
+
+								// Check overlapping charges.
+
+								for (var j = 0; j < charges.length; j++) {
+
+										if (j != _i2) {
+
+												var _dir = vec3.sub(vec3.create(), _charge.position, charges[j].position);
+												var _dist3 = vec3.length(_dir);
+												var minDist = _charge.scale[0] + charges[j].scale[0];
+												var offset = -0.15;
+
+												if (_dist3 < minDist + offset) {
+
+														vec3.scale(_dir, _dir, Math.pow(minDist - _dist3, 3) * 5);
+														_charge.applyForce(_dir);
+												}
+										}
+								}
+
+								for (var _j = 0; _j < fixedCharges.length; _j++) {
+
+										var _dir2 = vec3.sub(vec3.create(), _charge.position, fixedCharges[_j].position);
+										var _dist4 = vec3.length(_dir2);
+										var _minDist = _charge.scale[0] + fixedCharges[_j].scale[0];
+										var _offset = -0.07;
+
+										if (_dist4 < _minDist + _offset) {
+
+												vec3.scale(_dir2, _dir2, Math.pow(_minDist - _dist4, 2) * 5);
+												_charge.applyForce(_dir2);
+										}
+								}
 						}
 
 						if (chargesUniform.length > 0) {
@@ -5784,30 +5835,30 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						var playerParticles = this.gameElements.playerParticles.instances;
 
-						for (var j = 0; j < playerParticles.length; j++) {
+						for (var _j2 = 0; _j2 < playerParticles.length; _j2++) {
 
-								var particle = playerParticles[j];
+								var particle = playerParticles[_j2];
 
-								var dir = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist3 = vec3.length(dir);
+								var _dir3 = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist5 = vec3.length(_dir3);
 
-								vec3.normalize(dir, dir);
-								vec3.scale(dir, dir, 1 / Math.pow(_dist3 + 1.0, 2) * 2);
+								vec3.normalize(_dir3, _dir3);
+								vec3.scale(_dir3, _dir3, 1 / Math.pow(_dist5 + 1.0, 2) * 2);
 
-								particle.applyForce(dir);
+								particle.applyForce(_dir3);
 
 								for (var _i3 = 0; _i3 < charges.length; _i3++) {
 
 										var _charge2 = charges[_i3];
 
-										var _dir = vec3.sub(vec3.create(), _charge2.position, particle.position);
-										var minDist = _charge2.scale[0] + particle.scale[0];
-										var _dist4 = vec3.length(_dir);
+										var _dir4 = vec3.sub(vec3.create(), _charge2.position, particle.position);
+										var _minDist2 = _charge2.scale[0] + particle.scale[0];
+										var _dist6 = vec3.length(_dir4);
 
-										if (_dist4 < minDist) {
+										if (_dist6 < _minDist2) {
 
-												vec3.scale(_dir, _dir, -(minDist - _dist4) * 100);
-												particle.applyForce(_dir);
+												vec3.scale(_dir4, _dir4, -(_minDist2 - _dist6) * 100);
+												particle.applyForce(_dir4);
 										} else {
 
 												var _force2 = this.computeElectricForce(_charge2, particle);
@@ -5897,18 +5948,18 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 												indices.push(textData.indices[j] + positions.length / 2);
 										}
 
-										for (var _j = 0; _j < textData.positions.length; _j += 2) {
+										for (var _j3 = 0; _j3 < textData.positions.length; _j3 += 2) {
 
-												var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+												var v = [textData.positions[_j3 + 0], textData.positions[_j3 + 1], 0];
 												vec3.transformMat4(v, v, modelMatrix);
 
 												positions.push(v[0]);
 												positions.push(v[1]);
 										}
 
-										for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+										for (var _j4 = 0; _j4 < textData.uvs.length; _j4++) {
 
-												uvs.push(textData.uvs[_j2]);
+												uvs.push(textData.uvs[_j4]);
 										}
 								}
 						}
@@ -5933,23 +5984,23 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
 								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
 
-								for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
+								for (var _j5 = 0; _j5 < _textData.indices.length; _j5++) {
 
-										indices.push(_textData.indices[_j3] + positions.length / 2);
+										indices.push(_textData.indices[_j5] + positions.length / 2);
 								}
 
-								for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
+								for (var _j6 = 0; _j6 < _textData.positions.length; _j6 += 2) {
 
-										var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
+										var _v = [_textData.positions[_j6 + 0], _textData.positions[_j6 + 1], 0];
 										vec3.transformMat4(_v, _v, modelMatrix);
 
 										positions.push(_v[0]);
 										positions.push(_v[1]);
 								}
 
-								for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
+								for (var _j7 = 0; _j7 < _textData.uvs.length; _j7++) {
 
-										uvs.push(_textData.uvs[_j5]);
+										uvs.push(_textData.uvs[_j7]);
 								}
 						}
 
@@ -5971,37 +6022,38 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				key: "checkCharges",
 				value: function checkCharges(_position) {
 
+						var totalCharges = [];
 						var charges = this.gameElements.charges.instances;
+						var fixedCharges = this.gameElements.fixedCharges.instances;
 
-						for (var i = 0; i < charges.length; i++) {
+						totalCharges = totalCharges.concat(charges);
+						totalCharges = totalCharges.concat(fixedCharges);
 
-								var rangeCenter = charges[i].radius * 0.5;
-								var distToCenter = vec3.length(vec3.sub(vec3.create(), charges[i].position, _position));
+						for (var i = 0; i < totalCharges.length; i++) {
 
-								var rangeEdge = 0.1;
-								var distToEdge = Math.abs(distToCenter - charges[i].radius);
+								var rangeCenter = totalCharges[i].radius * 0.5;
+								var distToCenter = vec3.length(vec3.sub(vec3.create(), totalCharges[i].position, _position));
+
+								var rangeEdge = 0.2;
+								var distToEdge = Math.abs(distToCenter - totalCharges[i].radius);
 
 								if (distToEdge < rangeEdge) {
 
-										var tC = charges[i];
-										this.gameElements.charges.instances.splice(i, 1);
-										this.gameElements.charges.instances.unshift(tC);
+										var tC = totalCharges[i];
 
 										return {
 
-												element: this.gameElements.charges.instances[0],
+												element: tC,
 												type: 'edge'
 
 										};
-								} else if (distToEdge > rangeEdge && distToCenter < charges[i].radius) {
+								} else if (distToEdge > rangeEdge && distToCenter < totalCharges[i].radius) {
 
-										var _tC = charges[i];
-										this.gameElements.charges.instances.splice(i, 1);
-										this.gameElements.charges.instances.unshift(_tC);
+										var _tC = totalCharges[i];
 
 										return {
 
-												element: this.gameElements.charges.instances[0],
+												element: _tC,
 												type: 'center'
 
 										};
@@ -6027,9 +6079,10 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				key: "resetPlayer",
 				value: function resetPlayer() {
 
-						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop(), 0);
+						this.gameElements.player.instances[0].color[3] = 0;
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop() + 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
-						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 10, -10, 0]);
+						this.gameElements.player.instances[0].applyForce([0, -10, 0]);
 				}
 		}, {
 				key: "reloadLevel",
@@ -6104,6 +6157,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 				_this.positiveColor = vec4.fromValues(252 / 255 + rCV(), 74 / 255 + rCV(), 50 / 255 + rCV(), 1.0);
 				_this.negativeColor = vec4.fromValues(50 / 255 + rCV(), 104 / 255 + rCV(), 252 / 255 + rCV(), 1.0);
 				_this.color = vec4.clone(_this.neutralColor);
+				_this.alphaTarget = 1.0;
 
 				function rCV() {
 
@@ -6119,14 +6173,6 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 
 						_get(ElectricParticle.prototype.__proto__ || Object.getPrototypeOf(ElectricParticle.prototype), "update", this).call(this);
 
-						if (this.isKilled) {
-
-								this.radius += (0.2 - this.radius) * 0.005;
-								this.scale = vec3.fromValues(this.radius, this.radius, this.radius);
-								this.color[3] = this.lifePercent;
-								return;
-						}
-
 						// Clamp scale 
 
 						if (this.targetRadius > this.maxRadius) {
@@ -6139,6 +6185,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 
 						// Interpolate scale changes to make a smooth animation.
 
+						this.color[3] += (this.alphaTarget - this.color[3]) * 0.05;
 						this.radius += (this.targetRadius - this.radius) * 0.1;
 						this.scale = vec3.fromValues(this.radius, this.radius, this.radius);
 
@@ -6169,19 +6216,26 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 
 						var dir = vec3.sub(vec3.create(), this.targetPosition, this.position);
 						vec3.scale(dir, dir, 0.5);
-						this.applyForce(dir);
+						// this.applyForce ( dir );
 				}
 		}, {
 				key: "kill",
 				value: function kill() {
 
-						// this.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1, ( Math.random () - 0.5 ) * 1 ) );
-						this.drag = 0.99;
-						this.enabled = true;
+						if (this.killed) return;
 						this.isKilled = true;
 						this.canDye = true;
-						this.lifeSpan = 300 + Math.random() * 500;
-						this.lifeLeft = this.lifeSpan;
+
+						setTimeout(function () {
+
+								this.alphaTarget = 0;
+								this.targetRadius = this.minRadius;
+
+								setTimeout(function () {
+
+										this.lifeLeft = 0;
+								}.bind(this), 1000);
+						}.bind(this), Math.random() * 500);
 				}
 		}]);
 
@@ -6379,7 +6433,7 @@ var ElementCore = exports.ElementCore = function () {
 }();
 
 },{}],59:[function(require,module,exports){
-"use strict";
+'use strict';
 
 Object.defineProperty(exports, "__esModule", {
 		value: true
@@ -6390,11 +6444,13 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
 
-var _shaderHelper = require("./shaderHelper");
+var _utils = require('../utils');
 
-var _LevelCore2 = require("./LevelCore");
+var _shaderHelper = require('./shaderHelper');
 
-var _Text = require("./Text");
+var _LevelCore2 = require('./LevelCore');
+
+var _Text = require('./Text');
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -6424,10 +6480,10 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		}
 
 		_createClass(GravityElectricLevel, [{
-				key: "build",
+				key: 'build',
 				value: function build() {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "build", this).call(this);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'build', this).call(this);
 
 						// Build the scan background.
 						// Electric Potential of the planets
@@ -6478,22 +6534,26 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						this.scanGravity.scale.set(maxScale * 1.4, maxScale * 1.4, 1.0);
 						this.scanScene.add(this.scanGravity);
 						this.scanGravityMaterial.extensions.derivatives = true;
+
+						this.mouseDown = false;
 				}
 		}, {
-				key: "onUp",
+				key: 'onUp',
 				value: function onUp(_position) {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onUp", this).call(this, _position);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onUp', this).call(this, _position);
 						this.activePlanet = null;
 
 						this.indicatorScaleTarget = 0.0;
 						this.indicatorAlphaTarget = 0.0;
+
+						this.mouseDown = false;
 				}
 		}, {
-				key: "onDown",
+				key: 'onDown',
 				value: function onDown(_position) {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onDown", this).call(this, _position);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onDown', this).call(this, _position);
 						this.activePlanet = this.checkPlanets(this.glMouseWorld);
 
 						if (!this.activeScreen && this.activePlanet) {
@@ -6510,24 +6570,26 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 								// this.indicatorObj.rotation.z = angle;
 								// this.indicatorScaleTarget = dist;
 						}
+
+						this.mouseDown = true;
 				}
 		}, {
-				key: "onClick",
+				key: 'onClick',
 				value: function onClick(_position) {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onClick", this).call(this, _position);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onClick', this).call(this, _position);
 				}
 		}, {
-				key: "onMove",
+				key: 'onMove',
 				value: function onMove(_position) {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onMove", this).call(this, _position);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onMove', this).call(this, _position);
 				}
 		}, {
-				key: "onDrag",
+				key: 'onDrag',
 				value: function onDrag(_position) {
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "onDrag", this).call(this, _position);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onDrag', this).call(this, _position);
 
 						if (!this.activeScreen && this.activePlanet) {
 
@@ -6547,7 +6609,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						}
 				}
 		}, {
-				key: "update",
+				key: 'update',
 				value: function update() {
 
 						// Check if all is loaded.
@@ -6572,7 +6634,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 								}
 						}
 
-						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), "update", this).call(this);
+						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'update', this).call(this);
 
 						// this.indicatorObj.scale.y += ( this.indicatorScaleTarget - this.indicatorObj.scale.y ) * 0.2;
 						// this.indicatorObj.rotation.z += ( this.indicatorAngleTarget - this.indicatorObj.rotation.z ) * 0.2;
@@ -6626,25 +6688,39 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 								for (var j = 0; j < charges.length; j++) {
 
+										if (this.mouseDown) {
+
+												var dir = vec3.sub(vec3.create(), charges[j].position, this.glMouseWorld);
+												var _dist = vec3.length(dir);
+												var maxDist = 2.0;
+												vec3.normalize(dir, dir);
+												var amp = (0, _utils.clamp)(_dist / maxDist, 0, 1);
+
+												if (_dist < 0.5) {
+
+														charges[j].applyForce(vec3.scale(dir, dir, amp * 3));
+												}
+										}
+
 										for (var k = 0; k < charges.length; k++) {
 
 												if (j != k) {
 
-														var dir = vec3.sub(vec3.create(), charges[k].position, charges[j].position);
-														var _dist = vec3.length(dir);
-														vec3.normalize(dir, dir);
+														var _dir = vec3.sub(vec3.create(), charges[k].position, charges[j].position);
+														var _dist2 = vec3.length(_dir);
+														vec3.normalize(_dir, _dir);
 
-														var offset = 0.06;
+														var offset = 0.23;
 														var minDist = charges[k].scale[0] + charges[j].scale[0] + offset;
 
-														if (_dist < minDist) {
+														if (_dist2 < minDist) {
 
-																vec3.scale(dir, dir, -(minDist - _dist) * 120);
-																charges[j].applyForce(dir);
+																vec3.scale(_dir, _dir, -Math.pow(minDist - _dist2, 3) * 120);
+																charges[j].applyForce(_dir);
 														} else {
 
-																vec3.scale(dir, dir, 1.0 / Math.pow(_dist + 1.0, 2) * 0.1);
-																charges[j].applyForce(dir);
+																vec3.scale(_dir, _dir, 1.0 / Math.pow(_dist2 + 1.0, 2) * 0.1);
+																charges[j].applyForce(_dir);
 														}
 												}
 										}
@@ -6677,34 +6753,53 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 								var particle = playerParticles[_j];
 
-								var _dir = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist2 = vec3.length(_dir);
+								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist3 = vec3.length(_dir2);
 
-								vec3.normalize(_dir, _dir);
-								vec3.scale(_dir, _dir, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
+								vec3.normalize(_dir2, _dir2);
+								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist3 + 1.0, 2) * 2);
 
-								particle.applyForce(_dir);
+								particle.applyForce(_dir2);
+						}
+
+						// Obstacles
+
+						if (this.gameElements.obstacles) {
+
+								var obstacles = this.gameElements.obstacles.instances || [];
+
+								for (var _i = 0; _i < obstacles.length; _i++) {
+
+										var obstacle = obstacles[_i];
+
+										if (this.isInBox(obstacle, player.position)) {
+
+												this.resetPlayer();
+												break;
+										}
+								}
 						}
 
 						// Update FX particles
 
-						for (var _i = 0; _i < 2; _i++) {
+						// for ( let i = 0; i < 2; i ++ ) {
 
-								var instance = this.addInstanceOf('playerParticles', {
+						// 	let instance = this.addInstanceOf ( 'playerParticles', {
 
-										enabled: Math.random() > 0.05 ? true : false,
-										position: vec3.clone(player.position),
-										canDye: true,
-										lifeSpan: Math.random() * 1000 + 1000,
-										drag: 0.95,
-										mass: Math.random() * 100 + 200,
-										initialRadius: Math.random() * 0.06 + 0.03,
-										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+						// 		enabled: Math.random () > 0.05 ? true : false,
+						// 		position: vec3.clone ( player.position ),
+						// 		canDye: true,
+						// 		lifeSpan: Math.random () * 1000 + 1000,
+						// 		drag: 0.95,
+						// 		mass: Math.random () * 100 + 200,
+						// 		initialRadius: Math.random () * 0.06 + 0.03,
+						// 		velocity: vec3.scale ( vec3.create (), vec3.clone ( player.velocity ), 0.1 ),
 
-								});
+						// 	} );
 
-								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
-						}
+						// 	instance.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30 ) );
+
+						// }
 
 						if (!this.infoScreenOpened) return;
 
@@ -6719,7 +6814,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						}
 				}
 		}, {
-				key: "updateTexts",
+				key: 'updateTexts',
 				value: function updateTexts() {
 
 						if (!this.textsGeometry) return;
@@ -6793,7 +6888,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				// Build the charges contained in the planets.
 
 		}, {
-				key: "buildCharges",
+				key: 'buildCharges',
 				value: function buildCharges() {
 
 						var planets = this.gameElements.planets.instances;
@@ -6847,7 +6942,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				// Compute natural forces according to some basic equations.
 
 		}, {
-				key: "computeElectricForce",
+				key: 'computeElectricForce',
 				value: function computeElectricForce(_e1, _e2) {
 
 						var k = 8.99 * Math.pow(10, 1.5); // Here we tweak a little bit the real values.
@@ -6860,7 +6955,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						return vec3.scale(dir, dir, mag);
 				}
 		}, {
-				key: "computeGravityForce",
+				key: 'computeGravityForce',
 				value: function computeGravityForce(_e1, _e2) {
 
 						var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
@@ -6876,7 +6971,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				// Interactions
 
 		}, {
-				key: "checkPlanets",
+				key: 'checkPlanets',
 				value: function checkPlanets(_vector) {
 
 						var planets = this.gameElements.planets.instances;
@@ -6894,15 +6989,15 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						return null;
 				}
 		}, {
-				key: "resetPlayer",
+				key: 'resetPlayer',
 				value: function resetPlayer() {
 
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom() - 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
-						this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 2, 10000, 0]);
+						this.gameElements.player.instances[0].applyForce([0, 10000, 0]);
 				}
 		}, {
-				key: "reloadLevel",
+				key: 'reloadLevel',
 				value: function reloadLevel() {
 
 						this.resetPlayer();
@@ -6911,6 +7006,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						for (var i = 0; i < planets.length; i++) {
 
 								planets[i].charge = 0;
+								planets[i].targetCharge = 0;
 						}
 				}
 		}]);
@@ -6918,7 +7014,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":61,"./Text":67,"./shaderHelper":69}],60:[function(require,module,exports){
+},{"../utils":75,"./LevelCore":61,"./Text":67,"./shaderHelper":69}],60:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -7397,7 +7493,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 									this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
 									this.gameElements.player.instances[0].velocity = vec3.create();
-									this.gameElements.player.instances[0].applyForce([(Math.random() - 0.5) * 500, 1000, 0]);
+									this.gameElements.player.instances[0].applyForce([0, 1000, 0]);
 						}
 			}, {
 						key: "render",
@@ -7548,15 +7644,24 @@ var LevelCore = exports.LevelCore = function () {
 
 				// this.infoScanButton = new THREE.Mesh ( this.scanScreenButton.geometry.clone (), this.scanScreenButton.material.clone () );
 
-				this.scanScreenButtonMaterial2 = this.scanScreen.material.clone();
-				this.scanScreenButtonMaterial2.vertexShader = _shaderHelper.shaderHelper.screenButton.vertex;
-				this.scanScreenButtonMaterial2.fragmentShader = _shaderHelper.shaderHelper.screenButton.fragment;
-				this.scanScreenButtonMaterial2.uniforms.texture.value = this.scanSceneRenderTarget.texture;
-				this.scanScreenButton2 = new THREE.Mesh(this.quadGeometry, this.scanScreenButtonMaterial2);
-				this.scanScreenButton2.scale.set(0.5, 0.5, 0.5);
+				this.circleMaterial = new THREE.ShaderMaterial({
 
+						vertexShader: _shaderHelper.shaderHelper.circle.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.circle.fragment,
+
+						uniforms: {
+
+								diffuse: { value: [0, 0, 0, 1] }
+
+						},
+
+						transparent: true
+
+				});
+
+				this.scanScreenButton2 = new THREE.Mesh(this.quadGeometry, this.circleMaterial);
+				this.scanScreenButton2.scale.set(0.5, 0.5, 0.5);
 				this.infoScene.add(this.scanScreenButton2);
-				// this.infoScene.add ( new THREE.Mesh ( this.scanScreenButton.clone (), this.scanScreenButtonMaterial.clone () ) );
 
 				// Render all scenes once the get right matrices.
 
@@ -7564,9 +7669,7 @@ var LevelCore = exports.LevelCore = function () {
 				this.renderer.render(this.infoScene, this.mainCamera, this.infoSceneRenderTarget);
 				this.renderer.render(this.mainScene, this.mainCamera);
 
-				// Set the second scan button after the first rendering
-
-				this.scanScreenButton2.position.set(this.getWorldRight(), 0.0, 0.0);
+				// Add 
 
 				// Declare objects for drawing lines
 
@@ -7876,8 +7979,12 @@ var LevelCore = exports.LevelCore = function () {
 
 						this.addElement('arrival', {
 
-								static: true,
+								static: false,
 								manualMode: false,
+								transparent: true,
+								individual: false,
+								maxInstancesNum: 1,
+								renderOrder: 0,
 
 								shaders: {
 
@@ -7908,9 +8015,9 @@ var LevelCore = exports.LevelCore = function () {
 
 												enabled: true,
 												name: 'top',
-												position: vec3.fromValues(0, this.getWorldTop(), 0),
+												position: vec3.fromValues(0, this.getWorldTop() - 0.5, 0),
 												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(1.0, 1.0, 0.5)
+												scale: vec3.fromValues(0.4, 0.4, 0.5)
 
 										}
 
@@ -7918,49 +8025,50 @@ var LevelCore = exports.LevelCore = function () {
 
 						});
 
-						this.addElement('departure', {
+						// this.addElement ( 'departure', {
 
-								static: true,
-								manualMode: false,
+						// 	static: true,
+						// 	manualMode: false,
+						// 	renderOrder: 0,
 
-								shaders: {
+						// 	shaders: {
 
-										main: null,
+						// 		main: null,
 
-										normal: {
+						// 		normal: {
 
-												name: 'departure',
-												blending: 'NormalBlending',
-												uniforms: {
+						// 			name: 'departure',
+						// 			blending: 'NormalBlending',
+						// 			uniforms: {
 
-														solidColor: { value: [0.8, 0.8, 0.8, 1.0] }
+						// 				solidColor: { value: [ 0.8, 0.8, 0.8, 1.0 ] },
 
-												},
+						// 			},
 
-												transparent: true
+						// 			transparent: true,
 
-										},
+						// 		},
 
-										scan: null,
-										infos: null
+						// 		scan: null,
+						// 		infos: null,
 
-								},
+						// 	},
 
-								instances: {
+						// 	instances: {
 
-										0: {
+						// 		0: {
 
-												enabled: true,
-												name: 'bottom',
-												position: vec3.fromValues(0, this.getWorldBottom(), 0),
-												rotation: vec3.fromValues(0.0, 0.0, 0.0),
-												scale: vec3.fromValues(1.0, 1.0, 0.5)
+						// 			enabled: true,
+						// 			name: 'bottom',
+						// 			position: vec3.fromValues ( 0, this.getWorldBottom (), 0 ),
+						// 			rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
+						// 			scale: vec3.fromValues ( 0.4, 0.4, 0.5 ),
 
-										}
+						// 		},
 
-								}
+						// 	}
 
-						});
+						// } );
 
 						// Add level elements
 
@@ -8133,6 +8241,8 @@ var LevelCore = exports.LevelCore = function () {
 										this.renderer.clearDepth();
 										this.renderer.render(this.screensScene, this.mainCamera);
 								}.bind(this), 0);
+
+								this.scanScreenButton2.position.x = this.getWorldRight();
 						}.bind(this));
 				}
 		}, {
@@ -9255,8 +9365,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (this.scanScreen.position.x <= 0.5) this.scanScreenOpened = true;else this.scanScreenOpened = false;
 
-						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.1;
-						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.1;
+						this.scanScreen.position.x += (this.scanScreenTargetPosition.x - this.scanScreen.position.x) * 0.2;
+						this.scanScreen.position.y += (this.scanScreenTargetPosition.y - this.scanScreen.position.y) * 0.2;
 						this.scanScreenButton.position.x = this.scanScreen.position.x - this.getWorldRight();
 						this.scanScreenButton.position.y = this.scanScreen.position.y;
 
@@ -9264,8 +9374,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (this.infoScreen.position.x >= -0.5) this.infoScreenOpened = true;else this.infoScreenOpened = false;
 
-						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.1;
-						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.1;
+						this.infoScreen.position.x += (this.infoScreenTargetPosition.x - this.infoScreen.position.x) * 0.2;
+						this.infoScreen.position.y += (this.infoScreenTargetPosition.y - this.infoScreen.position.y) * 0.2;
 						this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight();
 						this.infoScreenButton.position.y = this.infoScreen.position.y;
 
@@ -9361,11 +9471,8 @@ var LevelCore = exports.LevelCore = function () {
 														}
 												}
 
-												if (_instances4.length > 0) {
-
-														geometry.attributes.transform.needsUpdate = true;
-														geometry.attributes.rgbaColor.needsUpdate = true;
-												}
+												geometry.attributes.transform.needsUpdate = true;
+												geometry.attributes.rgbaColor.needsUpdate = true;
 										}
 								} else if (element.static && !element.manualMode) {
 
@@ -9428,24 +9535,30 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'clearLevel',
 				value: function clearLevel(_onClear) {
 
-						while (this.mainScene.children.length > 0) {
+						setTimeout(function () {
 
-								// this.removeObj ( this.mainScene.children[ 0 ], this.mainScene );
-								this.mainScene.remove(this.mainScene.children[0]);
-						}
+								this.renderer.clearDepth();
+								this.renderer.clear();
 
-						while (this.scanScene.children.length > 0) {
+								while (this.mainScene.children.length > 0) {
 
-								// this.removeObj ( this.mainScene.children[ 0 ] );
-								this.scanScene.remove(this.scanScene.children[0]);
-						}
+										// this.removeObj ( this.mainScene.children[ 0 ], this.mainScene );
+										this.mainScene.remove(this.mainScene.children[0]);
+								}
 
-						while (this.infoScene.children.length > 0) {
+								while (this.scanScene.children.length > 0) {
 
-								this.infoScene.remove(this.infoScene.children[0]);
-						}
+										// this.removeObj ( this.mainScene.children[ 0 ] );
+										this.scanScene.remove(this.scanScene.children[0]);
+								}
 
-						if (_onClear) _onClear();
+								while (this.infoScene.children.length > 0) {
+
+										this.infoScene.remove(this.infoScene.children[0]);
+								}
+
+								if (_onClear) _onClear();
+						}.bind(this), 1000);
 				}
 		}, {
 				key: 'removeObj',
@@ -9551,7 +9664,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":74,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
+},{"../utils":75,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9789,9 +9902,9 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 
 				var _this = _possibleConstructorReturn(this, (Planet.__proto__ || Object.getPrototypeOf(Planet)).call(this, _options));
 
-				_this.sign = 1;
+				_this.sign = _options.sign || 1;
 				_this.maxCharge = _options.maxCharge || 50;
-				_this.minCharge = _options.minCharge || -50;
+				_this.minCharge = _options.minCharge || -_this.maxCharge;
 				_this.charge = _options.charge || 0;
 				_this.targetCharge = _this.charge;
 
@@ -9825,7 +9938,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 		return Planet;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"../utils":74,"./PhysicalElement":64}],66:[function(require,module,exports){
+},{"../utils":75,"./PhysicalElement":64}],66:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9868,7 +9981,8 @@ var Player = exports.Player = function (_PhysicalElement) {
 
 						// console.log(obj);
 
-						this.scale[1] = this.length + vec3.length(this.velocity) * 1;
+						// this.scale[ 1 ] = this.length + vec3.length ( this.velocity ) * 1 ;
+						this.color[3] += (1.0 - this.color[0]) * 0.1;
 						this.rotation[2] = Math.atan2(this.velocity[1], this.velocity[0]) - Math.PI * 0.5;
 				}
 		}]);
@@ -10026,7 +10140,7 @@ var shaderHelper = {
 
 								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7;\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7 + ( 1.0 - f_Color.a );\n\n\t\t\t}\n\n\t\t"
 
 				},
 
@@ -10154,6 +10268,30 @@ var shaderHelper = {
 
 				},
 
+				fixedElectricCharge: {
+
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\n\t\t\t\tfloat w = 0.4;\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist ) );\n\n\t\t\t\tgl_FragColor.r = outLineMultiplier * f_Color.r + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * f_Color.g + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * f_Color.b + ( 1.0 - outLineMultiplier ) * 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t}\n\n\t\t"
+
+				},
+
+				fixedElectricChargeScan: {
+
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w, w - 0.13, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+
+				},
+
+				fixedElectricChargeInfo: {
+
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat w2 = 0.57 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w2;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a +=  smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w2, w2 - 0.05, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+
+				},
+
 				equipotentialLines: {
 
 								vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
@@ -10166,7 +10304,7 @@ var shaderHelper = {
 
 								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.85, 0.85, 0.85, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
 
 				},
 
@@ -10190,9 +10328,9 @@ var shaderHelper = {
 
 				electricPlanet: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\t\t\t\tfloat sdfDist2 = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = f_Scale - w;\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist2 ) );\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.r = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.r;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.g;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.b;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
 				},
 
@@ -10228,18 +10366,18 @@ var shaderHelper = {
 								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 				},
 
-				arrival: {
-
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
-
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( 0.79, 0.8, cDist ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
-
 				departure: {
 
 								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;\n\t\t\t\t// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;\n\n\t\t\t\tfloat w = 0.2;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+				},
+
+				arrival: {
+
+								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 				},
 
 				sdfFont: {
@@ -10254,6 +10392,38 @@ var shaderHelper = {
 								vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
 
 								fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
+
+				},
+
+				circle: {
+
+								vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
+
+								fragment: "\n\t\t\tuniform vec4 diffuse;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\n\t        \tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\n\t        \tgl_FragColor = diffuse;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\t        \n\t        }\n\n\t\t"
+
+				},
+
+				introParticles: {
+
+								vertex: "\n\t        void main() {\n\t    \n\t    \t\tgl_PointSize = position.z;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
+
+								fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( 1.0, 0.85, cDist ) * 0.5 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+				},
+
+				introEndParticles: {
+
+								vertex: "\n\t\t\tuniform float scale;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t    \t\tvec3 outPosition = vec3 ( position.xy, 0.0 ) * scale;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy * scale, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
+
+								fragment: "\n\t\t\tuniform float scale;\n\t\t\tuniform float alpha;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * scale;\n\n\t\t\t\tfloat w = 0.1;\n\t\t\t\tfloat t = scale - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+				},
+
+				introArrival: {
+
+								vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
+
+								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
 				}
 
@@ -10448,7 +10618,315 @@ var GameManager = exports.GameManager = function () {
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":55,"./GameElements/GravityElectricLevel":59,"./GameElements/GravityLevel":60,"./utils":74}],71:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":55,"./GameElements/GravityElectricLevel":59,"./GameElements/GravityLevel":60,"./utils":75}],71:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+		value: true
+});
+exports.IntroScene = undefined;
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _shaderHelper = require('./GameElements/shaderHelper');
+
+var _PhysicalElement = require('./GameElements/PhysicalElement');
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var IntroScene = exports.IntroScene = function () {
+		function IntroScene(_renderer) {
+				_classCallCheck(this, IntroScene);
+
+				this.renderer = _renderer;
+
+				this.run = false;
+				var size = this.renderer.getSize();
+				this.camera = new THREE.PerspectiveCamera(75, size.width / size.height, 0.1, 1000);
+				this.camera.position.z = 5;
+
+				this.scene = new THREE.Scene();
+				this.scene.background = new THREE.Color(0xE6E6E6);
+				this.renderer.render(this.scene, this.camera);
+
+				this.ended = false;
+
+				this.quadGeometry = new THREE.PlaneBufferGeometry(1, 1);
+
+				this.playerMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.circle.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.circle.fragment,
+
+						uniforms: {
+
+								diffuse: { value: [0.5, 0.5, 0.5, 1.0] }
+
+						},
+
+						transparent: true
+
+				});
+
+				this.player = new _PhysicalElement.PhysicalElement({
+
+						position: [0, this.getWorldTop() + 0.1, 0],
+						mass: 1500,
+						drag: 0.986,
+						enabled: true,
+						acceleration: [0.06, -0.06, 0]
+
+				});
+
+				this.playerScaleTarget = 0.13;
+				this.playerMesh = new THREE.Mesh(this.quadGeometry, this.playerMaterial);
+				this.playerMesh.scale.set(0.1, 0.1, 0.1);
+				this.playerMesh.position.set(0, this.player.position[1], 0);
+				this.playerMesh.renderOrder = 10;
+				this.scene.add(this.playerMesh);
+
+				this.arrivalMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.introArrival.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.introArrival.fragment,
+						transparent: true
+
+				});
+
+				this.arrivalScaleTarget = 1.0;
+				this.arrival = new THREE.Mesh(this.quadGeometry, this.arrivalMaterial);
+				this.scene.add(this.arrival);
+
+				this.nParticles = 120;
+
+				this.particles = [];
+
+				this.particlesGeometry = new THREE.BufferGeometry();
+				this.particlesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nParticles * 3), 3));
+				this.particlesGeometry.attributes.position.dynamic = true;
+				this.particlesMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.introParticles.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.introParticles.fragment,
+						transparent: true
+
+				});
+
+				this.particlePoints = new THREE.Points(this.particlesGeometry, this.particlesMaterial);
+				this.scene.add(this.particlePoints);
+
+				// End circle
+
+				this.endCircleScaleTarget = 0.0;
+				this.endCircleAlphaTarget = 1.0;
+				this.endCircleMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.introEndParticles.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.introEndParticles.fragment,
+
+						uniforms: {
+
+								alpha: { value: 1.0 },
+								scale: { value: 0.0 }
+
+						},
+
+						transparent: true
+
+				});
+
+				this.endCircle = new THREE.Mesh(this.quadGeometry, this.endCircleMaterial);
+				this.scene.add(this.endCircle);
+		}
+
+		_createClass(IntroScene, [{
+				key: 'onResize',
+				value: function onResize() {
+
+						this.camera.aspect = window.innerWidth / window.innerHeight;
+						this.camera.updateProjectionMatrix();
+
+						this.renderer.setSize(window.innerWidth, window.innerHeight);
+				}
+		}, {
+				key: 'render',
+				value: function render() {
+
+						this.renderer.render(this.scene, this.camera);
+				}
+		}, {
+				key: 'update',
+				value: function update() {
+
+						if (!this.run) return;
+
+						// Update arrival
+
+						if (this.arrival.scale.x > 0.01) {
+
+								this.arrival.scale.x += (this.arrivalScaleTarget - this.arrival.scale.x) * 0.1;
+								this.arrival.scale.y += (this.arrivalScaleTarget - this.arrival.scale.y) * 0.1;
+						}
+
+						// Update player
+
+						var force = vec3.sub(vec3.create(), [0, 0, 0], this.player.position);
+						var dist = vec3.length(force);
+
+						if (dist < 0.2 && !this.ended) {
+
+								this.ended = true;
+								this.player.drag = 0.7;
+								this.playerScaleTarget = 0;
+								this.arrivalScaleTarget = 0;
+								this.endCircleScaleTarget = Math.abs(this.getWorldTop()) > Math.abs(this.getWorldRight()) ? this.getWorldTop() * 2.0 : this.getWorldRight() * 2.0;
+								this.endCircleAlphaTarget = 0.0;
+								if (this.onEndCallback) this.onEndCallback();
+						}
+
+						vec3.normalize(force, force);
+						vec3.scale(force, force, 1.0 / Math.pow(dist + 1.0, 2) * 30);
+
+						this.player.scale[0] += (this.playerScaleTarget - this.player.scale[0]) * 0.1;
+						this.player.scale[1] += (this.playerScaleTarget - this.player.scale[1]) * 0.1;
+						this.player.applyForce(force);
+						this.player.update();
+
+						this.playerMesh.position.set(this.player.position[0], this.player.position[1], this.player.position[2]);
+						this.playerMesh.scale.set(this.player.scale[0], this.player.scale[1], 1.0);
+
+						// Update particles
+
+						for (var i = this.nParticles - 4; i >= 0; i--) {
+
+								var bufferIndex = i * 3;
+
+								if (i < this.particles.length) {
+
+										this.particles[i].update();
+
+										if (!this.particles[i].isDead()) {
+
+												var dir = vec3.sub(vec3.create(), this.player.position, this.particles[i].position);
+												var _dist = vec3.length(dir);
+												vec3.normalize(dir, dir);
+												vec3.scale(dir, dir, 1.0 / Math.pow(_dist + 1.0, 2) * 1);
+												this.particles[i].applyForce(dir);
+
+												this.particlesGeometry.attributes.position.array[bufferIndex + 0] = this.particles[i].position[0];
+												this.particlesGeometry.attributes.position.array[bufferIndex + 1] = this.particles[i].position[1];
+
+												// pass size with position z
+
+												this.particlesGeometry.attributes.position.array[bufferIndex + 2] = this.particles[i].scale[0] * this.particles[i].lifePercent;
+										} else {
+
+												this.particles.splice(i, 1);
+										}
+								} else {
+
+										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = 0;
+								}
+						}
+
+						if (this.particles.length < this.nParticles && !this.ended) {
+
+								this.createNewParticle();
+								this.createNewParticle();
+						}
+
+						this.particlesGeometry.attributes.position.needsUpdate = true;
+
+						this.endCircleMaterial.uniforms.alpha.value += (this.endCircleAlphaTarget - this.endCircleMaterial.uniforms.alpha.value) * 0.08;
+						this.endCircleMaterial.uniforms.scale.value += (this.endCircleScaleTarget - this.endCircleMaterial.uniforms.scale.value) * 0.08;
+				}
+		}, {
+				key: 'createNewParticle',
+				value: function createNewParticle() {
+
+						this.particles.push(new _PhysicalElement.PhysicalElement({
+
+								position: this.player.position,
+								scale: [Math.random() * 10 * this.renderer.getPixelRatio() + 1.0, 0, 0],
+								acceleration: [(Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.03, 0],
+								velocity: vec3.scale(vec3.create(), this.player.velocity, 0.2),
+								canDye: true,
+								lifeSpan: 1000,
+								lifeLeft: 1000,
+								mass: 20000,
+								enabled: true,
+								drag: 0.98
+
+						}));
+				}
+		}, {
+				key: 'init',
+				value: function init() {
+
+						this.run = true;
+				}
+		}, {
+				key: 'onEnd',
+				value: function onEnd(_callback) {
+
+						this.onEndCallback = _callback;
+				}
+		}, {
+				key: 'getWidth',
+				value: function getWidth() {
+
+						return this.renderer.domElement.offsetWidth * this.renderer.getPixelRatio();
+				}
+		}, {
+				key: 'getHeight',
+				value: function getHeight() {
+
+						return this.renderer.domElement.offsetHeight * this.renderer.getPixelRatio();
+				}
+		}, {
+				key: 'getWorldTop',
+				value: function getWorldTop() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).y;
+				}
+		}, {
+				key: 'getWorldBottom',
+				value: function getWorldBottom() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, this.getHeight())).y;
+				}
+		}, {
+				key: 'getWorldLeft',
+				value: function getWorldLeft() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(0, 0)).x;
+				}
+		}, {
+				key: 'getWorldRight',
+				value: function getWorldRight() {
+
+						return this.get3DPointOnBasePlane(new THREE.Vector2(this.getWidth(), 0)).x;
+				}
+		}, {
+				key: 'get3DPointOnBasePlane',
+				value: function get3DPointOnBasePlane(_vector) {
+
+						var vector = new THREE.Vector3();
+						vector.set(_vector.x / this.getWidth() * 2 - 1, -(_vector.y / this.getHeight()) * 2 + 1, 0.5);
+						vector.unproject(this.camera);
+						var dir = vector.sub(this.camera.position).normalize();
+						var distance = -this.camera.position.z / dir.z;
+
+						return this.camera.position.clone().add(dir.multiplyScalar(distance));
+				}
+		}]);
+
+		return IntroScene;
+}();
+
+},{"./GameElements/PhysicalElement":64,"./GameElements/shaderHelper":69}],72:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -10458,6 +10936,8 @@ var _GameManager = require("./GameManager");
 var _utils = require("./utils");
 
 var _levels = require("./levels");
+
+var _IntroScene = require("./IntroScene");
 
 // Loop utility
 
@@ -10493,46 +10973,11 @@ var loop = require('raf-loop');
 
 				// Build GUI
 
-				var menu = document.querySelector('#menu');
-				var activePage = document.querySelector('.active');
+				var pagesStack = [];
 				var pages = document.querySelectorAll('.page');
-				var levelsPages = document.querySelectorAll('.levels');
-
-				var _loop = function _loop(i) {
-
-						var file = levelsPages[i].attributes.file.value;
-
-						var _loop2 = function _loop2(level) {
-
-								var levelElement = document.createElement('div');
-								levelElement.classList.add('button');
-								var content = document.createElement('div');
-								content.classList.add('content');
-								var title = document.createElement('h2');
-								title.classList.add('title');
-								title.innerHTML = level;
-								content.appendChild(title);
-								levelElement.appendChild(content);
-								levelsPages[i].appendChild(levelElement);
-
-								(0, _utils.addEvent)(levelElement, 'click', function () {
-
-										gameManager.startLevel(_levels.levels[file][level], function () {
-
-												menu.classList.add('hidden');
-												activePage.classList.remove('active');
-										});
-								});
-						};
-
-						for (var level in _levels.levels[file]) {
-								_loop2(level);
-						}
-				};
-
-				for (var i = 0; i < levelsPages.length; i++) {
-						_loop(i);
-				}
+				var mainMenu = document.querySelector('#main-menu');
+				var loadingPanel = document.querySelector('#loading-panel');
+				var loadingLevelPanel = document.querySelector('#loading-level-panel');
 
 				for (var i = 0; i < pages.length; i++) {
 
@@ -10540,28 +10985,93 @@ var loop = require('raf-loop');
 
 						for (var j = 0; j < buttons.length; j++) {
 
-								var button = buttons[j];
-								button.style.height = 100 / buttons.length + "%";
+								if (WURFL.is_mobile === true) {
 
-								if (button.attributes.target) {
-										(function () {
+										(0, _utils.addEvent)(buttons[j], 'touchstart', function () {
 
-												var target = button.attributes.target.value;
+												var onTouchEnd = function onTouchEnd() {
 
-												(0, _utils.addEvent)(button, 'click', function () {
+														var target = this.attributes.target.value;
+														setPageActive(document.querySelector('#' + target));
+														(0, _utils.removeEvent)({ elem: this, event: 'touchend', handler: onTouchEnd });
+												};
 
-														makePageActive(target);
-												});
-										})();
+												(0, _utils.addEvent)(this, 'touchend', onTouchEnd);
+										});
+								} else {
+
+										(0, _utils.addEvent)(buttons[j], 'mousedown', function () {
+
+												var onMouseUp = function onMouseUp() {
+
+														var target = this.attributes.target.value;
+														setPageActive(document.querySelector('#' + target));
+														(0, _utils.removeEvent)({ elem: this, event: 'mouseup', handler: onMouseUp });
+												};
+
+												(0, _utils.addEvent)(this, 'mouseup', onMouseUp);
+										});
 								}
 						}
 				}
 
-				function makePageActive(_target) {
+				// setPageActive ( mainMenu );
 
-						activePage.classList.remove("active");
-						activePage = document.querySelector('#' + _target);
-						activePage.classList.add('active');
+				function setPageActive(_page, _onTransitionEnd) {
+
+						var activePage = document.querySelector('.page-active');
+
+						if (activePage) {
+
+								setPageUnactive(activePage);
+						}
+
+						if (!_page.className.match(/(?:^|\s)page-active(?!\S)/)) {
+
+								_page.className += ' page-active';
+
+								if (_onTransitionEnd) {
+
+										(0, _utils.addEvent)(_page, 'transitionend', function () {
+
+												var onTransitionEnd = function onTransitionEnd() {
+
+														_onTransitionEnd();
+														(0, _utils.removeEvent)({ elem: _page, event: 'transitionend', handler: onTransitionEnd });
+												};
+
+												(0, _utils.addEvent)(_page, 'transitionend', onTransitionEnd);
+										});
+								}
+						}
+				}
+
+				function setPageUnactive(_page, _onTransitionEnd) {
+
+						if (_page.className.match(/(?:^|\s)page-active(?!\S)/)) {
+
+								_page.className = _page.className.replace(/(?:^|\s)page-active(?!\S)/g, '');
+
+								if (_onTransitionEnd) {
+
+										var onTransitionEnd = function onTransitionEnd() {
+
+												_onTransitionEnd();
+												(0, _utils.removeEvent)({ elem: _page, event: 'transitionend', handler: onTransitionEnd });
+										};
+
+										(0, _utils.addEvent)(_page, 'transitionend', onTransitionEnd);
+								}
+						}
+				}
+
+				function setAllPagesUnactive() {
+
+						var pages = document.querySelectorAll('.pages');
+						for (var _i = 0; _i < pages.length; _i++) {
+
+								setPageUnactive(page[_i]);
+						}
 				}
 
 				var backButton = document.querySelector('#back-button');
@@ -10611,6 +11121,11 @@ var loop = require('raf-loop');
 						var pos = vec2.fromValues(event.clientX, event.clientY);
 						gameManager.onClick(vec2.fromValues(event.clientX, event.clientY));
 						lastPos = pos;
+				});
+
+				(0, _utils.addEvent)(window, 'dbclick', function (event) {
+
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
 				});
 
 				// Mouse
@@ -10668,6 +11183,11 @@ var loop = require('raf-loop');
 						gameManager.onUp(lastPos);
 				});
 
+				(0, _utils.addEvent)(window, 'touchmove', function (event) {
+
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+				});
+
 				(0, _utils.addEvent)(rendererElement, 'touchmove', function (event) {
 
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
@@ -10687,6 +11207,7 @@ var loop = require('raf-loop');
 				(0, _utils.addEvent)(window, 'resize', function () {
 
 						gameManager.onResize();
+						introScene.onResize();
 				});
 
 				// Game
@@ -10706,7 +11227,7 @@ var loop = require('raf-loop');
 
 				// } );
 
-				// gameManager.startLevel ( levels[ 'electric' ][ 3 ], function () {
+				// gameManager.startLevel ( levels[ 'electric' ][ 2 ], function () {
 
 				// 	setTimeout ( function () {
 
@@ -10717,25 +11238,51 @@ var loop = require('raf-loop');
 
 				// } );
 
-				gameManager.startLevel(_levels.levels['gravityElectric'][0], function () {
+				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 3 ], function () {
+
+				// 	setTimeout ( function () {
+
+				// 		menu.classList.add ( 'hidden' );
+				// 		activePage.classList.remove ( 'active' );
+
+				// 	}, 200 );
+
+				// } );
+				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
+				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+
+				// Create intro scene
+
+				var introScene = new _IntroScene.IntroScene(renderer);
+				introScene.onEnd(function () {
 
 						setTimeout(function () {
 
-								menu.classList.add('hidden');
-								activePage.classList.remove('active');
-						}, 200);
+								setPageActive(mainMenu);
+						}, 50);
 				});
-				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+
+				setTimeout(function () {
+
+						setPageUnactive(loadingPanel, function () {
+
+								setTimeout(function () {
+
+										introScene.init();
+								}, 10);
+						});
+				}, 500);
 
 				function update(_deltaTime) {
 
 						gameManager.update(_deltaTime);
+						introScene.update();
 				}
 
 				function render(_deltaTime) {
 
 						gameManager.render(_deltaTime);
+						introScene.render();
 				}
 
 				var mainLoop = loop(function (deltaTime) {
@@ -10752,7 +11299,7 @@ var loop = require('raf-loop');
 		init();
 })();
 
-},{"./GameManager":70,"./levels":72,"./resourcesList":73,"./utils":74,"raf-loop":38}],72:[function(require,module,exports){
+},{"./GameManager":70,"./IntroScene":71,"./levels":73,"./resourcesList":74,"./utils":75,"raf-loop":38}],73:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -11484,7 +12031,7 @@ var levels = {
 
 																														normal: {
 
-																																				name: 'electricCharge',
+																																				name: 'fixedElectricCharge',
 																																				blending: 'MultiplyBlending',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -11494,7 +12041,7 @@ var levels = {
 
 																														scan: {
 
-																																				name: 'electricChargeScan',
+																																				name: 'fixedElectricChargeScan',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -11503,7 +12050,7 @@ var levels = {
 
 																														infos: {
 
-																																				name: 'electricChargeInfo',
+																																				name: 'fixedElectricChargeInfo',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -11514,9 +12061,10 @@ var levels = {
 
 																														0: {
 
-																																				infoPointIndex: 16 * 7 + 1,
-																																				enabled: true,
-																																				position: [-2, -2, 0],
+																																				infoPointIndex: 16 * 7 + 2,
+																																				enabled: false,
+																																				fixedRadius: true,
+																																				position: [-2, 0, 0],
 																																				radius: 0,
 																																				targetRadius: 0.5,
 																																				sign: -1,
@@ -11527,12 +12075,13 @@ var levels = {
 
 																														1: {
 
-																																				infoPointIndex: 16 * 7 + 3,
-																																				enabled: true,
-																																				position: [-2, 2, 0],
+																																				infoPointIndex: 16 * 7 + 4,
+																																				enabled: false,
+																																				fixedRadius: true,
+																																				position: [2, 0, 0],
 																																				radius: 0,
 																																				targetRadius: 0.5,
-																																				sign: -1,
+																																				sign: 1,
 																																				mass: 500000,
 																																				rotation: [0, 0, Math.random() * Math.PI * 2]
 
@@ -11664,7 +12213,7 @@ var levels = {
 
 																														normal: {
 
-																																				name: 'electricCharge',
+																																				name: 'fixedElectricCharge',
 																																				blending: 'MultiplyBlending',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -11674,7 +12223,7 @@ var levels = {
 
 																														scan: {
 
-																																				name: 'electricChargeScan',
+																																				name: 'fixedElectricChargeScan',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -11683,7 +12232,7 @@ var levels = {
 
 																														infos: {
 
-																																				name: 'electricChargeInfo',
+																																				name: 'fixedElectricChargeInfo',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -11695,7 +12244,7 @@ var levels = {
 																														0: {
 
 																																				infoPointIndex: 16 * 7 + 3,
-																																				enabled: true,
+																																				enabled: false,
 																																				position: [0, 0, 0],
 																																				radius: 0,
 																																				targetRadius: 0.6,
@@ -11820,7 +12369,7 @@ var levels = {
 
 																																				normal: {
 
-																																										name: 'electricCharge',
+																																										name: 'fixedElectricCharge',
 																																										transparent: true,
 																																										textureUrl: './resources/textures/generic_circle_sdf.png',
 																																										uniforms: {}
@@ -11952,7 +12501,7 @@ var levels = {
 																																										position: [0.63, 0, 0.0],
 																																										radius: 2,
 																																										mass: 100000,
-																																										scale: [1.0, 0.12, 0.1],
+																																										scale: [1.012, 0.12, 0.1],
 																																										rotation: [0, 0, Math.PI * -0.25],
 																																										color: [0.7, 0.7, 0.7, 1]
 
@@ -11963,7 +12512,7 @@ var levels = {
 																																										position: [-0.63, 0, 0],
 																																										radius: 2,
 																																										mass: 100000,
-																																										scale: [1.0, 0.12, 0.6],
+																																										scale: [1.012, 0.12, 0.6],
 																																										rotation: [0, 0, Math.PI * 0.25],
 																																										color: [0.7, 0.7, 0.7, 1]
 
@@ -12000,7 +12549,7 @@ var levels = {
 
 																														normal: {
 
-																																				name: 'electricCharge',
+																																				name: 'fixedElectricCharge',
 																																				blending: 'MultiplyBlending',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -12010,7 +12559,7 @@ var levels = {
 
 																														scan: {
 
-																																				name: 'electricChargeScan',
+																																				name: 'fixedElectricChargeScan',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -12019,7 +12568,7 @@ var levels = {
 
 																														infos: {
 
-																																				name: 'electricChargeInfo',
+																																				name: 'fixedElectricChargeInfo',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
 																																				uniforms: {}
@@ -12030,7 +12579,7 @@ var levels = {
 																														0: {
 
 																																				infoPointIndex: 16 * 7 + 3,
-																																				enabled: true,
+																																				enabled: false,
 																																				position: [0, 0, 0],
 																																				radius: 0,
 																																				targetRadius: 0.6,
@@ -12144,7 +12693,7 @@ var levels = {
 																																										mass: 100000,
 																																										scale: [1.0, 0.12, 0.1],
 																																										rotation: [0, 0, 0],
-																																										color: [0.7, 0.7, 0.7, 1]
+																																										color: [0.9, 0.9, 0.9, 1]
 
 																																				},
 
@@ -12155,7 +12704,7 @@ var levels = {
 																																										mass: 100000,
 																																										scale: [0.5, 0.12, 0.6],
 																																										rotation: [0, 0, 0],
-																																										color: [0.7, 0.7, 0.7, 1]
+																																										color: [0.9, 0.9, 0.9, 1]
 
 																																				}
 
@@ -12240,7 +12789,7 @@ var levels = {
 
 																														normal: {
 
-																																				name: 'electricCharge',
+																																				name: 'fixedElectricCharge',
 																																				blending: 'MultiplyBlending',
 																																				transparent: true,
 																																				textureUrl: './resources/textures/generic_circle_sdf.png',
@@ -12424,26 +12973,29 @@ var levels = {
 
 																														instances: {
 
-																																				// 0: {
+																																				0: {
 
-																																				// 	infoPointIndex: 16 * 7 + 2,
-																																				// 	particles: [ 1, 3, 6, 12 ],
-																																				//                       position: [ -2, 0, 0 ],
-																																				//                       radius: 4,
-																																				//                       mass: 1000000,
-																																				//                       scale: [ 1.8, 1.8, 1.8 ],
-																																				//                       color: [ 0.7, 0.7, 0.7, 1 ],
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 2,
+																																										particles: [1, 3, 6, 12],
+																																										position: [-2, 0, 0],
+																																										radius: 4,
+																																										mass: 10000,
+																																										scale: [1.3, 1.3, 1.3],
+																																										color: [0.8, 0.8, 0.8, 1],
+																																										charge: 25
 
-																																				//                   },
+																																				},
 
 																																				1: {
 
+																																										name: 'electricPlanet',
 																																										infoPointIndex: 16 * 7 + 4,
 																																										particles: [1, 3, 6, 12],
 																																										position: [2, 0, 0],
 																																										radius: 3.5,
-																																										mass: 100000,
-																																										scale: [1.5, 1.5, 1.5],
+																																										mass: 10000,
+																																										scale: [1.3, 1.3, 1.3],
 																																										color: [0.8, 0.8, 0.8, 1]
 
 																																				}
@@ -12502,27 +13054,541 @@ var levels = {
 
 																		}
 
+												},
+
+												1: {
+
+																		chapter: 'gravity-electric',
+																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
+																														textAlign: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 4,
+																																										particles: [1, 3, 6, 12, 12],
+																																										position: [2, 0, 0],
+																																										radius: 3.5,
+																																										mass: 1000000,
+																																										scale: [1.8, 1.8, 1.8],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricPlanetParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 200,
+																														renderOrder: 3,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricParticlePlanetScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricParticlePlanetInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												2: {
+
+																		chapter: 'gravity-electric',
+																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 4,
+																														textAlign: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 1,
+																																										particles: [1, 3, 6, 7],
+																																										position: [-2, -2, 0],
+																																										radius: 3.5,
+																																										mass: 10000,
+																																										charge: 10,
+																																										sign: -1,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				},
+
+																																				1: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 2,
+																																										particles: [1, 3, 6, 16],
+																																										position: [-2, 2, 0],
+																																										radius: 3.5,
+																																										mass: 1000000,
+																																										charge: 25,
+																																										scale: [1.4, 1.4, 1.4],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricPlanetParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 150,
+																														renderOrder: 3,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricParticlePlanetScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricParticlePlanetInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [-2, 0, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [2.5, 0.12, 0.1],
+																																										rotation: [0, 0, 0],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
+												},
+
+												3: {
+
+																		chapter: 'gravity-electric',
+																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 4,
+																														textAlign: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 4,
+																																										particles: [1, 3, 6, 7],
+																																										position: [2, -2, 0],
+																																										radius: 3.5,
+																																										mass: 10000,
+																																										charge: 15,
+																																										maxCharge: 30,
+																																										sign: -1,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				},
+
+																																				1: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 2,
+																																										particles: [1, 3, 6, 7],
+																																										position: [-2, 2, 0],
+																																										radius: 3.5,
+																																										mass: 1000000,
+																																										charge: 25,
+																																										sign: -1,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricPlanetParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 150,
+																														renderOrder: 3,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricParticlePlanetScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricParticlePlanetInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [1, 1, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.4, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [-1, -1, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.4, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
 												}
-
-												// 1: {
-
-
-												// },
-
-												// 2: {
-
-
-												// },
-
-												// 3: {
-
-
-												// },
-
-												// 4: {
-
-
-												// },
 
 						}
 
@@ -12530,7 +13596,7 @@ var levels = {
 
 exports.levels = levels;
 
-},{}],73:[function(require,module,exports){
+},{}],74:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -12577,7 +13643,7 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],74:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -12823,4 +13889,4 @@ function clone(obj) {
     throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
-},{}]},{},[71]);
+},{}]},{},[72]);

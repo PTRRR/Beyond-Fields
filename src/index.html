@@ -4,17 +4,118 @@
     
         <meta charset="utf-8">
         <meta name="description" content="">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black">
         <link rel="apple-touch-icon" href="./resources/icons/reload-button.png">
         <title>Beyond Fields</title>
         <link rel="stylesheet" href="./css/style.css">
+        <script type="text/javascript" src="//wurfl.io/wurfl.js"></script>
 
     </head>
     <body>
 
-        <div id="menu">
+        <div id="loading-panel" class="page page-active">
+            <!-- <h1>Beyond Fields</h1> -->
+        </div>
+
+        <div id="loading-level-panel" class="page">
+            
+        </div>
+
+        <div id="main-menu" class="page">
+
+            <div class="buttons">
+                
+                <div class="button" target="gravity-levels">
+                    <h2>Gravity</h2>
+                </div>
+                <div class="button" target="electric-levels">
+                    <h2>Electromagnetism</h2>
+                </div>
+                <div class="button" target="gravity-electric-levels">
+                    <h2>Gravity & Electromagnetism</h2>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="gravity-levels" class="page">
+            
+            <div class="buttons">
+                
+                <div class="button" target="main-menu">
+                    <h2>1</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>2</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>3</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>4</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>5</h2>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="electric-levels" class="page">
+
+            <div class="buttons">
+                
+                <div class="button" target="main-menu">
+                    <h2>1</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>2</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>3</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>4</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>5</h2>
+                </div>
+
+            </div>
+            
+        </div>
+
+        <div id="gravity-electric-levels" class="page">
+            
+            <div class="buttons">
+                
+                <div class="button" target="main-menu">
+                    <h2>1</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>2</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>3</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>4</h2>
+                </div>
+                <div class="button" target="main-menu">
+                    <h2>5</h2>
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- <div id="menu">
             
             <div id="home" class="page active">
                 <div class="button" target="gravity">
@@ -40,13 +141,13 @@
             <div id="electromagnetism" class="page levels" file="electric"></div>
             <div id="gravity-electromagnetism" class="page levels" file="gravityElectric"></div>
 
-        </div>
+        </div> -->
 
-        <div id="back-button">
+        <div id="back-button" class="opacity-animation">
             <div class="content"></div>
         </div>
 
-        <div id="reload-button">
+        <div id="reload-button" class="opacity-animation">
             <div class="content"></div>
         </div>
         
@@ -54,7 +155,6 @@
         <script src="js/libs/stats.min.js"></script>
         <script src="js/libs/three.min.js"></script>
         <script src="js/app.js"></script>
-        <!-- <script src="https://jsconsole.com/js/remote.js?439592300192834709385239324874324"></script> -->
 
     </body>
 </html>

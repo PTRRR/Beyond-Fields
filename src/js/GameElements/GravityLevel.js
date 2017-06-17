@@ -488,7 +488,7 @@ export class GravityLevel extends LevelCore {
 
 		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldBottom (), 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
-		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 500, 1000, 0 ] ); 
+		this.gameElements.player.instances[ 0 ].applyForce ( [ 0, 1000, 0 ] ); 
 
 	}
 

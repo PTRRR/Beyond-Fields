@@ -1,3 +1,4 @@
+import { clamp } from '../utils';
 import { shaderHelper } from './shaderHelper';
 import { LevelCore } from "./LevelCore";
 import { Text } from "./Text";
@@ -76,6 +77,8 @@ export class GravityElectricLevel extends LevelCore {
 		this.scanScene.add ( this.scanGravity );
 		this.scanGravityMaterial.extensions.derivatives = true;
 
+		this.mouseDown = false;
+
 	}
 
 	onUp ( _position ) {
@@ -85,6 +88,8 @@ export class GravityElectricLevel extends LevelCore {
 
 		this.indicatorScaleTarget = 0.0;
 		this.indicatorAlphaTarget = 0.0;
+
+		this.mouseDown = false;
 
 	} 
 
@@ -108,6 +113,8 @@ export class GravityElectricLevel extends LevelCore {
 			// this.indicatorScaleTarget = dist;
 
 		}
+
+		this.mouseDown = true;
 
 	}
 
@@ -230,6 +237,22 @@ export class GravityElectricLevel extends LevelCore {
 
 			for ( let j = 0; j < charges.length; j ++ ) {
 
+				if ( this.mouseDown ) {
+
+					let dir = vec3.sub ( vec3.create (), charges[ j ].position, this.glMouseWorld );
+					let dist = vec3.length ( dir );
+					let maxDist = 2.0;
+					vec3.normalize ( dir, dir );
+					let amp = clamp ( dist / maxDist , 0, 1 );
+
+					if ( dist < 0.5 ) {
+
+						charges[ j ].applyForce ( vec3.scale ( dir, dir, amp * 3 ) );
+
+					}
+
+				}
+
 				for ( let k = 0; k < charges.length; k ++ ) {
 
 					if ( j != k ) {
@@ -238,12 +261,12 @@ export class GravityElectricLevel extends LevelCore {
 						let dist = vec3.length ( dir );
 						vec3.normalize ( dir, dir );
 
-						let offset = 0.06;
+						let offset = 0.23;
 						let minDist = charges[ k ].scale[ 0 ] + charges[ j ].scale[ 0 ] + offset;
 
 						if ( dist < minDist ) {
 
-							vec3.scale ( dir, dir, - ( minDist - dist ) * 120 );
+							vec3.scale ( dir, dir, - Math.pow ( minDist - dist, 3 ) * 120 );
 							charges[ j ].applyForce ( dir );	
 
 						} else {
@@ -299,26 +322,47 @@ export class GravityElectricLevel extends LevelCore {
 
 		}
 
-		// Update FX particles
+		// Obstacles
 
-		for ( let i = 0; i < 2; i ++ ) {
+		if ( this.gameElements.obstacles ) {
 
-			let instance = this.addInstanceOf ( 'playerParticles', {
+			let obstacles = this.gameElements.obstacles.instances || [];
 
-				enabled: Math.random () > 0.05 ? true : false,
-				position: vec3.clone ( player.position ),
-				canDye: true,
-				lifeSpan: Math.random () * 1000 + 1000,
-				drag: 0.95,
-				mass: Math.random () * 100 + 200,
-				initialRadius: Math.random () * 0.06 + 0.03,
-				velocity: vec3.scale ( vec3.create (), vec3.clone ( player.velocity ), 0.1 ),
+			for ( let i = 0; i < obstacles.length; i ++ ) {
 
-			} );
+				let obstacle = obstacles[ i ];
 
-			instance.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30 ) );
+				if ( this.isInBox ( obstacle, player.position ) ) {
+
+					this.resetPlayer ();
+					break;
+
+				}
+
+			}
 
 		}
+
+		// Update FX particles
+
+		// for ( let i = 0; i < 2; i ++ ) {
+
+		// 	let instance = this.addInstanceOf ( 'playerParticles', {
+
+		// 		enabled: Math.random () > 0.05 ? true : false,
+		// 		position: vec3.clone ( player.position ),
+		// 		canDye: true,
+		// 		lifeSpan: Math.random () * 1000 + 1000,
+		// 		drag: 0.95,
+		// 		mass: Math.random () * 100 + 200,
+		// 		initialRadius: Math.random () * 0.06 + 0.03,
+		// 		velocity: vec3.scale ( vec3.create (), vec3.clone ( player.velocity ), 0.1 ),
+
+		// 	} );
+
+		// 	instance.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30 ) );
+
+		// }
 
 		if ( !this.infoScreenOpened ) return;
 
@@ -529,7 +573,7 @@ export class GravityElectricLevel extends LevelCore {
 
 		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldBottom () - 0.1, 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
-		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 2, 10000, 0 ] ); 
+		this.gameElements.player.instances[ 0 ].applyForce ( [ 0, 10000, 0 ] ); 
 
 	}
 
@@ -541,6 +585,7 @@ export class GravityElectricLevel extends LevelCore {
 		for ( let i = 0; i < planets.length; i ++ ) {
 
 			planets[ i ].charge = 0;
+			planets[ i ].targetCharge = 0;
 
 		}
 

@@ -143,7 +143,7 @@ let shaderHelper = {
 				float sdfDist = sdf.x * sdf.y * sdf.z;
 
 				gl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );
-				gl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7;
+				gl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7 + ( 1.0 - f_Color.a );
 
 			}
 
@@ -1087,6 +1087,302 @@ let shaderHelper = {
 
 	},
 
+	fixedElectricCharge: {
+
+		vertex: `\
+
+			attribute vec4 transform;
+			attribute vec4 rgbaColor;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+
+			mat4 scaleMatrix ( vec3 scale ) {
+
+				return mat4(scale.x, 0.0, 0.0, 0.0,
+				            0.0, scale.y, 0.0, 0.0,
+				            0.0, 0.0, scale.z, 0.0,
+				            0.0, 0.0, 0.0, 1.0);
+
+			}
+
+			mat4 rotationMatrix(vec3 axis, float angle) {
+
+				axis = normalize(axis);
+				float s = sin(angle);
+				float c = cos(angle);
+				float oc = 1.0 - c;
+				    
+				return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+				            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+				            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+				            0.0,                                0.0,                                0.0,                                1.0);
+				
+			}
+
+			void main () {
+
+				f_Color = rgbaColor;
+				f_Uv = uv;
+				vec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );
+
+				// Transform the position
+
+				float s = abs ( transform.z );
+				outPosition *= scaleMatrix ( vec3 ( s ) );
+				outPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );
+				
+
+				outPosition.x += transform.x;
+				outPosition.y += transform.y;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform sampler2D texture;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+				vec4 texture =  texture2D ( texture, f_Uv );
+				float sdfDist = texture.r * texture.g * texture.b;
+
+				float alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );
+
+				gl_FragColor = abs ( f_Color );
+				gl_FragColor.a = 1.0;
+
+
+				float w = 0.4;
+				float t = 0.99 - w;
+
+				float outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist ) );
+
+				gl_FragColor.r = outLineMultiplier * f_Color.r + ( 1.0 - outLineMultiplier ) * 1.0;
+				gl_FragColor.g = outLineMultiplier * f_Color.g + ( 1.0 - outLineMultiplier ) * 1.0;
+				gl_FragColor.b = outLineMultiplier * f_Color.b + ( 1.0 - outLineMultiplier ) * 1.0;
+
+				gl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );
+				gl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );
+				gl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );
+
+			}
+
+		`,
+
+	},
+
+	fixedElectricChargeScan: {
+
+		vertex: `\
+
+			attribute vec4 transform;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+
+			mat4 scaleMatrix ( vec3 scale ) {
+
+				return mat4(scale.x, 0.0, 0.0, 0.0,
+				            0.0, scale.y, 0.0, 0.0,
+				            0.0, 0.0, scale.z, 0.0,
+				            0.0, 0.0, 0.0, 1.0);
+
+			}
+
+			mat4 rotationMatrix(vec3 axis, float angle) {
+
+				axis = normalize(axis);
+				float s = sin(angle);
+				float c = cos(angle);
+				float oc = 1.0 - c;
+				    
+				return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+				            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+				            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+				            0.0,                                0.0,                                0.0,                                1.0);
+				
+			}
+
+			void main () {
+
+				f_Uv = uv;
+				vec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );
+
+				// Transform the position
+
+				f_Scale = transform.z;
+				outPosition *= scaleMatrix ( vec3 ( transform.z ) );
+				outPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );
+				
+
+				outPosition.x += transform.x;
+				outPosition.y += transform.y;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform sampler2D texture;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+
+			void main () {
+
+				vec4 sdf = texture2D ( texture, f_Uv );
+				float sdfDist = sdf.x * sdf.y * sdf.z;
+
+				float w = 0.18 / ( f_Scale + 1.0 );
+				float t = 0.99 - w;
+				float t2 = 0.5 - w;
+
+				// Background
+
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );
+
+				// Outside
+
+				gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );
+
+				// Outline
+
+				gl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w, w - 0.13, abs ( t2 - sdfDist ) );
+
+			}
+
+		`,
+
+	},
+
+	fixedElectricChargeInfo: {
+
+		vertex: `\
+
+			attribute vec4 rgbaColor;
+			attribute vec4 transform;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+			varying vec4 f_Color;
+
+			mat4 scaleMatrix ( vec3 scale ) {
+
+				return mat4(scale.x, 0.0, 0.0, 0.0,
+				            0.0, scale.y, 0.0, 0.0,
+				            0.0, 0.0, scale.z, 0.0,
+				            0.0, 0.0, 0.0, 1.0);
+
+			}
+
+			mat4 rotationMatrix(vec3 axis, float angle) {
+
+				axis = normalize(axis);
+				float s = sin(angle);
+				float c = cos(angle);
+				float oc = 1.0 - c;
+				    
+				return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+				            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+				            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+				            0.0,                                0.0,                                0.0,                                1.0);
+				
+			}
+
+			void main () {
+
+				f_Color = rgbaColor;
+				f_Uv = uv;
+				vec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );
+
+				// Transform the position
+
+				f_Scale = abs ( transform.z );
+				outPosition *= scaleMatrix ( vec3 ( transform.z ) );
+				outPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );
+				
+
+				outPosition.x += transform.x;
+				outPosition.y += transform.y;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform sampler2D texture;
+			varying vec2 f_Uv;
+			varying float f_Scale;
+			varying vec4 f_Color;
+
+			void main () {
+
+				float xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;
+				float yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;
+				float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;
+				vec4 sdf = texture2D ( texture, f_Uv );
+				float sdfDist = sdf.x * sdf.y * sdf.z;
+
+				float w = 0.92 / ( (f_Scale + 1.0) * 5.0 );
+				float w2 = 0.57 / ( (f_Scale + 1.0) * 5.0 );
+				float t = 0.99 - w;
+				float t2 = 0.5 - w2;
+
+				// Background
+
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );
+
+				// Draw sign.
+
+				if ( abs ( f_Color.r - 0.8 ) > 0.1 ) {
+
+					// Draw cross
+
+					float r = 0.10;
+					float w1 = 0.013;
+
+					if ( f_Color.r > f_Color.b ) {
+
+						gl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );
+
+					} else if ( f_Color.r < f_Color.b ) {
+
+						gl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );
+
+					}
+
+					gl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );
+					
+				} else {
+
+					gl_FragColor.a = 0.0;
+
+				}
+
+				// Outside
+
+				gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );
+
+				// Outline
+
+				gl_FragColor.a +=  smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w2, w2 - 0.05, abs ( t2 - sdfDist ) );
+
+			}
+
+		`,
+
+	},
+
 	equipotentialLines: {
 
 		vertex: `\
@@ -1224,7 +1520,7 @@ let shaderHelper = {
 
 				float cDist = length ( vec2 ( 0.5 ) - f_Uv );
 
-				gl_FragColor = vec4 ( 0.8, 0.8, 0.8, 1.0 - cDist * 0.2 );
+				gl_FragColor = vec4 ( 0.85, 0.85, 0.85, 1.0 - cDist * 0.2 );
 
 			}
 
@@ -1391,9 +1687,11 @@ let shaderHelper = {
 			attribute vec4 rgbaColor;
 			varying vec4 f_Color;
 			varying vec2 f_Uv;
+			varying float f_Scale;
 
 			void main () {
 
+				f_Scale = position.z;
 				f_Color = rgbaColor;
 				f_Uv = uv;
 				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );
@@ -1406,6 +1704,7 @@ let shaderHelper = {
 
 			varying vec4 f_Color;
 			varying vec2 f_Uv;
+			varying float f_Scale;
 			uniform sampler2D texture;
 
 			void main () {
@@ -1414,8 +1713,16 @@ let shaderHelper = {
 
 				vec4 sdf = texture2D ( texture, f_Uv );
 				float sdfDist = sdf.x * sdf.y * sdf.z;
+				float sdfDist2 = sdf.x * sdf.y * sdf.z * f_Scale;
+
+				float w = 0.15;
+				float t = f_Scale - w;
+				float outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist2 ) );
 
 				gl_FragColor = f_Color;
+				gl_FragColor.r = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.r;
+				gl_FragColor.g = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.g;
+				gl_FragColor.b = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.b;
 				gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );
 				gl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );
 
@@ -1746,43 +2053,6 @@ let shaderHelper = {
 		`,
 	},
 
-	arrival: {
-
-		vertex: `\
-
-			varying vec2 f_Uv;
-
-			void main () {
-
-				f_Uv = uv;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
-
-
-			}
-
-		`,
-
-		fragment: `\
-
-			varying vec2 f_Uv;
-			uniform float alpha;
-
-			void main () {
-
-				float cDist = length ( vec2 ( 0.5, 0.0 ) - f_Uv ) * 2.0;
-
-				float w = 0.2;
-				float t = 1.0 - w;
-
-				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( 0.79, 0.8, cDist ) );
-
-
-					
-			}
-
-		`,
-	},
-
 	departure: {
 
 		vertex: `\
@@ -1806,15 +2076,87 @@ let shaderHelper = {
 
 			void main () {
 
-				float cDist = length ( vec2 ( 0.5, 0.6 ) - f_Uv ) * 2.0;
-				// vec2 d =  vec2 ( 0.5, 0.5 ) - f_Uv) * 2.0;
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
 
-				float w = 0.2;
+				float w = 0.15;
 				float t = 1.0 - w;
 
-				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, 0.0 );
-				gl_FragColor.a += smoothstep ( 0.2, 0.19, abs ( ( 0.5 - f_Uv.y ) * 2.0 ) );
-				gl_FragColor.a += smoothstep ( 0.8, 0.79, cDist );
+				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );
+
+
+					
+			}
+
+		`,
+	},
+
+	arrival: {
+
+		vertex: `\
+
+			attribute vec4 transform;
+			attribute vec4 rgbaColor;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+
+			mat4 scaleMatrix ( vec3 scale ) {
+
+				return mat4(scale.x, 0.0, 0.0, 0.0,
+				            0.0, scale.y, 0.0, 0.0,
+				            0.0, 0.0, scale.z, 0.0,
+				            0.0, 0.0, 0.0, 1.0);
+
+			}
+
+			mat4 rotationMatrix(vec3 axis, float angle) {
+
+				axis = normalize(axis);
+				float s = sin(angle);
+				float c = cos(angle);
+				float oc = 1.0 - c;
+				    
+				return mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+				            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+				            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+				            0.0,                                0.0,                                0.0,                                1.0);
+				
+			}
+
+			void main () {
+
+				f_Color = rgbaColor;
+				f_Uv = uv;
+				vec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );
+
+				// Transform the position
+
+				outPosition *= scaleMatrix ( vec3 ( transform.z ) );
+				outPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );
+				
+
+				outPosition.x += transform.x;
+				outPosition.y += transform.y;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+			uniform float alpha;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+
+				float w = 0.15;
+				float t = 1.0 - w;
+
+				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );
+				gl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );
 					
 			}
 
@@ -1891,6 +2233,139 @@ let shaderHelper = {
 	        	gl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );
 	        
 	        }
+
+		`,
+
+	},
+
+	circle: {
+
+		vertex: `\
+
+	      	varying vec2 f_Uv;
+
+	        void main() {
+	    
+	    		f_Uv = uv;
+	        	gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+	        }
+
+		`,
+
+		fragment: `\
+
+			uniform vec4 diffuse;
+			varying vec2 f_Uv;
+
+	        void main() {
+
+	        	float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;
+
+	        	gl_FragColor = diffuse;
+	        	gl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );
+	        
+	        }
+
+		`,
+
+	},
+
+	introParticles: {
+
+		vertex: `\
+
+	        void main() {
+	    
+	    		gl_PointSize = position.z;
+	        	gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );
+
+	        }
+
+		`,
+
+		fragment: `\
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( 1.0, 0.85, cDist ) * 0.5 );
+					
+			}
+
+		`,
+
+	},
+
+	introEndParticles: {
+
+		vertex: `\
+
+			uniform float scale;
+			varying vec2 f_Uv;
+
+	        void main() {
+	    
+	    		f_Uv = uv;
+	    		vec3 outPosition = vec3 ( position.xy, 0.0 ) * scale;
+	        	gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy * scale, 0.0, 1.0 );
+
+	        }
+
+		`,
+
+		fragment: `\
+
+			uniform float scale;
+			uniform float alpha;
+			varying vec2 f_Uv;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * scale;
+
+				float w = 0.1;
+				float t = scale - w;
+
+				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;
+				// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+					
+			}
+
+		`,
+
+	},
+
+	introArrival: {
+
+		vertex: `\
+
+	      	varying vec2 f_Uv;
+
+	        void main() {
+	    
+	    		f_Uv = uv;
+	        	gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+	        }
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+
+				float w = 0.15;
+				float t = 1.0 - w;
+
+				gl_FragColor = vec4 ( 0.8, 0.8, 0.8, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );
+				gl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );
+					
+			}
 
 		`,
 

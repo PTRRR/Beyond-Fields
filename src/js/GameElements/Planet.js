@@ -7,9 +7,9 @@ export class Planet extends PhysicalElement {
 
 		super ( _options );
 
-		this.sign = 1;
+		this.sign = _options.sign || 1;
 		this.maxCharge = _options.maxCharge || 50;
-		this.minCharge =  _options.minCharge || -50;
+		this.minCharge =  _options.minCharge || -this.maxCharge;
 		this.charge = _options.charge || 0;
 		this.targetCharge = this.charge;
 

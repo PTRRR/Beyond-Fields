@@ -57,7 +57,7 @@ export class ElectricLevel extends LevelCore {
 
 		this.onLoad ( function () {
 
-			console.log(this.gameElements);
+			this.gameElements.arrival.instances[ 0 ].position[ 1 ] = this.getWorldBottom () + 0.5;
 
 		}.bind ( this ) );
 
@@ -126,7 +126,7 @@ export class ElectricLevel extends LevelCore {
 			this.createdInstance.sign = Math.sign ( yDist );
 			this.createdInstance.targetRadius = dist;
 
-		} else if ( this.currentInstance ) {
+		} else if ( this.currentInstance && this.currentInstance.element.enabled ) {
 
 			let dir = null;
 			let dist = null;
@@ -136,7 +136,8 @@ export class ElectricLevel extends LevelCore {
 
 				case 'center':
 
-					this.currentInstance.element.targetPosition = mouse;
+					// this.currentInstance.element.targetPosition = mouse;
+					
 					// this.currentInstance.element.targetRadius = 0;
 
 				break;
@@ -253,11 +254,31 @@ export class ElectricLevel extends LevelCore {
 
 		// Charges
 
+		// Update current charge
+
+		if ( this.currentInstance && this.currentInstance.type == 'center' ) {
+
+			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.currentInstance.element.position );
+			this.currentInstance.element.applyForce ( dir );
+
+		}
+
 		let charges = this.gameElements.charges.instances;
 
 		for ( let i = 0; i < charges.length; i ++ ) {
 
 			let charge = charges[ i ];
+
+			if ( this.checkEdges ( charge.position, 0.2 ) ) {
+
+				charge.update ();
+				if ( !charge.killed ) {
+
+					charge.kill ();
+					
+				}
+
+			}
 
 			chargesUniform.push ( charge.position[ 0 ] );
 			chargesUniform.push ( charge.position[ 1 ] );
@@ -273,6 +294,44 @@ export class ElectricLevel extends LevelCore {
 
 				let force = this.computeElectricForce ( charge, player );
 				vec3.add ( forceResult, forceResult, force );
+
+			}
+
+			// Check overlapping charges.
+
+			for ( let j = 0; j < charges.length; j ++ ) {
+
+				if ( j != i ) {
+
+					let dir = vec3.sub ( vec3.create (), charge.position, charges[ j ].position );
+					let dist = vec3.length ( dir );
+					let minDist = charge.scale[ 0 ] + charges[ j ].scale[ 0 ];
+					let offset = -0.15;
+
+					if ( dist < minDist + offset ) {
+
+						vec3.scale ( dir, dir, Math.pow ( minDist - dist, 3 ) * 5 );
+						charge.applyForce ( dir );
+
+					}
+
+				}
+
+			}
+
+			for ( let j = 0; j < fixedCharges.length; j ++ ) {
+
+				let dir = vec3.sub ( vec3.create (), charge.position, fixedCharges[ j ].position );
+				let dist = vec3.length ( dir );
+				let minDist = charge.scale[ 0 ] + fixedCharges[ j ].scale[ 0 ];
+				let offset = -0.07;
+
+				if ( dist < minDist + offset ) {
+
+					vec3.scale ( dir, dir, Math.pow ( minDist - dist, 2 ) * 5 );
+					charge.applyForce ( dir );
+
+				}
 
 			}
 
@@ -303,7 +362,7 @@ export class ElectricLevel extends LevelCore {
 
 			particle.applyForce ( dir );
 
-			for ( let i= 0; i < charges.length; i ++ ) {
+			for ( let i = 0; i < charges.length; i ++ ) {
 
 				let charge = charges[ i ];
 
@@ -500,38 +559,39 @@ export class ElectricLevel extends LevelCore {
 
 	checkCharges ( _position ) {
 
+		let totalCharges = [];
 		let charges = this.gameElements.charges.instances;
+		let fixedCharges = this.gameElements.fixedCharges.instances;
 
-		for ( let i = 0; i < charges.length; i ++ ) {
+		totalCharges = totalCharges.concat ( charges );
+		totalCharges = totalCharges.concat ( fixedCharges );
 
-			let rangeCenter = charges[ i ].radius * 0.5;
-			let distToCenter = vec3.length ( vec3.sub ( vec3.create(), charges[ i ].position, _position ) );
+		for ( let i = 0; i < totalCharges.length; i ++ ) {
 
-			let rangeEdge = 0.1;
-			let distToEdge = Math.abs ( distToCenter - charges[ i ].radius );
+			let rangeCenter = totalCharges[ i ].radius * 0.5;
+			let distToCenter = vec3.length ( vec3.sub ( vec3.create(), totalCharges[ i ].position, _position ) );
+
+			let rangeEdge = 0.2;
+			let distToEdge = Math.abs ( distToCenter - totalCharges[ i ].radius );
 
 			if ( distToEdge < rangeEdge ) {
 
-				let tC = charges[ i ];
-				this.gameElements.charges.instances.splice ( i, 1 );
-				this.gameElements.charges.instances.unshift ( tC );
+				let tC = totalCharges[ i ];
 
 				return {
 
-					element: this.gameElements.charges.instances[ 0 ],
+					element: tC,
 					type: 'edge',
 
 				}
 
-			} else if ( distToEdge > rangeEdge && distToCenter < charges[ i ].radius ) {
+			} else if ( distToEdge > rangeEdge && distToCenter < totalCharges[ i ].radius ) {
 
-				let tC = charges[ i ];
-				this.gameElements.charges.instances.splice ( i, 1 );
-				this.gameElements.charges.instances.unshift ( tC );
+				let tC = totalCharges[ i ];
 
 				return {
 
-					element: this.gameElements.charges.instances[ 0 ],
+					element: tC,
 					type: 'center',
 
 				};
@@ -559,9 +619,10 @@ export class ElectricLevel extends LevelCore {
 
 	resetPlayer () {
 
-		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldTop (), 0 );
+		this.gameElements.player.instances[ 0 ].color[ 3 ] = 0;
+		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldTop () + 0.1, 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
-		this.gameElements.player.instances[ 0 ].applyForce ( [ ( Math.random () - 0.5 ) * 10, -10, 0 ] ); 
+		this.gameElements.player.instances[ 0 ].applyForce ( [ 0, -10, 0 ] ); 
 
 	}
 
