@@ -11,7 +11,7 @@ export class ElectricParticle extends PhysicalElement {
 		// Charge
 
 		this.chargeDenominator = -3;
-		this.sign = _options.sign || ( Math.random() > 0.5 ? 1 : -1 );
+		this.sign = _options.sign || ( Math.random() > 0.3 ? 1 : -1 );
 		this.minCharge = _options.minCharge || -10.0 * Math.pow ( 10, this.chargeDenominator );
 		this.maxCharge = _options.maxCharge || 10.0 * Math.pow ( 10, this.chargeDenominator ); 
 
@@ -19,8 +19,8 @@ export class ElectricParticle extends PhysicalElement {
 
 		// Scale
 
-		this.maxRadius = _options.minRadius || 0.8;
-		this.minRadius = _options.maxRadius || 0.25;
+		this.maxRadius = _options.maxRadius || 0.8;
+		this.minRadius = _options.minRadius || 0.25;
 		this.rangeScale = this.maxRadius - this.minRadius;
 		this.targetRadius = _options.targetRadius || 0.2;
 		this.radius = 0;

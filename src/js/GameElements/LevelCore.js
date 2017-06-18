@@ -406,64 +406,64 @@ export class LevelCore {
 		// Add base elements.
 		// Add the scale square in the background.
 
-		this.addElement ( 'scaleSquare', {
+		// this.addElement ( 'scaleSquare', {
 
-			static: true,
-			manualMode: false,
-			renderOrder: 0,
+		// 	static: true,
+		// 	manualMode: false,
+		// 	renderOrder: 0,
 
-			shaders: {
+		// 	shaders: {
 
-				main: null,
+		// 		main: null,
 
-				normal: {
+		// 		normal: {
 
-					name: 'solidQuad',
-					uniforms: {
+		// 			name: 'solidQuad',
+		// 			uniforms: {
 
-						solidColor: { value: [ 0.9, 0.9, 0.9, 1.0 ] },
+		// 				solidColor: { value: [ 0.9, 0.9, 0.9, 1.0 ] },
 
-					}
+		// 			}
 
-				},
+		// 		},
 
-				scan: {
+		// 		scan: {
 
-					name: 'simpleTexture',
-					transparent: true,
-					textureUrl: './resources/textures/scale_square.png',
+		// 			name: 'simpleTexture',
+		// 			transparent: true,
+		// 			textureUrl: './resources/textures/scale_square.png',
 
-				},
+		// 		},
 
-				infos: {
+		// 		infos: {
 
-					name: 'coloredTexture',
-					transparent: true,
-					textureUrl: './resources/textures/scale_square.png',
-					uniforms: {
+		// 			name: 'coloredTexture',
+		// 			transparent: true,
+		// 			textureUrl: './resources/textures/scale_square.png',
+		// 			uniforms: {
 
-						solidColor: { value: [ 0.0, 0.0, 0.0, 1.0 ] },
+		// 				solidColor: { value: [ 0.0, 0.0, 0.0, 1.0 ] },
 
-					}
+		// 			}
 
-				},
+		// 		},
 
-			},
+		// 	},
 
-			instances: {
+		// 	instances: {
 
-				0: {
+		// 		0: {
 
-					enabled: true,
-					position: [ 0, 0, 0 ],
-					rotation: [ 0, 0, 0 ],
-					scale: [ 2, 2, 1 ],
+		// 			enabled: true,
+		// 			position: [ 0, 0, 0 ],
+		// 			rotation: [ 0, 0, 0 ],
+		// 			scale: [ 2, 2, 1 ],
 
-				}
+		// 		}
 
-			}
+		// 	}
 
-		} );
+		// } );
 
 		// Add the goals elements.
 
@@ -630,7 +630,14 @@ export class LevelCore {
 
 				},
 
-				scan: null,
+				scan: {
+
+					name: 'playerScan',
+					transparent: true,
+					textureUrl: './resources/textures/generic_circle_sdf.png',
+					uniforms: {},
+
+				},
 
 				infos: {
 
@@ -1853,7 +1860,7 @@ export class LevelCore {
 		let distToScanButton = this.mouseWorld.distanceTo ( this.scanScreenButton.position );
 		let onScan = false;
 
-		if ( distToScanButton < this.scanScreenButton.scale.x * 0.5 ) {
+		if ( distToScanButton < this.scanScreenButton.scale.x * 1.0 ) {
 
 			onScan = true;
 
@@ -1862,7 +1869,7 @@ export class LevelCore {
 		let distToInfoButton = this.mouseWorld.distanceTo ( this.infoScreenButton.position );
 		let onInfo = false;
 
-		if ( distToInfoButton < this.infoScreenButton.scale.x * 0.5 ) {
+		if ( distToInfoButton < this.infoScreenButton.scale.x * 1.0 ) {
 
 			onInfo = true;
 

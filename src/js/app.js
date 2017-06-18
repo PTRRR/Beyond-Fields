@@ -49,11 +49,16 @@ let loop = require ( 'raf-loop' );
 
 		// Build GUI
 
+		let isRuning = false;
 		let pagesStack = [];
+		let backPage = null;
+		let backAction = false;
 		let pages = document.querySelectorAll('.page');
 		let mainMenu = document.querySelector('#main-menu');
 		let loadingPanel = document.querySelector('#loading-panel');
 		let loadingLevelPanel = document.querySelector('#loading-level-panel');
+
+		// Set events on the buttons.
 
 		for ( let i = 0; i < pages.length; i ++ ) {
 
@@ -63,35 +68,109 @@ let loop = require ( 'raf-loop' );
 
 				if ( WURFL.is_mobile === true ) {
 
-					addEvent ( buttons[ j ], 'touchstart', function () {
+					( function ( button ) {
 
-						var onTouchEnd = function () {
+						button.addEventListener ( 'touchstart', function () {
 
-							let target = this.attributes.target.value;
-							setPageActive ( document.querySelector ( '#' + target ) );
-							removeEvent ( { elem: this, event: 'touchend', handler: onTouchEnd } );
+							let onMouseUp = function () {
 
-						}
+								if ( button.attributes.target ) {
 
-						addEvent ( this, 'touchend', onTouchEnd );
+									let target = button.attributes.target.value;
+									let currentPage = document.querySelector('.page-active');
+									setPageActive ( document.querySelector( '#' + target ) );
+									backPage = currentPage;
+									button.removeEventListener ( 'touchend', onMouseUp );
 
-					} );
+									if ( button.attributes.chapter ) {
+
+										let chapter = button.attributes.chapter.value;
+										let level = button.attributes.level.value;
+
+										loadingLevelPanel.style.opacity = 1;
+										loadingLevelPanel.style.pointerEvents = 'auto';
+
+										setTimeout ( function () {
+
+											gameManager.startLevel ( levels[ chapter ][ level ], function () {
+
+												isRuning = true;
+
+												setTimeout ( function () {
+
+													loadingLevelPanel.style.opacity = 0;
+													loadingLevelPanel.style.pointerEvents = 'none';
+
+												}, 500 );
+
+											} );
+
+										}, 500 );
+
+									}
+
+								}
+
+							}
+							
+							button.addEventListener ( 'touchend', onMouseUp );
+
+						} );
+
+					} )( buttons[ j ] );
 
 				} else {
 
-					addEvent ( buttons[ j ], 'mousedown', function () {
+					( function ( button ) {
 
-						var onMouseUp = function () {
+						button.addEventListener ( 'mousedown', function () {
 
-							let target = this.attributes.target.value;
-							setPageActive ( document.querySelector ( '#' + target ) );
-							removeEvent ( { elem: this, event: 'mouseup', handler: onMouseUp } );
+							let onMouseUp = function () {
 
-						}
+								if ( button.attributes.target ) {
 
-						addEvent ( this, 'mouseup', onMouseUp );
+									let target = button.attributes.target.value;
+									let currentPage = document.querySelector('.page-active');
+									setPageActive ( document.querySelector( '#' + target ) );
+									backPage = currentPage;
+									button.removeEventListener ( 'mouseup', onMouseUp );
 
-					} );
+									if ( button.attributes.chapter ) {
+
+										let chapter = button.attributes.chapter.value;
+										let level = button.attributes.level.value;
+
+										loadingLevelPanel.style.opacity = 1;
+										loadingLevelPanel.style.pointerEvents = 'auto';
+
+										setTimeout ( function () {
+
+											gameManager.startLevel ( levels[ chapter ][ level ], function () {
+
+												isRuning = true;
+
+												setTimeout ( function () {
+
+													loadingLevelPanel.style.opacity = 0;
+													loadingLevelPanel.style.pointerEvents = 'none';
+
+												}, 500 );
+
+											} );
+
+										}, 500 );
+
+									}
+
+								}
+
+							}
+							
+							button.addEventListener ( 'mouseup', onMouseUp );
+
+						} );
+
+					} )( buttons[ j ] );
 
 				}
 
@@ -107,13 +186,69 @@ let loop = require ( 'raf-loop' );
 
 			if ( activePage ) {
 
+				if ( !backAction ) pagesStack.push ( activePage );
+				backAction = false;
 				setPageUnactive ( activePage );
 
 			}
 
 			if ( !_page.className.match(/(?:^|\s)page-active(?!\S)/) ) {
 
+				switch ( _page.id ) {
+
+					case 'main-menu':
+
+						setTimeout ( function () {
+
+							introScene.initMainMenu ();
+
+						}, 500 );
+
+					break;
+
+					case 'gravity-levels':
+
+						setTimeout ( function () {
+
+							introScene.initGravity ();
+
+						}, 500 );
+
+					break;
+
+					case 'electric-levels':
+
+						setTimeout ( function () {
+
+							introScene.initElectric ();
+
+						}, 500 );
+
+					break;
+
+					case 'gravity-electric-levels':
+
+						setTimeout ( function () {
+
+							introScene.initGravityElectric ();
+
+						}, 500 );
+
+					break;
+
+				}
+
 				_page.className += ' page-active';
+
+				if ( _page.attributes.back ) {
+
+					backPage = document.querySelector ( '#' + _page.attributes.back.value );
+
+				} else {
+
+					backPage = null;
+
+				}
 				
 				if ( _onTransitionEnd ) {
 
@@ -131,6 +266,18 @@ let loop = require ( 'raf-loop' );
 					} );
 
 				}
+
+			}
+
+			if ( backPage ) {
+
+				backButton.style.opacity = 1;
+				backButton.style.pointerEvents = 'auto';
+
+			} else {
+
+				backButton.style.opacity = 0;
+				backButton.style.pointerEvents = 'none';
 
 			}
 
@@ -170,14 +317,45 @@ let loop = require ( 'raf-loop' );
 
 		}
 
+		// Top Bar
+
 		let backButton = document.querySelector('#back-button');
-		addEvent ( backButton, 'click', function () {
 
-			menu.classList.remove ( 'hidden' );
-			gameManager.end();
-			makePageActive ( 'home' );
+		if ( WURFL.is_mobile === true ) {
 
-		} );
+			backButton.addEventListener ( 'touchstart', function () {
+
+				let onMouseUp = function () {
+
+					backAction = true;
+					setPageActive ( backPage );
+					isRuning = false;
+					backButton.removeEventListener ( 'touchend', onMouseUp );
+
+				}
+				
+				backButton.addEventListener ( 'touchend', onMouseUp );
+
+			} );
+
+		} else {
+
+			backButton.addEventListener ( 'mousedown', function () {
+
+				let onMouseUp = function () {
+
+					backAction = true;
+					setPageActive ( backPage );
+					isRuning = false;
+					backButton.removeEventListener ( 'mouseup', onMouseUp );
+
+				}
+				
+				backButton.addEventListener ( 'mouseup', onMouseUp );
+
+			} );
+
+		}
 
 		let reloadButton = document.querySelector('#reload-button');
 		addEvent ( reloadButton, 'click', function () {
@@ -188,7 +366,7 @@ let loop = require ( 'raf-loop' );
 
 		// General
 
-		let renderer = new THREE.WebGLRenderer( { alpha: true } );
+		let renderer = new THREE.WebGLRenderer();
 		let gl = renderer.getContext ();
 
 		let devicePixelRatio = window.devicePixelRatio;
@@ -197,6 +375,7 @@ let loop = require ( 'raf-loop' );
 			devicePixelRatio = 1.5;
 
 		}
+
 		renderer.setPixelRatio ( devicePixelRatio );
 		renderer.setSize( window.innerWidth, window.innerHeight );
 
@@ -206,7 +385,7 @@ let loop = require ( 'raf-loop' );
 
 		let stats = new Stats();
 		stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-		// document.body.appendChild( stats.dom );
+		document.body.appendChild( stats.dom );
 
 		// Events
 
@@ -365,41 +544,62 @@ let loop = require ( 'raf-loop' );
 		// Create intro scene
 
 		let introScene = new IntroScene ( renderer );
-		introScene.onEnd ( function () {
+
+		// Delay all transition in order to prevent overloading the gpu.
+
+		introScene.build ( function () {
 
 			setTimeout ( function () {
 
-				setPageActive ( mainMenu );
+				setPageUnactive ( loadingPanel, function () {
 
-			}, 50 );
+					setTimeout ( function () {
+
+						// Init the intro scene and set a callback that will be fired when the players hit the target.
+
+						introScene.initIntro ( function () {
+
+							setTimeout ( function () {
+
+								setPageActive ( mainMenu );
+
+							}, 100 );
+
+						} );
+
+					}, 100 );
+
+				} );
+
+			}, 300 );
 
 		} );
-		
-		setTimeout ( function () {
-
-			setPageUnactive ( loadingPanel, function () {
-
-				setTimeout ( function () {
-
-					introScene.init ();
-
-				}, 10 );
-
-			} );
-
-		}, 500 );
 
 		function update ( _deltaTime ) {
 
-			gameManager.update ( _deltaTime );
-			introScene.update ();
+			if ( isRuning ) {
+
+				gameManager.update ( _deltaTime );
+				
+			} else {
+
+				introScene.update ();
+				
+			}
 
 		}
 
 		function render ( _deltaTime ) {
 			
-			gameManager.render ( _deltaTime );
-			introScene.render ();
+			if ( isRuning ) {
+
+				gameManager.render ( _deltaTime );
+				
+			} else {
+
+				introScene.render ();
+				
+			}
 
 		}
 

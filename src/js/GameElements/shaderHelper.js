@@ -194,6 +194,49 @@ let shaderHelper = {
 
 	},
 
+	playerScan: {
+
+		vertex: `\
+
+			attribute vec4 rgbaColor;
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+
+			void main () {
+
+				f_Color = rgbaColor;
+				f_Uv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec4 f_Color;
+			varying vec2 f_Uv;
+			uniform sampler2D texture;
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;
+
+				vec4 sdf = texture2D ( texture, f_Uv );
+				float sdfDist = sdf.x * sdf.y * sdf.z;
+
+				float t = 0.80;
+
+				gl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );
+				gl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );
+
+
+			}
+
+		`,
+
+	},
+
 	playerParticles: {
 
 		vertex: `\
@@ -2263,13 +2306,15 @@ let shaderHelper = {
 	        	float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;
 
 	        	gl_FragColor = diffuse;
-	        	gl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );
+	        	gl_FragColor.a *= smoothstep ( 1.0, 0.95, cDist );
 	        
 	        }
 
 		`,
 
 	},
+
+	// Intro
 
 	introParticles: {
 
@@ -2297,7 +2342,7 @@ let shaderHelper = {
 
 	},
 
-	introEndParticles: {
+	introEndCircles: {
 
 		vertex: `\
 
@@ -2307,7 +2352,6 @@ let shaderHelper = {
 	        void main() {
 	    
 	    		f_Uv = uv;
-	    		vec3 outPosition = vec3 ( position.xy, 0.0 ) * scale;
 	        	gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy * scale, 0.0, 1.0 );
 
 	        }
@@ -2327,8 +2371,7 @@ let shaderHelper = {
 				float w = 0.1;
 				float t = scale - w;
 
-				gl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;
-				// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;
 					
 			}
 
@@ -2369,7 +2412,239 @@ let shaderHelper = {
 
 		`,
 
-	}
+	},
+
+	introGenericCircle: {
+
+		vertex: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				f_Uv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+			uniform sampler2D texture;
+			uniform vec4 solidColor;
+
+			float aastep ( float value ) {
+
+			    #ifdef GL_OES_standard_derivatives
+
+			      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;
+
+			    #else
+
+			      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );
+
+			    #endif
+
+			    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );
+
+			}
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;
+			    vec4 texColor = texture2D ( texture, f_Uv );
+			    float alpha = aastep ( texColor.a );
+			    gl_FragColor = solidColor;
+			    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist );
+
+			    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+			    if ( gl_FragColor.a < 0.0001 ) discard;
+
+			    // gl_FragColor = texColor;
+
+			}
+
+		`,
+
+	},
+
+	introGenericCirclePoint: {
+
+		vertex: `\
+
+			varying vec2 f_Uv;
+			varying float f_Size;
+
+			void main () {
+
+				f_Uv = uv;
+				f_Size = position.z;
+				gl_PointSize = position.z;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+			varying float f_Size;
+			uniform sampler2D texture;
+			uniform vec4 solidColor;
+
+			float aastep ( float value ) {
+
+			    #ifdef GL_OES_standard_derivatives
+
+			      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;
+
+			    #else
+
+			      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );
+
+			    #endif
+
+			    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );
+
+			}
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;
+			    vec4 texColor = texture2D ( texture, gl_PointCoord.xy );
+			    float alpha = aastep ( texColor.a );
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );
+			    gl_FragColor.rgb += solidColor.rgb + ( vec3 ( 1.0 ) - solidColor.rgb ) * ( 1.0 - alpha ) + smoothstep ( 0.0, 5.0, cDist ) + ( f_Size / 100.0 - 0.5 ) * 0.05;
+			    if ( alpha < 0.0001 ) discard;
+
+			}
+
+		`,
+
+	},
+
+	introElectricPlanet: {
+
+		vertex: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				f_Uv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+			uniform sampler2D texture;
+			uniform vec4 solidColor;
+
+			float aastep ( float value ) {
+
+			    #ifdef GL_OES_standard_derivatives
+
+			      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;
+
+			    #else
+
+			      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );
+
+			    #endif
+
+			    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );
+
+			}
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;
+			    vec4 texColor = texture2D ( texture, f_Uv );
+			    float alpha = aastep ( texColor.a - 0.2 );
+
+			    float w = 0.2;
+			    float t = 1.0 - w;
+
+			    gl_FragColor = solidColor;
+			    gl_FragColor.rgb -= smoothstep ( 1.0, 0.9, texColor.a ) * 0.4;
+			    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist ) * smoothstep ( 0.0, 2.0, cDist );
+
+
+			    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+			    if ( gl_FragColor.a < 0.0001 ) discard;
+
+			    // gl_FragColor = texColor;
+
+			}
+
+		`,
+
+	},
+
+	introGenericCircleElectricPlanet: {
+
+		vertex: `\
+
+			attribute vec4 rgbaColor;
+			varying vec4 f_Color;
+
+			void main () {
+
+				f_Color = rgbaColor;
+				gl_PointSize = position.z;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			uniform sampler2D texture;
+			varying vec4 f_Color;
+			uniform float globalAlpha;
+
+			float aastep ( float value ) {
+
+			    #ifdef GL_OES_standard_derivatives
+
+			      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;
+
+			    #else
+
+			      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );
+
+			    #endif
+
+			    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );
+
+			}
+
+			void main () {
+
+				float cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;
+			    vec4 texColor = texture2D ( texture, gl_PointCoord.xy );
+			    float alpha = aastep ( texColor.a );
+			    gl_FragColor = f_Color;
+			    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist ) * globalAlpha;
+
+			    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );
+			    // if ( gl_FragColor.a < 0.0001 ) discard;
+
+			    // gl_FragColor = texColor;
+
+			}
+
+		`,
+
+	},
 
 }
 

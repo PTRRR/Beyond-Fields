@@ -54,7 +54,7 @@ export function removeEvent( token ) {
 
     if ( token.elem.removeEventListener ) {
 
-        token.elem.removeEventListener( token.event, token.handler );
+        token.elem.removeEventListener( token.event, token.handler, true );
 
     } else {
 

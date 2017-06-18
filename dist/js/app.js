@@ -6133,7 +6133,7 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 				// Charge
 
 				_this.chargeDenominator = -3;
-				_this.sign = _options.sign || (Math.random() > 0.5 ? 1 : -1);
+				_this.sign = _options.sign || (Math.random() > 0.3 ? 1 : -1);
 				_this.minCharge = _options.minCharge || -10.0 * Math.pow(10, _this.chargeDenominator);
 				_this.maxCharge = _options.maxCharge || 10.0 * Math.pow(10, _this.chargeDenominator);
 
@@ -6141,8 +6141,8 @@ var ElectricParticle = exports.ElectricParticle = function (_PhysicalElement) {
 
 				// Scale
 
-				_this.maxRadius = _options.minRadius || 0.8;
-				_this.minRadius = _options.maxRadius || 0.25;
+				_this.maxRadius = _options.maxRadius || 0.8;
+				_this.minRadius = _options.minRadius || 0.25;
 				_this.rangeScale = _this.maxRadius - _this.minRadius;
 				_this.targetRadius = _options.targetRadius || 0.2;
 				_this.radius = 0;
@@ -6405,14 +6405,11 @@ var ElementCore = exports.ElementCore = function () {
 						this.lastTime = this.time;
 
 						this.lifeStartMultiplier += (1 - this.lifeStartMultiplier) * this.lifeStartSpeed;
+						this.lifeLeft -= this.deltaTime;
 
-						if (this.lifeLeft > 0) {
+						// Clamp the value when it reaches 0.
 
-								this.lifeLeft -= this.deltaTime;
-						} else {
-
-								this.lifeLeft = 0;
-						}
+						this.lifeLeft = Math.max(0, this.lifeLeft);
 				}
 		}, {
 				key: 'isDead',
@@ -7916,64 +7913,64 @@ var LevelCore = exports.LevelCore = function () {
 						// Add base elements.
 						// Add the scale square in the background.
 
-						this.addElement('scaleSquare', {
+						// this.addElement ( 'scaleSquare', {
 
-								static: true,
-								manualMode: false,
-								renderOrder: 0,
+						// 	static: true,
+						// 	manualMode: false,
+						// 	renderOrder: 0,
 
-								shaders: {
+						// 	shaders: {
 
-										main: null,
+						// 		main: null,
 
-										normal: {
+						// 		normal: {
 
-												name: 'solidQuad',
-												uniforms: {
+						// 			name: 'solidQuad',
+						// 			uniforms: {
 
-														solidColor: { value: [0.9, 0.9, 0.9, 1.0] }
+						// 				solidColor: { value: [ 0.9, 0.9, 0.9, 1.0 ] },
 
-												}
+						// 			}
 
-										},
+						// 		},
 
-										scan: {
+						// 		scan: {
 
-												name: 'simpleTexture',
-												transparent: true,
-												textureUrl: './resources/textures/scale_square.png'
+						// 			name: 'simpleTexture',
+						// 			transparent: true,
+						// 			textureUrl: './resources/textures/scale_square.png',
 
-										},
+						// 		},
 
-										infos: {
+						// 		infos: {
 
-												name: 'coloredTexture',
-												transparent: true,
-												textureUrl: './resources/textures/scale_square.png',
-												uniforms: {
+						// 			name: 'coloredTexture',
+						// 			transparent: true,
+						// 			textureUrl: './resources/textures/scale_square.png',
+						// 			uniforms: {
 
-														solidColor: { value: [0.0, 0.0, 0.0, 1.0] }
+						// 				solidColor: { value: [ 0.0, 0.0, 0.0, 1.0 ] },
 
-												}
+						// 			}
 
-										}
+						// 		},
 
-								},
+						// 	},
 
-								instances: {
+						// 	instances: {
 
-										0: {
+						// 		0: {
 
-												enabled: true,
-												position: [0, 0, 0],
-												rotation: [0, 0, 0],
-												scale: [2, 2, 1]
+						// 			enabled: true,
+						// 			position: [ 0, 0, 0 ],
+						// 			rotation: [ 0, 0, 0 ],
+						// 			scale: [ 2, 2, 1 ],
 
-										}
+						// 		}
 
-								}
+						// 	}
 
-						});
+						// } );
 
 						// Add the goals elements.
 
@@ -8138,7 +8135,14 @@ var LevelCore = exports.LevelCore = function () {
 
 										},
 
-										scan: null,
+										scan: {
+
+												name: 'playerScan',
+												transparent: true,
+												textureUrl: './resources/textures/generic_circle_sdf.png',
+												uniforms: {}
+
+										},
 
 										infos: {
 
@@ -9285,7 +9289,7 @@ var LevelCore = exports.LevelCore = function () {
 						var distToScanButton = this.mouseWorld.distanceTo(this.scanScreenButton.position);
 						var onScan = false;
 
-						if (distToScanButton < this.scanScreenButton.scale.x * 0.5) {
+						if (distToScanButton < this.scanScreenButton.scale.x * 1.0) {
 
 								onScan = true;
 						}
@@ -9293,7 +9297,7 @@ var LevelCore = exports.LevelCore = function () {
 						var distToInfoButton = this.mouseWorld.distanceTo(this.infoScreenButton.position);
 						var onInfo = false;
 
-						if (distToInfoButton < this.infoScreenButton.scale.x * 0.5) {
+						if (distToInfoButton < this.infoScreenButton.scale.x * 1.0) {
 
 								onInfo = true;
 						}
@@ -10100,332 +10104,374 @@ exports.library = library;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-				value: true
+			value: true
 });
 var shaderHelper = {
 
-				test: {
+			test: {
 
-								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 1.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				solidQuad: {
+			solidQuad: {
 
-								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = solidColor;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = solidColor;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				simpleTexture: {
+			simpleTexture: {
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				coloredTexture: {
+			coloredTexture: {
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * solidColor;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tvoid main () {\n\n\t\t\t\tgl_FragColor = texture2D ( texture, f_Uv ) * solidColor;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				player: {
+			player: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7 + ( 1.0 - f_Color.a );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.3, 0.3, 0.3, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.0, 1.0, sdfDist ) * 0.7 + ( 1.0 - f_Color.a );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				playerInfo: {
+			playerInfo: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat t = 0.80;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );\n\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat t = 0.80;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );\n\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				playerParticles: {
+			playerScan: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.92, 0.92, 0.92, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.4, 1.0, sdfDist ) * 0.08;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat t = 0.80;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.6, 0.50, sdfDist );\n\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				// Gravity
+			playerParticles: {
 
-				blackMatter: {
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.92, 0.92, 0.92, 1.0 );\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.4, 1.0, sdfDist ) * 0.08;\n\n\t\t\t}\n\n\t\t"
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat a = ( 1.0 - f_Color.a ) * 0.1;\n\t\t\t\tgl_FragColor = vec4 ( 0.91 + a, 0.91 + a, 0.91 + a, 1.0 );\n\t\t\t\tgl_FragColor.a = 1.0;\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.95, 0.99, sdfDist );\n\n\n\n\t\t\t\t// gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
+			},
 
-				},
+			// Gravity
 
-				blackMatterScan: {
+			blackMatter: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat a = ( 1.0 - f_Color.a ) * 0.1;\n\t\t\t\tgl_FragColor = vec4 ( 0.91 + a, 0.91 + a, 0.91 + a, 1.0 );\n\t\t\t\tgl_FragColor.a = 1.0;\n\t\t\t\tgl_FragColor.rgb += smoothstep ( 0.95, 0.99, sdfDist );\n\n\n\n\t\t\t\t// gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\n\t\t\t\t// gl_FragColor = vec4( f_Color.rgb * 1.5, 1.0 );\n\t\t\t\t// gl_FragColor.rgb *= 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 2.0, 0.0, cDist ) );\n\t\t\t\t// gl_FragColor.rgb += 1.0 - f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				blackMatterInfo: {
+			blackMatterScan: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.22 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.98 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				planet: {
+			blackMatterInfo: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.22 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.98 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				scanPlanet: {
+			planet: {
 
-								vertex: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.05, f_Scale - 0.08, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 3.5, 0.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				infoPlanet: {
+			scanPlanet: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale - 0.05, f_Scale - 0.08, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				smoke: {
+			infoPlanet: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.0, cDist );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.070;\n\t\t\t\tfloat t = f_Scale - w - 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.05, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				screen: {
+			smoke: {
 
-								vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.0, cDist );\n\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				screenButton: {
+			screen: {
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvoid main () {\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				testDerivative: {
+			screenButton: {
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\n\n\t\t\t\tfloat val = abs ( fract ( ( 1.0 - cDist ) * 20.0 ) - 0.5 ) * 2.0;\n\n\n\t\t\t\tfloat f = fwidth ( val );\n\n\t\t\t\tgl_FragColor.rgb *= smoothstep ( 0.99 * f * 1.5, 0.85 * f * 1.5, val );\n\n\n\t\t\t\t// gl_FragColor = vec4 ( f_Uv.x, f_Uv.y, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec2 screenDimentions;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 screenColors = texture2D ( texture, gl_FragCoord.xy / screenDimentions );\n\t\t\t\tgl_FragColor = screenColors;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				// Electric
+			testDerivative: {
 
-				electricCharge: {
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 );\n\n\n\t\t\t\tfloat val = abs ( fract ( ( 1.0 - cDist ) * 20.0 ) - 0.5 ) * 2.0;\n\n\n\t\t\t\tfloat f = fwidth ( val );\n\n\t\t\t\tgl_FragColor.rgb *= smoothstep ( 0.99 * f * 1.5, 0.85 * f * 1.5, val );\n\n\n\t\t\t\t// gl_FragColor = vec4 ( f_Uv.x, f_Uv.y, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
+			},
 
-				},
+			// Electric
 
-				electricChargeScan: {
+			electricCharge: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t\t// gl_FragColor.rgb += alphaVal;\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				electricChargeInfo: {
+			electricChargeScan: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				fixedElectricCharge: {
+			electricChargeInfo: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\n\t\t\t\tfloat w = 0.4;\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist ) );\n\n\t\t\t\tgl_FragColor.r = outLineMultiplier * f_Color.r + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * f_Color.g + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * f_Color.b + ( 1.0 - outLineMultiplier ) * 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				fixedElectricChargeScan: {
+			fixedElectricCharge: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tfloat s = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( s ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w, w - 0.13, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec4 texture =  texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = texture.r * texture.g * texture.b;\n\n\t\t\t\tfloat alphaVal = 1.0 - ( smoothstep ( 0.99, 0.9, sdfDist ) * smoothstep ( 4.0, 0.0, cDist ) ) * abs ( f_Color.a );\n\n\t\t\t\tgl_FragColor = abs ( f_Color );\n\t\t\t\tgl_FragColor.a = 1.0;\n\n\n\t\t\t\tfloat w = 0.4;\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist ) );\n\n\t\t\t\tgl_FragColor.r = outLineMultiplier * f_Color.r + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * f_Color.g + ( 1.0 - outLineMultiplier ) * 1.0;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * f_Color.b + ( 1.0 - outLineMultiplier ) * 1.0;\n\n\t\t\t\tgl_FragColor.r += alphaVal * ( 1.0 - gl_FragColor.r );\n\t\t\t\tgl_FragColor.g += alphaVal * ( 1.0 - gl_FragColor.g );\n\t\t\t\tgl_FragColor.b += alphaVal * ( 1.0 - gl_FragColor.b );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				fixedElectricChargeInfo: {
+			fixedElectricChargeScan: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat w2 = 0.57 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w2;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a +=  smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w2, w2 - 0.05, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w, w - 0.13, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				equipotentialLines: {
+			fixedElectricChargeInfo: {
 
-								vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.92 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat w2 = 0.57 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\t\t\t\tfloat t2 = 0.5 - w2;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.10;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a +=  smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) + smoothstep ( w2, w2 - 0.05, abs ( t2 - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				obstacle: {
+			equipotentialLines: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tconst float MAX_Z = 2.0;\n\t\t\tconst int MAX_CHARGES = 20;\n\t\t\tuniform float numCharges;\n\t\t\tuniform vec3 charges[ MAX_CHARGES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_CHARGES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numCharges ) ) break;\n\n\t\t\t\t\tvec2 dir = charges[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( charges[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * charges[ i ].z;\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\n\t\t\t\tvec4 outPosition = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = rV.z;\n\t\t\t\tgl_Position = outPosition;\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.85, 0.85, 0.85, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main()\n\t\t\t{\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t\tvec3 P = vec3 ( f_Z );\n\n\t\t\t\tfloat gsize = 50.0;\n\t\t\t\tfloat gwidth = 1.5;\n\n\t\t\t\tvec3 f  = abs( fract ( P * gsize ) -0.5 );\n\t\t\t\tvec3 df = fwidth ( P * gsize );\n\t\t\t\tvec3 g = smoothstep ( -gwidth * df, gwidth * df, f );\n\t\t\t\tfloat c = g.x * g.y * g.z; \n\t\t\t\tgl_FragColor = vec4 ( 1.0, 1.0, 1.0, 1.0 - c );// * gl_Color;\n\t\t\t\tgl_FragColor.a *= 1.0 - cDist * 0.6;\n\t\t\t\tgl_FragColor.a *= pow ( clamp ( 1.0 / ( abs ( f_Z ) * 5.0 ), 0.0, 1.0 ), 2.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				obstacleScan: {
+			obstacle: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.7 );\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( f_Scale.x - 0.015, f_Scale.x - 0.000, x ) + smoothstep ( f_Scale.y - 0.015, f_Scale.y - 0.000, y );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv );\n\n\t\t\t\tgl_FragColor = vec4 ( 0.85, 0.85, 0.85, 1.0 - cDist * 0.2 );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				obstacleInfo: {
+			obstacleScan: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\tgl_FragColor.a += smoothstep ( f_Scale.x - 0.020, f_Scale.x - 0.01, x ) + smoothstep ( f_Scale.y - 0.020, f_Scale.y - 0.01, y );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.7 );\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( f_Scale.x - 0.015, f_Scale.x - 0.000, x ) + smoothstep ( f_Scale.y - 0.015, f_Scale.y - 0.000, y );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				// Gravity Electric
+			obstacleInfo: {
 
-				electricPlanet: {
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = vec2 ( transform.z, position.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z, position.z, 1.0 ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying vec2 f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// float w = 0.18 / ( f_Scale + 1.0 );\n\t\t\t\t// float t = 0.99 - w;\n\n\t\t\t\tfloat x = abs ( f_Uv.x - 0.5 ) * 2.0 * f_Scale.x;\n\t\t\t\tfloat y = abs ( f_Uv.y - 0.5 ) * 2.0 * f_Scale.y;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\tgl_FragColor.a += smoothstep ( f_Scale.x - 0.020, f_Scale.x - 0.01, x ) + smoothstep ( f_Scale.y - 0.020, f_Scale.y - 0.01, y );\n\n\t\t\t}\n\n\t\t"
 
-								fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\t\t\t\tfloat sdfDist2 = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = f_Scale - w;\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist2 ) );\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.r = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.r;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.g;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.b;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
+			},
 
-				},
+			// Gravity Electric
 
-				electricParticlePlanetScan: {
+			electricPlanet: {
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Scale = position.z;\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.3 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\t\t\t\tfloat sdfDist2 = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = f_Scale - w;\n\t\t\t\tfloat outLineMultiplier = smoothstep ( w, w - 0.03, abs ( t - sdfDist2 ) );\n\n\t\t\t\tgl_FragColor = f_Color;\n\t\t\t\tgl_FragColor.r = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.r;\n\t\t\t\tgl_FragColor.g = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.g;\n\t\t\t\tgl_FragColor.b = outLineMultiplier * 0.7 + ( 1.0 - outLineMultiplier ) * f_Color.b;\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist ) * smoothstep ( 2.5, 0.0, cDist );\n\t\t\t\tgl_FragColor.a *= smoothstep ( -0.5, 2.0, cDist );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				electricParticlePlanetInfo: {
+			electricParticlePlanetScan: {
 
-								vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\tf_Sign = sign ( transform.z );\n\n\t\t\t\tif ( sign ( rgbaColor.a ) >= 0.0 ) f_Zero = 1.0;\n\t\t\t\telse f_Zero = 0.0;\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 1.6 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.08;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.3 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-				},
+			},
 
-				// General
+			electricParticlePlanetInfo: {
 
-				grid: {
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tattribute vec4 transform;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Scale = abs ( transform.z );\n\t\t\t\tf_Sign = sign ( transform.z );\n\n\t\t\t\tif ( sign ( rgbaColor.a ) >= 0.0 ) f_Zero = 1.0;\n\t\t\t\telse f_Zero = 0.0;\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( abs ( transform.z ) ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-								vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 108;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z, 2.0 );\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\t\t\tvarying float f_Sign;\n\t\t\tvarying float f_Zero;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat xDist = abs ( 0.5 - f_Uv.x ) * 2.0 * f_Scale;\n\t\t\t\tfloat yDist = abs ( 0.5 - f_Uv.y ) * 2.0 * f_Scale;\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * f_Scale;\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 1.6 / ( (f_Scale + 1.0) * 5.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Draw sign.\n\n\t\t\t\tif ( abs ( f_Color.r - 0.8 ) > 0.1 ) {\n\n\t\t\t\t\t// Draw cross\n\n\t\t\t\t\tfloat r = 0.08;\n\t\t\t\t\tfloat w1 = 0.013;\n\n\t\t\t\t\tif ( f_Color.r > f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist ) + smoothstep ( w1, w1 - 0.005, xDist );\n\n\t\t\t\t\t} else if ( f_Color.r < f_Color.b ) {\n\n\t\t\t\t\t\tgl_FragColor.a += smoothstep ( w1, w1 - 0.005, yDist );\n\n\t\t\t\t\t}\n\n\t\t\t\t\tgl_FragColor.a *= smoothstep ( r, r - 0.03, cDist );\n\t\t\t\t\t\n\t\t\t\t} else {\n\n\t\t\t\t\tgl_FragColor.a = 0.0;\n\n\t\t\t\t}\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) );\n\n\t\t\t}\n\n\t\t"
 
-								fragment: "\n\t\t\tuniform float gridSubdivisions;\n\t\t\tuniform float mainAlpha;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 ) * mainAlpha;\n\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
+			},
 
-				indicator: {
+			// General
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+			grid: {
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
+						vertex: "\n\t\t\tconst float MAX_Z = 40.0;\n\t\t\tconst int MAX_MASSES = 108;\n\t\t\tuniform float numMasses;\n\t\t\tuniform vec3 masses[ MAX_MASSES ];\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 vPos = modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\t\t\t\tvec3 rV = vec3 ( 0.0 );\n\n\t\t\t\tfor ( int i = 0; i < MAX_MASSES; i ++ ) {\n\n\t\t\t\t\tif ( i >= int ( numMasses ) ) break;\n\n\t\t\t\t\tvec2 dir = masses[ i ].xy - vPos.xy;\n\t\t\t\t\tfloat maxDist = 5.5;\n\t\t\t\t\tfloat dist = length ( dir );\n\n\t\t\t\t\tvec3 exDir = vec3 ( masses[ i ].xy, 0.0 ) - cameraPosition;\n\t\t\t\t\texDir = normalize ( exDir );\n\t\t\t\t\texDir *= normalMatrix;\n\t\t\t\t\texDir *= MAX_Z * ( 1.0 - clamp ( dist / maxDist, 0.0, 1.0 ) ) * ( 1.0 / pow ( dist + 1.0, 3.0 ) ) * pow ( masses[ i ].z, 2.0 );\n\n\t\t\t\t\trV += exDir;\n\n\t\t\t\t}\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_maxZ = MAX_Z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz + rV, 1.0 );\n\t\t\t\tf_Z = gl_Position.z;\n\n\t\t\t}\n\n\t\t",
 
-				departure: {
+						fragment: "\n\t\t\tuniform float gridSubdivisions;\n\t\t\tuniform float mainAlpha;\n\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_maxZ;\n\t\t\tvarying float f_Z;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\t// Pick a coordinate to visualize in a grid\n\t\t\t\tvec2 coord = f_Uv * gridSubdivisions;\n\n\t\t\t\t// Compute anti-aliased world-space grid lines\n\t\t\t\tvec2 grid = abs ( fract ( coord - 0.5 ) - 0.5 ) / fwidth ( coord );\n\t\t\t\tfloat line = min ( grid.x, grid.y );\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4  ( 1.0, 1.0, 1.0, ( 1.5 - min ( line, 10.0 ) ) * 0.6 );\n\t\t\t\tgl_FragColor.a *= clamp ( ( 1.0 - cDist * 0.70 ) * pow ( clamp ( 1.0 - f_Z / ( f_maxZ + 30.0 ), 0.0, 1.0 ), 2.0 ), 0.0, 1.0 ) * mainAlpha;\n\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
+			indicator: {
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-				arrival: {
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat dX = abs ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t\tfloat w = 0.05;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= smoothstep ( w, w - 0.02, dX ) * alpha;\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
 
-								vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+			departure: {
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\n\t\t\t}\n\n\t\t",
 
-				sdfFont: {
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\n\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
 
-								vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
+			arrival: {
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
-				},
+						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-				line: {
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform float alpha;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
 
-								vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
+			sdfFont: {
 
-								fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-				},
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\n\t\t\tvoid main () {\n\n\t\t\t\t// Just visualize the grid lines directly\n\t\t\t\tgl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\tgl_FragColor.a *= texture2D ( texture, f_Uv ).a;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+			},
 
-				circle: {
+			line: {
 
-								vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
+						vertex: "\n\t\t\tuniform float thickness;\n\t        attribute float lineMiter;\n\t        attribute vec2 lineNormal;\n\t        attribute float lineOpacity;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tf_Opacity = lineOpacity;\n\t        \tf_Thickness = thickness;\n\t        \tf_Edge = sign ( lineMiter );\n\t        \tvec3 pointPos = position.xyz + vec3 ( lineNormal * thickness / 2.0 * lineMiter, 0.0 );\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( pointPos, 1.0 );\n\n\t        }\n\n\t\t",
 
-								fragment: "\n\t\t\tuniform vec4 diffuse;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\n\t        \tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\n\t        \tgl_FragColor = diffuse;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.98, cDist );\n\t        \n\t        }\n\n\t\t"
+						fragment: "\n\t\t\tuniform vec3 diffuse;\n\t        varying float f_Edge;\n\t        varying float f_Thickness;\n\t        varying float f_Opacity;\n\n\t        void main() {\n\n\t        \tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\t        \tgl_FragColor.a += ( 1.0 - smoothstep ( 0.0, 0.3, abs ( f_Edge ) ) ) * f_Opacity;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.8, abs ( f_Edge ) );\n\t        \n\t        }\n\n\t\t"
 
-				},
+			},
 
-				introParticles: {
+			circle: {
 
-								vertex: "\n\t        void main() {\n\t    \n\t    \t\tgl_PointSize = position.z;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
+						vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
 
-								fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( 1.0, 0.85, cDist ) * 0.5 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform vec4 diffuse;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\n\t        \tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\n\t        \tgl_FragColor = diffuse;\n\t        \tgl_FragColor.a *= smoothstep ( 1.0, 0.95, cDist );\n\t        \n\t        }\n\n\t\t"
 
-				},
+			},
 
-				introEndParticles: {
+			// Intro
 
-								vertex: "\n\t\t\tuniform float scale;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t    \t\tvec3 outPosition = vec3 ( position.xy, 0.0 ) * scale;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy * scale, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
+			introParticles: {
 
-								fragment: "\n\t\t\tuniform float scale;\n\t\t\tuniform float alpha;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * scale;\n\n\t\t\t\tfloat w = 0.1;\n\t\t\t\tfloat t = scale - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.9, 0.9, 0.9, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;\n\t\t\t\t// gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						vertex: "\n\t        void main() {\n\t    \n\t    \t\tgl_PointSize = position.z;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
 
-				},
+						fragment: "\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( 1.0, 0.85, cDist ) * 0.5 );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
 
-				introArrival: {
+			},
 
-								vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
+			introEndCircles: {
 
-								fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+						vertex: "\n\t\t\tuniform float scale;\n\t\t\tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy * scale, 0.0, 1.0 );\n\n\t        }\n\n\t\t",
 
-				}
+						fragment: "\n\t\t\tuniform float scale;\n\t\t\tuniform float alpha;\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0 * scale;\n\n\t\t\t\tfloat w = 0.1;\n\t\t\t\tfloat t = scale - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, smoothstep ( w, w - 0.02, abs ( t - cDist ) ) ) * alpha;\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+			},
+
+			introArrival: {
+
+						vertex: "\n\t      \tvarying vec2 f_Uv;\n\n\t        void main() {\n\t    \n\t    \t\tf_Uv = uv;\n\t        \tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t        }\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5, 0.5 ) - f_Uv ) * 2.0;\n\n\t\t\t\tfloat w = 0.15;\n\t\t\t\tfloat t = 1.0 - w;\n\n\t\t\t\tgl_FragColor = vec4 ( 0.8, 0.8, 0.8, smoothstep ( w, w - 0.01, abs ( t - cDist ) ) );\n\t\t\t\tgl_FragColor.a += smoothstep ( 0.3, 0.29, cDist );\n\t\t\t\t\t\n\t\t\t}\n\n\t\t"
+
+			},
+
+			introGenericCircle: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tfloat aastep ( float value ) {\n\n\t\t\t    #ifdef GL_OES_standard_derivatives\n\n\t\t\t      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;\n\n\t\t\t    #else\n\n\t\t\t      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );\n\n\t\t\t    #endif\n\n\t\t\t    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );\n\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t    vec4 texColor = texture2D ( texture, f_Uv );\n\t\t\t    float alpha = aastep ( texColor.a );\n\t\t\t    gl_FragColor = solidColor;\n\t\t\t    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist );\n\n\t\t\t    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t    if ( gl_FragColor.a < 0.0001 ) discard;\n\n\t\t\t    // gl_FragColor = texColor;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			introGenericCirclePoint: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Size;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tf_Size = position.z;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Size;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tfloat aastep ( float value ) {\n\n\t\t\t    #ifdef GL_OES_standard_derivatives\n\n\t\t\t      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;\n\n\t\t\t    #else\n\n\t\t\t      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );\n\n\t\t\t    #endif\n\n\t\t\t    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );\n\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t    vec4 texColor = texture2D ( texture, gl_PointCoord.xy );\n\t\t\t    float alpha = aastep ( texColor.a );\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t    gl_FragColor.rgb += solidColor.rgb + ( vec3 ( 1.0 ) - solidColor.rgb ) * ( 1.0 - alpha ) + smoothstep ( 0.0, 5.0, cDist ) + ( f_Size / 100.0 - 0.5 ) * 0.05;\n\t\t\t    if ( alpha < 0.0001 ) discard;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			introElectricPlanet: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\t\t\tuniform sampler2D texture;\n\t\t\tuniform vec4 solidColor;\n\n\t\t\tfloat aastep ( float value ) {\n\n\t\t\t    #ifdef GL_OES_standard_derivatives\n\n\t\t\t      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;\n\n\t\t\t    #else\n\n\t\t\t      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );\n\n\t\t\t    #endif\n\n\t\t\t    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );\n\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - f_Uv ) * 2.0;\n\t\t\t    vec4 texColor = texture2D ( texture, f_Uv );\n\t\t\t    float alpha = aastep ( texColor.a - 0.2 );\n\n\t\t\t    float w = 0.2;\n\t\t\t    float t = 1.0 - w;\n\n\t\t\t    gl_FragColor = solidColor;\n\t\t\t    gl_FragColor.rgb -= smoothstep ( 1.0, 0.9, texColor.a ) * 0.4;\n\t\t\t    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist ) * smoothstep ( 0.0, 2.0, cDist );\n\n\n\t\t\t    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t    if ( gl_FragColor.a < 0.0001 ) discard;\n\n\t\t\t    // gl_FragColor = texColor;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			introGenericCircleElectricPlanet: {
+
+						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tuniform float globalAlpha;\n\n\t\t\tfloat aastep ( float value ) {\n\n\t\t\t    #ifdef GL_OES_standard_derivatives\n\n\t\t\t      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;\n\n\t\t\t    #else\n\n\t\t\t      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );\n\n\t\t\t    #endif\n\n\t\t\t    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );\n\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t    vec4 texColor = texture2D ( texture, gl_PointCoord.xy );\n\t\t\t    float alpha = aastep ( texColor.a );\n\t\t\t    gl_FragColor = f_Color;\n\t\t\t    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist ) * globalAlpha;\n\n\t\t\t    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t    // if ( gl_FragColor.a < 0.0001 ) discard;\n\n\t\t\t    // gl_FragColor = texColor;\n\n\t\t\t}\n\n\t\t"
+
+			}
 
 };
 
@@ -10632,7 +10678,13 @@ var _shaderHelper = require('./GameElements/shaderHelper');
 
 var _PhysicalElement = require('./GameElements/PhysicalElement');
 
+var _ElectricParticle = require('./GameElements/ElectricParticle');
+
+var _Planet = require('./GameElements/Planet');
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var SDFSHader = require('three-bmfont-text/shaders/sdf');
 
 var IntroScene = exports.IntroScene = function () {
 		function IntroScene(_renderer) {
@@ -10649,94 +10701,18 @@ var IntroScene = exports.IntroScene = function () {
 				this.scene.background = new THREE.Color(0xE6E6E6);
 				this.renderer.render(this.scene, this.camera);
 
-				this.ended = false;
+				// General
 
 				this.quadGeometry = new THREE.PlaneBufferGeometry(1, 1);
 
-				this.playerMaterial = new THREE.ShaderMaterial({
+				// Step values
 
-						vertexShader: _shaderHelper.shaderHelper.circle.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.circle.fragment,
-
-						uniforms: {
-
-								diffuse: { value: [0.5, 0.5, 0.5, 1.0] }
-
-						},
-
-						transparent: true
-
-				});
-
-				this.player = new _PhysicalElement.PhysicalElement({
-
-						position: [0, this.getWorldTop() + 0.1, 0],
-						mass: 1500,
-						drag: 0.986,
-						enabled: true,
-						acceleration: [0.06, -0.06, 0]
-
-				});
-
-				this.playerScaleTarget = 0.13;
-				this.playerMesh = new THREE.Mesh(this.quadGeometry, this.playerMaterial);
-				this.playerMesh.scale.set(0.1, 0.1, 0.1);
-				this.playerMesh.position.set(0, this.player.position[1], 0);
-				this.playerMesh.renderOrder = 10;
-				this.scene.add(this.playerMesh);
-
-				this.arrivalMaterial = new THREE.ShaderMaterial({
-
-						vertexShader: _shaderHelper.shaderHelper.introArrival.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.introArrival.fragment,
-						transparent: true
-
-				});
-
-				this.arrivalScaleTarget = 1.0;
-				this.arrival = new THREE.Mesh(this.quadGeometry, this.arrivalMaterial);
-				this.scene.add(this.arrival);
-
-				this.nParticles = 120;
-
-				this.particles = [];
-
-				this.particlesGeometry = new THREE.BufferGeometry();
-				this.particlesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nParticles * 3), 3));
-				this.particlesGeometry.attributes.position.dynamic = true;
-				this.particlesMaterial = new THREE.ShaderMaterial({
-
-						vertexShader: _shaderHelper.shaderHelper.introParticles.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.introParticles.fragment,
-						transparent: true
-
-				});
-
-				this.particlePoints = new THREE.Points(this.particlesGeometry, this.particlesMaterial);
-				this.scene.add(this.particlePoints);
-
-				// End circle
-
-				this.endCircleScaleTarget = 0.0;
-				this.endCircleAlphaTarget = 1.0;
-				this.endCircleMaterial = new THREE.ShaderMaterial({
-
-						vertexShader: _shaderHelper.shaderHelper.introEndParticles.vertex,
-						fragmentShader: _shaderHelper.shaderHelper.introEndParticles.fragment,
-
-						uniforms: {
-
-								alpha: { value: 1.0 },
-								scale: { value: 0.0 }
-
-						},
-
-						transparent: true
-
-				});
-
-				this.endCircle = new THREE.Mesh(this.quadGeometry, this.endCircleMaterial);
-				this.scene.add(this.endCircle);
+				this.run = false;
+				this.intro = false;
+				this.mainMenu = false;
+				this.gravity = false;
+				this.electric = false;
+				this.gravityElectric = false;
 		}
 
 		_createClass(IntroScene, [{
@@ -10747,6 +10723,185 @@ var IntroScene = exports.IntroScene = function () {
 						this.camera.updateProjectionMatrix();
 
 						this.renderer.setSize(window.innerWidth, window.innerHeight);
+				}
+		}, {
+				key: 'build',
+				value: function build(_callback) {
+
+						// Build genereal
+
+						this.quadGeometry = new THREE.PlaneBufferGeometry(1, 1);
+
+						// Player
+
+						this.player = new _PhysicalElement.PhysicalElement({
+
+								position: [0, this.getWorldTop() + 0.2, 0],
+								scale: [0.000001, 0.000001, 0.000001],
+								enabled: true
+
+						});
+
+						this.playerScaleTarget = 0.13;
+
+						this.playerMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.circle.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.circle.fragment,
+
+								uniforms: {
+
+										diffuse: { value: [0.2, 0.2, 0.2, 0.8] }
+
+								},
+
+								transparent: true
+
+						});
+
+						this.playerMesh = new THREE.Mesh(this.quadGeometry, this.playerMaterial);
+						this.playerMesh.renderOrder = 20;
+						this.playerMesh.position.set(this.player.position[0], this.player.position[1], this.player.position[2]);
+						this.playerMesh.scale.set(this.player.scale[0], this.player.scale[1], this.player.scale[2]);
+						this.scene.add(this.playerMesh);
+
+						// Particles
+
+						this.enableParticles = false;
+						this.nParticles = 200;
+						this.particles = [];
+
+						this.particlesMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.introParticles.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.introParticles.fragment,
+								transparent: true
+
+						});
+
+						this.particlesGeometry = new THREE.BufferGeometry();
+						this.particlesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nParticles * 3), 3));
+
+						this.particlesPoints = new THREE.Points(this.particlesGeometry, this.particlesMaterial);
+						this.particlesPoints.renderOrder = 10000;
+
+						this.scene.add(this.particlesPoints);
+
+						//
+						// Intro
+						//
+
+						this.introEnd = false;
+						this.arrivalMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.introArrival.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.introArrival.fragment,
+								transparent: true
+
+						});
+
+						this.arrivalScaleTarget = 0.0;
+						this.arrival = new THREE.Mesh(this.quadGeometry, this.arrivalMaterial);
+						this.arrival.scale.set(0.000001, 0.000001, 0.000001);
+						this.scene.add(this.arrival);
+
+						this.nParticles = 120;
+
+						this.particles = [];
+
+						this.particlesGeometry = new THREE.BufferGeometry();
+						this.particlesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nParticles * 3), 3));
+						this.particlesGeometry.attributes.position.dynamic = true;
+						this.particlesMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.introParticles.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.introParticles.fragment,
+								transparent: true
+
+						});
+
+						this.particlePoints = new THREE.Points(this.particlesGeometry, this.particlesMaterial);
+						this.scene.add(this.particlePoints);
+
+						// End circle
+
+						this.endCircleScaleTarget = 0.0;
+						this.endCircleAlphaTarget = 1.0;
+						this.endCircleMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.introEndCircles.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.introEndCircles.fragment,
+
+								uniforms: {
+
+										alpha: { value: 0.0 },
+										scale: { value: 0.0 }
+
+								},
+
+								transparent: true
+
+						});
+
+						this.endCircle = new THREE.Mesh(this.quadGeometry, this.endCircleMaterial);
+						this.scene.add(this.endCircle);
+
+						//
+						// Gravity
+						//
+
+						this.nMasses = 50;
+						this.masses = [];
+
+						this.nPlanets = 3;
+						this.planets = [];
+						this.planetsMesh = [];
+
+						this.planetMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.planet.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.planet.fragment,
+								transparent: true
+
+						});
+
+						for (var i = 0; i < this.nPlanets; i++) {
+
+								this.planets.push(new _PhysicalElement.PhysicalElement({
+
+										position: [0, 0, 0],
+										scale: [2, 2, 2],
+										mass: 10000
+
+								}));
+
+								this.planetsMesh.push(new THREE.Mesh(this.quadGeometry, this.planetMaterial));
+						}
+
+						//
+						// Electric
+						//
+
+						this.nCharges = 5;
+						this.charges = [];
+						this.chargesMeshes = [];
+
+						//
+						// Gravity Electric
+						//
+
+						this.nElectricPlanets = 3;
+						this.planets = [];
+						this.planetCharges = [];
+
+						var textureLoader = new THREE.TextureLoader().load('./resources/textures/generic_circle_sdf_unity.png', function (texture) {
+
+								this.genericTexture = texture;
+								this.canDrawMasses = true;
+								this.canCreateCharge = true;
+
+								_callback();
+						}.bind(this));
 				}
 		}, {
 				key: 'render',
@@ -10760,113 +10915,19 @@ var IntroScene = exports.IntroScene = function () {
 
 						if (!this.run) return;
 
-						// Update arrival
+						this.updatePlayer();
+						if (this.enableParticles) this.emitParticles();
+						if (this.particles.length > 0) this.updateParticles();
 
-						if (this.arrival.scale.x > 0.01) {
-
-								this.arrival.scale.x += (this.arrivalScaleTarget - this.arrival.scale.x) * 0.1;
-								this.arrival.scale.y += (this.arrivalScaleTarget - this.arrival.scale.y) * 0.1;
-						}
-
-						// Update player
-
-						var force = vec3.sub(vec3.create(), [0, 0, 0], this.player.position);
-						var dist = vec3.length(force);
-
-						if (dist < 0.2 && !this.ended) {
-
-								this.ended = true;
-								this.player.drag = 0.7;
-								this.playerScaleTarget = 0;
-								this.arrivalScaleTarget = 0;
-								this.endCircleScaleTarget = Math.abs(this.getWorldTop()) > Math.abs(this.getWorldRight()) ? this.getWorldTop() * 2.0 : this.getWorldRight() * 2.0;
-								this.endCircleAlphaTarget = 0.0;
-								if (this.onEndCallback) this.onEndCallback();
-						}
-
-						vec3.normalize(force, force);
-						vec3.scale(force, force, 1.0 / Math.pow(dist + 1.0, 2) * 30);
-
-						this.player.scale[0] += (this.playerScaleTarget - this.player.scale[0]) * 0.1;
-						this.player.scale[1] += (this.playerScaleTarget - this.player.scale[1]) * 0.1;
-						this.player.applyForce(force);
-						this.player.update();
-
-						this.playerMesh.position.set(this.player.position[0], this.player.position[1], this.player.position[2]);
-						this.playerMesh.scale.set(this.player.scale[0], this.player.scale[1], 1.0);
-
-						// Update particles
-
-						for (var i = this.nParticles - 4; i >= 0; i--) {
-
-								var bufferIndex = i * 3;
-
-								if (i < this.particles.length) {
-
-										this.particles[i].update();
-
-										if (!this.particles[i].isDead()) {
-
-												var dir = vec3.sub(vec3.create(), this.player.position, this.particles[i].position);
-												var _dist = vec3.length(dir);
-												vec3.normalize(dir, dir);
-												vec3.scale(dir, dir, 1.0 / Math.pow(_dist + 1.0, 2) * 1);
-												this.particles[i].applyForce(dir);
-
-												this.particlesGeometry.attributes.position.array[bufferIndex + 0] = this.particles[i].position[0];
-												this.particlesGeometry.attributes.position.array[bufferIndex + 1] = this.particles[i].position[1];
-
-												// pass size with position z
-
-												this.particlesGeometry.attributes.position.array[bufferIndex + 2] = this.particles[i].scale[0] * this.particles[i].lifePercent;
-										} else {
-
-												this.particles.splice(i, 1);
-										}
-								} else {
-
-										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = 0;
-										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = 0;
-										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = 0;
-								}
-						}
-
-						if (this.particles.length < this.nParticles && !this.ended) {
-
-								this.createNewParticle();
-								this.createNewParticle();
-						}
-
-						this.particlesGeometry.attributes.position.needsUpdate = true;
-
-						this.endCircleMaterial.uniforms.alpha.value += (this.endCircleAlphaTarget - this.endCircleMaterial.uniforms.alpha.value) * 0.08;
-						this.endCircleMaterial.uniforms.scale.value += (this.endCircleScaleTarget - this.endCircleMaterial.uniforms.scale.value) * 0.08;
-				}
-		}, {
-				key: 'createNewParticle',
-				value: function createNewParticle() {
-
-						this.particles.push(new _PhysicalElement.PhysicalElement({
-
-								position: this.player.position,
-								scale: [Math.random() * 10 * this.renderer.getPixelRatio() + 1.0, 0, 0],
-								acceleration: [(Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.03, 0],
-								velocity: vec3.scale(vec3.create(), this.player.velocity, 0.2),
-								canDye: true,
-								lifeSpan: 1000,
-								lifeLeft: 1000,
-								mass: 20000,
-								enabled: true,
-								drag: 0.98
-
-						}));
+						this.updateIntro();
+						this.updateMainMenu();
+						this.updateGravity();
+						this.updateElectric();
+						this.updateGravityElectric();
 				}
 		}, {
 				key: 'init',
-				value: function init() {
-
-						this.run = true;
-				}
+				value: function init() {}
 		}, {
 				key: 'onEnd',
 				value: function onEnd(_callback) {
@@ -10921,12 +10982,884 @@ var IntroScene = exports.IntroScene = function () {
 
 						return this.camera.position.clone().add(dir.multiplyScalar(distance));
 				}
+		}, {
+				key: 'disable',
+				value: function disable() {
+
+						this.intro = false;
+						this.mainMenu = false;
+						this.gravity = false;
+						this.electric = false;
+						this.gravityElectric = false;
+				}
+		}, {
+				key: 'initIntro',
+				value: function initIntro(_callback) {
+
+						this.run = true;
+						this.intro = true;
+						this.player.position = [0, this.getWorldTop() + 0.2, 0];
+						// this.player.acceleration = [ 0.05, -0.06, 0 ];
+						this.player.acceleration = [0, -0.06, 0];
+						this.player.mass = 400;
+						this.player.drag = 0.985;
+						this.arrivalScaleTarget = 1.0;
+						this.enableParticles = true;
+						this.introOnEndCallback = _callback;
+				}
+		}, {
+				key: 'updateIntro',
+				value: function updateIntro() {
+
+						// Apply force towars the target when intro is active.
+
+						if (this.intro) {
+
+								var arrivapPosition = [this.arrival.position.x, this.arrival.position.y, this.arrival.position.z];
+								var force = vec3.sub(vec3.create(), arrivapPosition, this.player.position);
+								var dist = vec3.length(force);
+								vec3.normalize(force, force);
+								var mag = 1.0 / Math.pow(dist + 1.0, 2);
+								vec3.scale(force, force, mag * 5);
+								if (!this.introEnd) this.player.applyForce(force);
+
+								// Check if ended
+
+								if (dist < 0.3 && !this.introEnd) {
+
+										this.arrivalScaleTarget = 0.000001;
+										this.player.drag = 0.98;
+										this.endCircleScaleTarget = this.getWorldTop() > this.getWorldRight() ? this.getWorldTop() * 2 : this.getWorldRight() * 2;
+										this.endCircleAlphaTarget = 0.0;
+										this.introEnd = true;
+
+										if (this.introOnEndCallback) this.introOnEndCallback();
+								}
+						}
+
+						// Update the target
+
+						this.arrival.scale.x += (this.arrivalScaleTarget - this.arrival.scale.x) * 0.08;
+						this.arrival.scale.y += (this.arrivalScaleTarget - this.arrival.scale.y) * 0.08;
+
+						// Update the end circle
+
+						this.endCircleMaterial.uniforms.scale.value += (this.endCircleScaleTarget - this.endCircleMaterial.uniforms.scale.value) * 0.05;
+						this.endCircleMaterial.uniforms.alpha.value += (this.endCircleAlphaTarget - this.endCircleMaterial.uniforms.alpha.value) * 0.05;
+
+						// Check disabled objects
+
+						if (this.arrival.scale.x < 0.001) {
+
+								this.arrival.visible = false;
+						} else {
+
+								this.arrival.visible = true;
+						}
+
+						if (this.endCircleMaterial.uniforms.alpha.value < 0.001) {
+
+								this.endCircle.visible = false;
+						} else {
+
+								this.endCircle.visible = true;
+						}
+				}
+		}, {
+				key: 'initMainMenu',
+				value: function initMainMenu() {
+
+						this.intro = false;
+						this.mainMenu = true;
+						this.gravity = false;
+						this.electric = false;
+						this.gravityElectric = false;
+
+						this.enableParticles = true;
+						this.player.drag = 0.99;
+						this.player.mass = 400;
+						this.playerScaleTarget = 0.13;
+						this.player.scale = [this.playerScaleTarget, this.playerScaleTarget, this.playerScaleTarget];
+						this.forcePosition = [0, 0, 0];
+						this.resetForceTimeout = null;
+						this.canResetForcePosition = true;
+				}
+		}, {
+				key: 'updateMainMenu',
+				value: function updateMainMenu() {
+
+						if (this.mainMenu) {
+
+								if (this.canResetForcePosition) {
+
+										this.forcePosition = [(Math.random() - 0.5) * 2.0, (Math.random() - 0.5) * 2.0, 0.0];
+										this.canResetForcePosition = false;
+
+										this.resetForceTimeout = setTimeout(function () {
+
+												this.canResetForcePosition = true;
+										}.bind(this), 2000);
+								}
+
+								var force = vec3.sub([0, 0, 0], this.forcePosition, this.player.position);
+								var dist = vec3.length(force);
+								vec3.normalize(force, force);
+								var mag = 1.0 / Math.pow(dist + 1.0, 2) * 4;
+								this.player.applyForce(vec3.scale(force, force, mag));
+
+								if (dist < 0.3) {
+
+										clearTimeout(this.resetForceTimeout);
+										this.canResetForcePosition = true;
+								}
+
+								// Check edges
+
+								this.mirrorEdges();
+						}
+				}
+		}, {
+				key: 'initGravity',
+				value: function initGravity() {
+
+						this.intro = false;
+						this.mainMenu = false;
+						this.gravity = true;
+						this.electric = false;
+						this.gravityElectric = false;
+						this.forcePosition = [0, 0, 0];
+						this.resetForceTimeout = null;
+						this.canResetForcePosition = true;
+						this.player.drag = 0.98;
+
+						if (!this.massDrawer) {
+
+								this.massDrawer = new _PhysicalElement.PhysicalElement({
+
+										position: this.getRandomEdgePosition(),
+										mass: 400,
+										drag: 0.98,
+										acceleration: [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0],
+										enabled: true
+
+								});
+						}
+
+						if (!this.massesPoints) {
+
+								this.massesGeometry = new THREE.BufferGeometry();
+								this.massesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nMasses * 3), 3));
+								this.massesMaterial = new THREE.ShaderMaterial({
+
+										vertexShader: _shaderHelper.shaderHelper.introGenericCirclePoint.vertex,
+										fragmentShader: _shaderHelper.shaderHelper.introGenericCirclePoint.fragment,
+
+										uniforms: {
+
+												solidColor: { value: [0.8, 0.8, 0.8, 1] },
+												texture: { value: this.genericTexture }
+
+										},
+
+										blending: THREE.MultiplyBlending,
+										transparent: true
+
+								});
+
+								this.massesPoints = new THREE.Points(this.massesGeometry, this.massesMaterial);
+								this.scene.add(this.massesPoints);
+								this.massesMaterial.extensions.derivatives = true;
+						}
+
+						if (this.genericTexture) {
+
+								this.canDrawMasses = true;
+						}
+				}
+		}, {
+				key: 'updateGravity',
+				value: function updateGravity() {
+
+						if (this.gravity) {
+
+								if (this.canDrawMasses && this.masses.length < this.nMasses) {
+
+										var rS = Math.random() * 0.5 + 0.5;
+
+										this.canDrawMasses = false;
+
+										this.masses.push(new _PhysicalElement.PhysicalElement({
+
+												position: this.massDrawer.position,
+												scale: [0, 0, 0],
+												drag: 0.9,
+												acceleration: [(Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01, 0],
+												enabled: true,
+												targetScale: [rS, rS, rS],
+												canDye: true,
+												lifeSpan: 5000
+
+										}));
+
+										setTimeout(function () {
+
+												this.canDrawMasses = true;
+										}.bind(this), 30);
+								}
+
+								// Update mass drawer
+
+								if (this.canResetForcePosition) {
+
+										this.forcePosition = [(Math.random() - 0.5) * 4.0, (Math.random() - 0.5) * 4.0, 0.0];
+										this.canResetForcePosition = false;
+
+										this.resetForceTimeout = setTimeout(function () {
+
+												this.canResetForcePosition = true;
+										}.bind(this), 2000);
+								}
+
+								var force = vec3.sub([0, 0, 0], this.forcePosition, this.massDrawer.position);
+								var dist = vec3.length(force);
+								vec3.normalize(force, force);
+								var mag = 1.0 / Math.pow(dist + 1.0, 2) * 4;
+								this.massDrawer.applyForce(vec3.scale(force, force, mag));
+
+								if (dist < 0.3) {
+
+										clearTimeout(this.resetForceTimeout);
+										this.canResetForcePosition = true;
+								}
+
+								this.massDrawer.update();
+								this.mirrorEdges(this.massDrawer.position);
+
+								// Update masses
+
+								this.mirrorEdges();
+						}
+
+						if (this.masses.length > 0) {
+
+								this.massesPoints.visible = true;
+
+								for (var i = this.nMasses - 4; i >= 0; i--) {
+
+										var bufferIndex = i * 3;
+
+										if (i < this.masses.length) {
+
+												var _force = vec3.sub([0, 0, 0], this.masses[i].position, this.player.position);
+												var _dist = vec3.length(_force);
+												var minDist = (this.masses[i].scale[0] * this.masses[i].lifePercent + this.player.scale[0]) * 0.5;
+												vec3.normalize(_force, _force);
+												var _mag2 = 1.0 / Math.pow(_dist + 1.0, 2.0) * 0.2;
+
+												if (_dist < minDist) {
+
+														this.emitParticles(50, 0.1);
+														this.player.position = this.getRandomEdgePosition();
+														this.player.velocity = [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0];
+												}
+
+												this.player.applyForce(vec3.scale(_force, _force, _mag2));
+
+												if (this.masses[i].isDead()) {
+
+														this.masses.splice(i, 1);
+												} else {
+
+														this.masses[i].scale[0] += (this.masses[i].targetScale[0] - this.masses[i].scale[0]) * 0.1;
+														this.masses[i].scale[1] += (this.masses[i].targetScale[1] - this.masses[i].scale[1]) * 0.1;
+														this.masses[i].update();
+
+														this.massesGeometry.attributes.position.array[bufferIndex + 0] = this.masses[i].position[0];
+														this.massesGeometry.attributes.position.array[bufferIndex + 1] = this.masses[i].position[1];
+														this.massesGeometry.attributes.position.array[bufferIndex + 2] = this.masses[i].scale[0] * this.renderer.getPixelRatio() * 100 * this.masses[i].lifePercent;
+												}
+										} else {
+
+												this.massesGeometry.attributes.position.array[bufferIndex + 0] = 0;
+												this.massesGeometry.attributes.position.array[bufferIndex + 1] = 0;
+												this.massesGeometry.attributes.position.array[bufferIndex + 2] = 0;
+										}
+								}
+
+								this.massesGeometry.attributes.position.needsUpdate = true;
+						} else {
+
+								if (this.massesPoints) this.massesPoints.visible = false;
+						}
+				}
+		}, {
+				key: 'initElectric',
+				value: function initElectric() {
+
+						this.intro = false;
+						this.mainMenu = false;
+						this.gravity = false;
+						this.electric = true;
+						this.gravityElectric = false;
+						this.canCreateCharge = false;
+						this.player.mass = 800;
+						this.player.drag = 0.9855;
+
+						if (this.genericTexture) {
+
+								this.canCreateCharge = true;
+						}
+				}
+		}, {
+				key: 'updateElectric',
+				value: function updateElectric() {
+
+						if (this.electric) {
+
+								// Create charges
+
+								if (this.charges.length < this.nCharges - 1 && this.canCreateCharge) {
+
+										this.canCreateCharge = false;
+
+										var newCharge = new _ElectricParticle.ElectricParticle({
+
+												position: [(Math.random() - 0.5) * 4.0, (Math.random() - 0.5) * 4.0, 0],
+												maxRadius: 1.6,
+												targetRadius: 1.0 * Math.random() + 0.6,
+												drag: 0.98,
+												canDye: true,
+												lifeSpan: 8000 * Math.random() + 5000,
+												enabled: true
+
+										});
+
+										this.charges.push(newCharge);
+
+										var chargeMaterial = new THREE.ShaderMaterial({
+
+												vertexShader: _shaderHelper.shaderHelper.introGenericCircle.vertex,
+												fragmentShader: _shaderHelper.shaderHelper.introGenericCircle.fragment,
+
+												uniforms: {
+
+														texture: { value: this.genericTexture },
+														solidColor: { value: [0, 0, 0, 1] }
+
+												},
+
+												transparent: true
+
+										});
+
+										var chargeMesh = new THREE.Mesh(this.quadGeometry, chargeMaterial);
+										chargeMesh.renderOrder = 0;
+										this.chargesMeshes.push(chargeMesh);
+										this.scene.add(chargeMesh);
+										chargeMaterial.extensions.derivatives = true;
+
+										setTimeout(function () {
+
+												this.canCreateCharge = true;
+										}.bind(this), Math.random() * 1500);
+								}
+
+								// Check edges.
+
+								this.mirrorEdges();
+						} else {
+
+								for (var i = 0; i < this.charges.length; i++) {
+
+										this.charges[i].kill();
+								}
+						}
+
+						// Update charges
+
+						for (var _i = this.charges.length - 1; _i >= 0; _i--) {
+
+								for (var j = this.charges.length - 1; j >= 0; j--) {
+
+										if (j != _i) {
+
+												var _force2 = vec3.sub([0, 0, 0], this.charges[_i].position, this.charges[j].position);
+												var _dist2 = vec3.length(_force2);
+												var _minDist = (this.charges[_i].scale[0] + this.charges[j].scale[0]) * 0.5;
+
+												if (_dist2 < _minDist) {
+
+														var _mag3 = Math.pow(_minDist - _dist2, 3);
+														vec3.normalize(_force2, _force2);
+														this.charges[_i].applyForce(vec3.scale(_force2, _force2, _mag3));
+												}
+										}
+								}
+
+								this.charges[_i].update();
+								this.chargesMeshes[_i].position.set(this.charges[_i].position[0], this.charges[_i].position[1], this.charges[_i].position[2]);
+								this.chargesMeshes[_i].scale.set(this.charges[_i].scale[0], this.charges[_i].scale[1], this.charges[_i].scale[2]);
+								this.chargesMeshes[_i].material.uniforms.solidColor.value = this.charges[_i].color;
+
+								// Update the player
+
+								var force = vec3.sub([0, 0, 0], this.charges[_i].position, this.player.position);
+								var dist = vec3.length(force);
+								var minDist = (this.charges[_i].scale[0] + this.player.scale[0]) * 0.5;
+								vec3.normalize(force, force);
+								var mag = 1.0 / Math.pow(dist + 1.0, 2.0) * 1000.0 * this.charges[_i].charge;
+
+								if (dist < minDist) {
+
+										this.emitParticles(50, 0.1);
+										this.player.position = this.getRandomEdgePosition();
+										this.player.velocity = [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0];
+								} else {
+
+										this.player.applyForce(vec3.scale(force, force, mag));
+								}
+
+								if (this.checkEdges(this.charges[_i].position, this.charges[_i].scale[0] * 0.5)) this.charges[_i].kill();
+
+								if (this.charges[_i].isDead()) {
+
+										this.charges[_i].kill();
+
+										if (this.charges[_i].color[3] < 0.001) {
+
+												this.charges.splice(_i, 1);
+												this.scene.remove(this.chargesMeshes[_i]);
+												this.chargesMeshes.splice(_i, 1);
+										}
+								}
+						}
+				}
+		}, {
+				key: 'initGravityElectric',
+				value: function initGravityElectric() {
+
+						this.intro = false;
+						this.mainMenu = false;
+						this.gravity = false;
+						this.electric = false;
+						this.gravityElectric = true;
+						this.canCreateCharge = false;
+						this.player.mass = 800;
+						this.player.drag = 0.9855;
+						this.planetsAlphaTarget = 1.0;
+						this.canChangeCharge = true;
+
+						if (this.electricPlanetsMaterial) {
+
+								this.electricPlanetsMaterial.uniforms.solidColor.value[3] = 0;
+						}
+
+						if (!this.electricPlanets) {
+
+								this.nElectricPlanets = 3;
+								this.electricPlanets = [];
+
+								this.electricPlanetsMeshes = [];
+
+								this.electricPlanetsMaterial = new THREE.ShaderMaterial({
+
+										vertexShader: _shaderHelper.shaderHelper.introElectricPlanet.vertex,
+										fragmentShader: _shaderHelper.shaderHelper.introElectricPlanet.fragment,
+
+										uniforms: {
+
+												texture: { value: this.genericTexture },
+												solidColor: { value: [0.8, 0.8, 0.8, 0.0] }
+
+										},
+
+										transparent: true
+
+								});
+
+								this.electricPlanetsMaterial.extensions.derivatives = true;
+
+								// Create planets and charges.
+
+								var layers = [1, 5, 10, 20];
+								this.nChargesPerPlanet = 0;
+								this.planetCharges = [];
+
+								for (var i = 0; i < this.nElectricPlanets; i++) {
+
+										var rS = Math.random() + 3;
+
+										var newElectricPlanet = new _Planet.Planet({
+
+												position: [(Math.random() - 0.5) * this.getWorldRight() * 2.0, (Math.random() - 0.5) * this.getWorldTop() * 2.0, 0],
+												scale: [rS, rS, rS],
+												drag: 0.7,
+												enabled: true
+
+										});
+
+										this.electricPlanets.push(newElectricPlanet);
+
+										// Create charges
+
+										for (var j = 0; j < layers.length; j++) {
+
+												this.nChargesPerPlanet += layers[j];
+
+												for (var k = 0; k < layers[j]; k++) {
+
+														var step = Math.PI * 2.0 / layers[j];
+														var angle = step * k; // + ( Math.random() - 0.5 ) * 0.2;
+														var dist = newElectricPlanet.scale[0] * 0.25 / (layers.length - 1) * j;
+
+														newElectricPlanet.charges.push(new _ElectricParticle.ElectricParticle({
+
+																position: vec3.fromValues(newElectricPlanet.position[0] + Math.cos(angle) * dist, newElectricPlanet.position[1] + Math.sin(angle) * dist, 0.0),
+																targetRadius: 0.2 + Math.random() * 0.13,
+																mass: 400,
+																drag: 0.95,
+																enabled: true
+
+														}));
+												}
+										}
+
+										var newMesh = new THREE.Mesh(this.quadGeometry, this.electricPlanetsMaterial);
+										this.electricPlanetsMeshes.push(newMesh);
+										this.scene.add(newMesh);
+								}
+
+								this.planetChargesGeometry = new THREE.BufferGeometry();
+								this.planetChargesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nPlanets * this.nChargesPerPlanet * 3), 3));
+								this.planetChargesGeometry.addAttribute('rgbaColor', new THREE.BufferAttribute(new Float32Array(this.nPlanets * this.nChargesPerPlanet * 4), 4));
+								this.planetChargesMaterial = new THREE.ShaderMaterial({
+
+										vertexShader: _shaderHelper.shaderHelper.introGenericCircleElectricPlanet.vertex,
+										fragmentShader: _shaderHelper.shaderHelper.introGenericCircleElectricPlanet.fragment,
+
+										uniforms: {
+
+												texture: { value: this.genericTexture },
+												globalAlpha: { value: 0.0 }
+
+										},
+
+										transparent: true
+
+								});
+
+								this.planetChargesMaterial.extensions.derivatives = true;
+
+								this.planetChargesPoints = new THREE.Points(this.planetChargesGeometry, this.planetChargesMaterial);
+								this.scene.add(this.planetChargesPoints);
+						}
+
+						this.planetChargesAlphaTarget = 1.0;
+				}
+		}, {
+				key: 'updateGravityElectric',
+				value: function updateGravityElectric() {
+
+						if (this.gravityElectric) {
+
+								// Update electric planets
+
+								if (this.canChangeCharge) {
+
+										this.canChangeCharge = false;
+
+										for (var i = 0; i < this.electricPlanets.length; i++) {
+
+												this.electricPlanets[i].targetCharge = (Math.random() - 0.5) * 50;
+												this.electricPlanets[i].sign = Math.random() > 0.5 ? 1 : -1;
+										}
+
+										setTimeout(function () {
+
+												this.canChangeCharge = true;
+										}.bind(this), 3000);
+								}
+
+								for (var _i2 = 0; _i2 < this.electricPlanets.length; _i2++) {
+
+										this.electricPlanets[_i2].update();
+
+										this.electricPlanetsMeshes[_i2].position.set(this.electricPlanets[_i2].position[0], this.electricPlanets[_i2].position[1], this.electricPlanets[_i2].position[2]);
+										this.electricPlanetsMeshes[_i2].scale.set(this.electricPlanets[_i2].scale[0], this.electricPlanets[_i2].scale[1], this.electricPlanets[_i2].scale[2]);
+
+										if (this.electricPlanetsMaterial.uniforms.solidColor.value[3] >= 0.001) {
+
+												this.electricPlanetsMeshes[_i2].visible = true;
+										}
+
+										var gForce = vec3.sub([0, 0, 0], this.electricPlanets[_i2].position, this.player.position);
+										var dist = vec3.length(gForce);
+										var minDist = (this.electricPlanets[_i2].scale[0] + this.player.scale[0]) * 0.5;
+										vec3.normalize(gForce, gForce);
+										var mag = 1.0 / Math.pow(dist + 1.0, 2) * 6;
+
+										this.player.applyForce(vec3.scale(gForce, gForce, mag));
+
+										var eMag = 1.0 / Math.pow(dist + 1.0, 2) * this.electricPlanets[_i2].charge;
+										this.player.applyForce(vec3.scale([0, 0, 0], gForce, eMag));
+
+										for (var j = 0; j < this.electricPlanets.length; j++) {
+
+												if (j != _i2) {
+
+														var force = vec3.sub([0, 0, 0], this.electricPlanets[_i2].position, this.electricPlanets[j].position);
+														var _dist3 = vec3.length(force);
+														var _minDist2 = (this.electricPlanets[_i2].scale[0] + this.electricPlanets[j].scale[0]) * 0.5;
+														vec3.normalize(force, force);
+
+														if (_dist3 < _minDist2) {
+
+																this.electricPlanets[_i2].applyForce(vec3.scale(force, force, Math.pow(_minDist2 - _dist3, 2))) * 0.001;
+														}
+												}
+										}
+
+										if (dist < minDist - 0.1) {
+
+												this.emitParticles(50, 0.1);
+												this.player.position = this.getRandomEdgePosition();
+										}
+
+										var charges = this.electricPlanets[_i2].charges;
+
+										for (var _j = 0; _j < charges.length; _j++) {
+
+												var planetForce = vec3.sub([0, 0, 0], this.electricPlanets[_i2].position, charges[_j].position);
+												var _dist4 = vec3.length(planetForce);
+												vec3.normalize(planetForce, planetForce);
+												var _mag4 = 1.0 / Math.pow(_dist4 + 1.0, 2.0) * 2;
+
+												if (_j != 0) charges[_j].applyForce(vec3.scale(planetForce, planetForce, _mag4));
+												if (_j == 0) charges[_j].position = this.electricPlanets[_i2].position;
+
+												for (var k = 0; k < charges.length; k++) {
+
+														if (k != _j) {
+
+																var _force3 = vec3.sub([0, 0, 0], charges[_j].position, charges[k].position);
+																var _dist5 = vec3.length(_force3);
+																var _minDist3 = (charges[k].scale[0] + charges[_i2].scale[0]) * 0.65;
+																vec3.normalize(_force3, _force3);
+
+																if (_dist5 < _minDist3) {
+
+																		if (_j != 0) charges[_j].applyForce(vec3.scale(_force3, _force3, Math.pow(_minDist3 - _dist5, 2) * 100.0));
+																}
+														}
+												}
+
+												charges[_j].update();
+
+												var bufferPositionIndex = _i2 * this.nChargesPerPlanet * 3 + _j * 3;
+												var bufferColorIndex = _i2 * this.nChargesPerPlanet * 4 + _j * 4;
+
+												// console.log(bufferPositionIndex);
+
+												this.planetChargesGeometry.attributes.position.array[bufferPositionIndex + 0] = charges[_j].position[0];
+												this.planetChargesGeometry.attributes.position.array[bufferPositionIndex + 1] = charges[_j].position[1];
+												this.planetChargesGeometry.attributes.position.array[bufferPositionIndex + 2] = charges[_j].scale[0] * this.renderer.getPixelRatio() * 100;
+
+												this.planetChargesGeometry.attributes.rgbaColor.array[bufferColorIndex + 0] = charges[_j].color[0];
+												this.planetChargesGeometry.attributes.rgbaColor.array[bufferColorIndex + 1] = charges[_j].color[1];
+												this.planetChargesGeometry.attributes.rgbaColor.array[bufferColorIndex + 2] = charges[_j].color[2];
+												this.planetChargesGeometry.attributes.rgbaColor.array[bufferColorIndex + 3] = charges[_j].color[3];
+										}
+								}
+
+								this.planetChargesGeometry.attributes.position.needsUpdate = true;
+								this.planetChargesGeometry.attributes.rgbaColor.needsUpdate = true;
+
+								if (this.planetChargesMaterial.uniforms.globalAlpha.value > 0.001) {
+
+										this.planetChargesPoints.visible = true;
+								}
+
+								// update player
+
+								this.mirrorEdges();
+						} else {
+
+								this.planetsAlphaTarget = 0;
+								this.planetChargesAlphaTarget = 0;
+
+								if (this.electricPlanetsMaterial && this.electricPlanetsMaterial.uniforms.solidColor.value[3] < 0.001) {
+
+										for (var _i3 = 0; _i3 < this.electricPlanetsMeshes.length; _i3++) {
+
+												this.electricPlanetsMeshes[_i3].visible = false;
+										}
+								}
+
+								if (this.planetChargesMaterial && this.planetChargesMaterial.uniforms.globalAlpha.value < 0.001) {
+
+										this.planetChargesPoints.visible = false;
+								}
+						}
+
+						if (this.electricPlanetsMaterial) {
+
+								this.electricPlanetsMaterial.uniforms.solidColor.value[3] += (this.planetsAlphaTarget - this.electricPlanetsMaterial.uniforms.solidColor.value[3]) * 0.05;
+								this.planetChargesMaterial.uniforms.globalAlpha.value += (this.planetChargesAlphaTarget - this.planetChargesMaterial.uniforms.globalAlpha.value) * 0.05;
+						}
+				}
+		}, {
+				key: 'updatePlayer',
+				value: function updatePlayer() {
+
+						this.player.update();
+						this.player.scale[0] += (this.playerScaleTarget - this.player.scale[0]) * 0.1;
+						this.player.scale[1] += (this.playerScaleTarget - this.player.scale[1]) * 0.1;
+						this.playerMesh.position.set(this.player.position[0], this.player.position[1], this.player.position[2]);
+						this.playerMesh.scale.set(this.player.scale[0], this.player.scale[1], this.player.scale[2]);
+				}
+		}, {
+				key: 'getRandomEdgePosition',
+				value: function getRandomEdgePosition() {
+
+						var offset = 0.5;
+
+						if (Math.random() > 0.5) {
+
+								if (Math.random() > 0.5) {
+
+										return [this.getWorldRight() + offset, (Math.random() - 0.5) * this.getWorldTop() * 4.0, 0.0];
+								} else {
+
+										return [this.getWorldLeft() - offset, (Math.random() - 0.5) * this.getWorldTop() * 4.0, 0.0];
+								}
+						} else {
+
+								if (Math.random() > 0.5) {
+
+										return [(Math.random() - 0.5) * this.getWorldRight() * 4.0, this.getWorldTop() + offset, 0.0];
+								} else {
+
+										return [(Math.random() - 0.5) * this.getWorldRight() * 4.0, this.getWorldBottom() - offset, 0.0];
+								}
+						}
+				}
+		}, {
+				key: 'checkEdges',
+				value: function checkEdges(_position, _offset) {
+
+						_offset = _offset || 0;
+
+						if (_position[0] > this.getWorldRight() + _offset || _position[0] < this.getWorldLeft() - _offset || _position[1] > this.getWorldTop() + _offset || _position[1] < this.getWorldBottom() - _offset) return true;
+						return false;
+				}
+		}, {
+				key: 'mirrorEdges',
+				value: function mirrorEdges(_position) {
+
+						var offset = 0.1;
+
+						if (_position) {
+
+								if (_position[0] > this.getWorldRight() + offset) {
+
+										_position[0] = this.getWorldLeft() - offset;
+								} else if (_position[0] < this.getWorldLeft() - offset) {
+
+										_position[0] = this.getWorldRight() + offset;
+								} else if (_position[1] > this.getWorldTop() + offset) {
+
+										_position[1] = this.getWorldBottom() - offset;
+								} else if (_position[1] < this.getWorldBottom() - offset) {
+
+										_position[1] = this.getWorldTop() + offset;
+								}
+						} else {
+
+								if (this.player.position[0] > this.getWorldRight() + offset) {
+
+										this.player.position[0] = this.getWorldLeft() - offset;
+								} else if (this.player.position[0] < this.getWorldLeft() - offset) {
+
+										this.player.position[0] = this.getWorldRight() + offset;
+								} else if (this.player.position[1] > this.getWorldTop() + offset) {
+
+										this.player.position[1] = this.getWorldBottom() - offset;
+								} else if (this.player.position[1] < this.getWorldBottom() - offset) {
+
+										this.player.position[1] = this.getWorldTop() + offset;
+								}
+						}
+				}
+		}, {
+				key: 'emitParticles',
+				value: function emitParticles(_num, _mag) {
+
+						// Add particles
+
+						if (this.particles.length < this.nParticles) {
+
+								for (var i = 0; i < (_num || 2); i++) {
+
+										this.particles.push(new _PhysicalElement.PhysicalElement({
+
+												position: this.player.position,
+												scale: [Math.random() * 10 * this.renderer.getPixelRatio() + 1.0, 0, 0],
+												acceleration: [(Math.random() - 0.5) * (_mag || 0.02), (Math.random() - 0.5) * (_mag || 0.02), 0],
+												velocity: vec3.scale(vec3.create(), this.player.velocity, 0.2),
+												canDye: true,
+												lifeSpan: 1000 * Math.random(),
+												mass: 700 * Math.random() + 700,
+												enabled: true,
+												drag: 0.99
+
+										}));
+								}
+						}
+				}
+		}, {
+				key: 'updateParticles',
+				value: function updateParticles() {
+
+						// Update the particles & the geometry used to render them.
+
+						for (var i = this.nParticles - 4; i >= 0; i--) {
+
+								var bufferIndex = i * 3;
+
+								if (i < this.particles.length) {
+
+										var force = vec3.sub([0, 0, 0], this.player.position, this.particles[i].position);
+										var dist = vec3.length(force);
+										vec3.normalize(force, force);
+										var mag = 1.0 / Math.pow(dist + 1.0, 2.0) * 1.0;
+
+										this.particles[i].applyForce(vec3.scale(force, force, mag));
+										this.particles[i].update();
+
+										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = this.particles[i].position[0];
+										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = this.particles[i].position[1];
+										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = this.particles[i].scale[0] * this.particles[i].lifePercent;
+
+										if (this.particles[i].isDead()) {
+
+												this.particles.splice(i, 1);
+										}
+								} else {
+
+										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = 0;
+								}
+						}
+
+						this.particlesGeometry.attributes.position.needsUpdate = true;
+				}
 		}]);
 
 		return IntroScene;
 }();
 
-},{"./GameElements/PhysicalElement":64,"./GameElements/shaderHelper":69}],72:[function(require,module,exports){
+},{"./GameElements/ElectricParticle":56,"./GameElements/PhysicalElement":64,"./GameElements/Planet":65,"./GameElements/shaderHelper":69,"three-bmfont-text/shaders/sdf":45}],72:[function(require,module,exports){
 "use strict";
 
 var _resourcesList = require("./resourcesList");
@@ -10973,11 +11906,16 @@ var loop = require('raf-loop');
 
 				// Build GUI
 
+				var isRuning = false;
 				var pagesStack = [];
+				var backPage = null;
+				var backAction = false;
 				var pages = document.querySelectorAll('.page');
 				var mainMenu = document.querySelector('#main-menu');
 				var loadingPanel = document.querySelector('#loading-panel');
 				var loadingLevelPanel = document.querySelector('#loading-level-panel');
+
+				// Set events on the buttons.
 
 				for (var i = 0; i < pages.length; i++) {
 
@@ -10987,30 +11925,92 @@ var loop = require('raf-loop');
 
 								if (WURFL.is_mobile === true) {
 
-										(0, _utils.addEvent)(buttons[j], 'touchstart', function () {
+										(function (button) {
 
-												var onTouchEnd = function onTouchEnd() {
+												button.addEventListener('touchstart', function () {
 
-														var target = this.attributes.target.value;
-														setPageActive(document.querySelector('#' + target));
-														(0, _utils.removeEvent)({ elem: this, event: 'touchend', handler: onTouchEnd });
-												};
+														var onMouseUp = function onMouseUp() {
 
-												(0, _utils.addEvent)(this, 'touchend', onTouchEnd);
-										});
+																if (button.attributes.target) {
+
+																		var target = button.attributes.target.value;
+																		var currentPage = document.querySelector('.page-active');
+																		setPageActive(document.querySelector('#' + target));
+																		backPage = currentPage;
+																		button.removeEventListener('touchend', onMouseUp);
+
+																		if (button.attributes.chapter) {
+
+																				var chapter = button.attributes.chapter.value;
+																				var level = button.attributes.level.value;
+
+																				loadingLevelPanel.style.opacity = 1;
+																				loadingLevelPanel.style.pointerEvents = 'auto';
+
+																				setTimeout(function () {
+
+																						gameManager.startLevel(_levels.levels[chapter][level], function () {
+
+																								isRuning = true;
+
+																								setTimeout(function () {
+
+																										loadingLevelPanel.style.opacity = 0;
+																										loadingLevelPanel.style.pointerEvents = 'none';
+																								}, 500);
+																						});
+																				}, 500);
+																		}
+																}
+														};
+
+														button.addEventListener('touchend', onMouseUp);
+												});
+										})(buttons[j]);
 								} else {
 
-										(0, _utils.addEvent)(buttons[j], 'mousedown', function () {
+										(function (button) {
 
-												var onMouseUp = function onMouseUp() {
+												button.addEventListener('mousedown', function () {
 
-														var target = this.attributes.target.value;
-														setPageActive(document.querySelector('#' + target));
-														(0, _utils.removeEvent)({ elem: this, event: 'mouseup', handler: onMouseUp });
-												};
+														var onMouseUp = function onMouseUp() {
 
-												(0, _utils.addEvent)(this, 'mouseup', onMouseUp);
-										});
+																if (button.attributes.target) {
+
+																		var target = button.attributes.target.value;
+																		var currentPage = document.querySelector('.page-active');
+																		setPageActive(document.querySelector('#' + target));
+																		backPage = currentPage;
+																		button.removeEventListener('mouseup', onMouseUp);
+
+																		if (button.attributes.chapter) {
+
+																				var chapter = button.attributes.chapter.value;
+																				var level = button.attributes.level.value;
+
+																				loadingLevelPanel.style.opacity = 1;
+																				loadingLevelPanel.style.pointerEvents = 'auto';
+
+																				setTimeout(function () {
+
+																						gameManager.startLevel(_levels.levels[chapter][level], function () {
+
+																								isRuning = true;
+
+																								setTimeout(function () {
+
+																										loadingLevelPanel.style.opacity = 0;
+																										loadingLevelPanel.style.pointerEvents = 'none';
+																								}, 500);
+																						});
+																				}, 500);
+																		}
+																}
+														};
+
+														button.addEventListener('mouseup', onMouseUp);
+												});
+										})(buttons[j]);
 								}
 						}
 				}
@@ -11023,12 +12023,62 @@ var loop = require('raf-loop');
 
 						if (activePage) {
 
+								if (!backAction) pagesStack.push(activePage);
+								backAction = false;
 								setPageUnactive(activePage);
 						}
 
 						if (!_page.className.match(/(?:^|\s)page-active(?!\S)/)) {
 
+								switch (_page.id) {
+
+										case 'main-menu':
+
+												setTimeout(function () {
+
+														introScene.initMainMenu();
+												}, 500);
+
+												break;
+
+										case 'gravity-levels':
+
+												setTimeout(function () {
+
+														introScene.initGravity();
+												}, 500);
+
+												break;
+
+										case 'electric-levels':
+
+												setTimeout(function () {
+
+														introScene.initElectric();
+												}, 500);
+
+												break;
+
+										case 'gravity-electric-levels':
+
+												setTimeout(function () {
+
+														introScene.initGravityElectric();
+												}, 500);
+
+												break;
+
+								}
+
 								_page.className += ' page-active';
+
+								if (_page.attributes.back) {
+
+										backPage = document.querySelector('#' + _page.attributes.back.value);
+								} else {
+
+										backPage = null;
+								}
 
 								if (_onTransitionEnd) {
 
@@ -11043,6 +12093,16 @@ var loop = require('raf-loop');
 												(0, _utils.addEvent)(_page, 'transitionend', onTransitionEnd);
 										});
 								}
+						}
+
+						if (backPage) {
+
+								backButton.style.opacity = 1;
+								backButton.style.pointerEvents = 'auto';
+						} else {
+
+								backButton.style.opacity = 0;
+								backButton.style.pointerEvents = 'none';
 						}
 				}
 
@@ -11074,13 +12134,39 @@ var loop = require('raf-loop');
 						}
 				}
 
-				var backButton = document.querySelector('#back-button');
-				(0, _utils.addEvent)(backButton, 'click', function () {
+				// Top Bar
 
-						menu.classList.remove('hidden');
-						gameManager.end();
-						makePageActive('home');
-				});
+				var backButton = document.querySelector('#back-button');
+
+				if (WURFL.is_mobile === true) {
+
+						backButton.addEventListener('touchstart', function () {
+
+								var onMouseUp = function onMouseUp() {
+
+										backAction = true;
+										setPageActive(backPage);
+										isRuning = false;
+										backButton.removeEventListener('touchend', onMouseUp);
+								};
+
+								backButton.addEventListener('touchend', onMouseUp);
+						});
+				} else {
+
+						backButton.addEventListener('mousedown', function () {
+
+								var onMouseUp = function onMouseUp() {
+
+										backAction = true;
+										setPageActive(backPage);
+										isRuning = false;
+										backButton.removeEventListener('mouseup', onMouseUp);
+								};
+
+								backButton.addEventListener('mouseup', onMouseUp);
+						});
+				}
 
 				var reloadButton = document.querySelector('#reload-button');
 				(0, _utils.addEvent)(reloadButton, 'click', function () {
@@ -11090,7 +12176,7 @@ var loop = require('raf-loop');
 
 				// General
 
-				var renderer = new THREE.WebGLRenderer({ alpha: true });
+				var renderer = new THREE.WebGLRenderer();
 				var gl = renderer.getContext();
 
 				var devicePixelRatio = window.devicePixelRatio;
@@ -11098,6 +12184,7 @@ var loop = require('raf-loop');
 
 						devicePixelRatio = 1.5;
 				}
+
 				renderer.setPixelRatio(devicePixelRatio);
 				renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -11107,7 +12194,7 @@ var loop = require('raf-loop');
 
 				var stats = new Stats();
 				stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-				// document.body.appendChild( stats.dom );
+				document.body.appendChild(stats.dom);
 
 				// Events
 
@@ -11254,35 +12341,51 @@ var loop = require('raf-loop');
 				// Create intro scene
 
 				var introScene = new _IntroScene.IntroScene(renderer);
-				introScene.onEnd(function () {
+
+				// Delay all transition in order to prevent overloading the gpu.
+
+				introScene.build(function () {
 
 						setTimeout(function () {
 
-								setPageActive(mainMenu);
-						}, 50);
+								setPageUnactive(loadingPanel, function () {
+
+										setTimeout(function () {
+
+												// Init the intro scene and set a callback that will be fired when the players hit the target.
+
+												introScene.initIntro(function () {
+
+														setTimeout(function () {
+
+																setPageActive(mainMenu);
+														}, 100);
+												});
+										}, 100);
+								});
+						}, 300);
 				});
-
-				setTimeout(function () {
-
-						setPageUnactive(loadingPanel, function () {
-
-								setTimeout(function () {
-
-										introScene.init();
-								}, 10);
-						});
-				}, 500);
 
 				function update(_deltaTime) {
 
-						gameManager.update(_deltaTime);
-						introScene.update();
+						if (isRuning) {
+
+								gameManager.update(_deltaTime);
+						} else {
+
+								introScene.update();
+						}
 				}
 
 				function render(_deltaTime) {
 
-						gameManager.render(_deltaTime);
-						introScene.render();
+						if (isRuning) {
+
+								gameManager.render(_deltaTime);
+						} else {
+
+								introScene.render();
+						}
 				}
 
 				var mainLoop = loop(function (deltaTime) {
@@ -13712,7 +14815,7 @@ function removeEvent(token) {
 
     if (token.elem.removeEventListener) {
 
-        token.elem.removeEventListener(token.event, token.handler);
+        token.elem.removeEventListener(token.event, token.handler, true);
     } else {
 
         token.elem.detachEvent("on" + token.event, token.handler);

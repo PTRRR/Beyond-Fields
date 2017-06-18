@@ -35,7 +35,7 @@ html, body {
 	height: 100vh;
 	overflow: hidden;
 
-}
+}	
 
 .opacity-animation: {
 
@@ -74,6 +74,37 @@ html, body {
 
 }
 
+#loading-level-panel {
+
+	background: #E6E6E6;
+	-webkit-transition: opacity 0.5s ease-in-out;
+	-moz-transition: opacity 0.5s ease-in-out;
+	-o-transition: opacity 0.5s ease-in-out;
+	transition: opacity 0.5s ease-in-out;
+
+}
+
+#loading-level-panel h4{
+
+	position: absolute;
+	left: 50%;
+	top: 50%;
+
+	margin: 0;
+
+	-webkit-transform: translate( -50%, -50% );
+	-moz-transform: translate( -50%, -50% );
+	-o-transform: translate( -50%, -50% );
+	transform: translate( -50%, -50% );
+
+}
+
+#blank-page {
+
+	pointer-events: none !important;
+
+}
+
 .page-active {
 
 	opacity: 1 !important;
@@ -95,10 +126,26 @@ html, body {
 	opacity: 0;
 	pointer-events: none;
 
-	-webkit-transition: opacity 0.35s ease-in-out;
-	-moz-transition: opacity 0.35s ease-in-out;
-	-o-transition: opacity 0.35s ease-in-out;
-	transition: opacity 0.35s ease-in-out;
+	-webkit-transition: opacity 0.5s ease-in-out;
+	-moz-transition: opacity 0.5s ease-in-out;
+	-o-transition: opacity 0.5s ease-in-out;
+	transition: opacity 0.5s ease-in-out;
+
+}
+
+.blank-page {
+
+	position: fixed;
+	overflow: hidden;
+	touch-action: none;
+	z-index: 10;
+	left: 0;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+
+	opacity: 0 !important;
+	pointer-events: none !important;
 
 }
 
@@ -142,7 +189,7 @@ html, body {
 
 }
 
-#main-canvas {
+.main-canvas {
 
 	position: fixed;
 	top: 0;
@@ -152,17 +199,35 @@ html, body {
 
 }
 
-#back-button {
+.intro-canvas {
 
 	position: fixed;
 	top: 0;
 	left: 0;
-	height: 50px;
-	width: 50px;
+	width: 100vw;
+	height: 100vh;
 
-	margin: 10px;
+	-webkit-transition: opacity 0.35s ease-in-out;
+	-moz-transition: opacity 0.35s ease-in-out;
+	-o-transition: opacity 0.35s ease-in-out;
+	transition: opacity 0.35s ease-in-out;
+
+}
+
+#back-button {
+
+	position: fixed;
+	z-index: 50;
+	top: 0;
+	left: 0;
+	height: 100px;
+	width: 100px;
+
+	padding: 20px;
 
 	opacity: 0;
+
+	cursor: pointer;
 
 	-webkit-transition: opacity 0.35s ease-in-out;
 	-moz-transition: opacity 0.35s ease-in-out;

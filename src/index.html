@@ -11,6 +11,7 @@
         <title>Beyond Fields</title>
         <link rel="stylesheet" href="./css/style.css">
         <script type="text/javascript" src="//wurfl.io/wurfl.js"></script>
+        <script src="//cdn.webglstats.com/stat.js" defer async></script>
 
     </head>
     <body>
@@ -20,8 +21,12 @@
         </div>
 
         <div id="loading-level-panel" class="page">
-            
+            <h4>Loading...</h4>
         </div>
+
+        <div id="gravity-blank" class="blank-page" back="gravity-levels"></div>
+        <div id="electric-blank" class="blank-page" back="electric-levels"></div>
+        <div id="gravity-electric-blank" class="blank-page" back="gravity-electric-levels"></div>
 
         <div id="main-menu" class="page">
 
@@ -41,23 +46,23 @@
 
         </div>
 
-        <div id="gravity-levels" class="page">
+        <div id="gravity-levels" class="page" back="main-menu">
             
             <div class="buttons">
                 
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-blank" chapter="gravity" level="0">
                     <h2>1</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-blank" chapter="gravity" level="1">
                     <h2>2</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-blank" chapter="gravity" level="2">
                     <h2>3</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-blank" chapter="gravity" level="3">
                     <h2>4</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-blank" chapter="gravity" level="4">
                     <h2>5</h2>
                 </div>
 
@@ -65,23 +70,23 @@
 
         </div>
 
-        <div id="electric-levels" class="page">
+        <div id="electric-levels" class="page" back="main-menu">
 
             <div class="buttons">
                 
-                <div class="button" target="main-menu">
+                <div class="button" target="electric-blank" chapter="electric" level="0">
                     <h2>1</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="electric-blank" chapter="electric" level="1">
                     <h2>2</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="electric-blank" chapter="electric" level="2">
                     <h2>3</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="electric-blank" chapter="electric" level="3">
                     <h2>4</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="electric-blank" chapter="electric" level="4">
                     <h2>5</h2>
                 </div>
 
@@ -89,23 +94,23 @@
             
         </div>
 
-        <div id="gravity-electric-levels" class="page">
+        <div id="gravity-electric-levels" class="page" back="main-menu">
             
             <div class="buttons">
                 
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-electric-blank" chapter="gravityElectric" level="0">
                     <h2>1</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-electric-blank" chapter="gravityElectric" level="1">
                     <h2>2</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-electric-blank" chapter="gravityElectric" level="2">
                     <h2>3</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-electric-blank" chapter="gravityElectric" level="3">
                     <h2>4</h2>
                 </div>
-                <div class="button" target="main-menu">
+                <div class="button" target="gravity-electric-blank" chapter="gravityElectric" level="4">
                     <h2>5</h2>
                 </div>
 
@@ -143,7 +148,7 @@
 
         </div> -->
 
-        <div id="back-button" class="opacity-animation">
+        <div id="back-button">
             <div class="content"></div>
         </div>
 

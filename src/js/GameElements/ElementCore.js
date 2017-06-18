@@ -35,16 +35,11 @@ export class ElementCore {
 		this.lastTime = this.time;
 
 		this.lifeStartMultiplier += ( 1 - this.lifeStartMultiplier ) * this.lifeStartSpeed; 
+		this.lifeLeft -= this.deltaTime;
 
-		if ( this.lifeLeft > 0 ) {
+		// Clamp the value when it reaches 0.
 
-			this.lifeLeft -= this.deltaTime;
-
-		} else {
-
-			this.lifeLeft = 0;
-
-		}
+		this.lifeLeft = Math.max ( 0, this.lifeLeft );
 
 	}
 
