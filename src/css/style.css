@@ -133,6 +133,43 @@ html, body {
 
 }
 
+.end-page {
+
+
+}
+
+.end-page .content {
+
+	position: absolute;
+	left: 50%;
+	top: 50%;
+
+	border: solid;
+
+	text-align: center;
+
+	-webkit-transform: translate( -50%, -50% );
+	-moz-transform: translate( -50%, -50% );
+	-o-transform: translate( -50%, -50% );
+	transform: translate( -50%, -50% );
+
+	
+
+}
+
+.end-page .content h4 {
+
+	margin: 0;
+
+	-webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+    -khtml-user-select: none; /* Konqueror HTML */
+    -moz-user-select: none; /* Firefox */
+    -ms-user-select: none; /* Internet Explorer/Edge */
+    user-select: none; /* Non-prefixed version, currently supported by Chrome and Opera */
+
+}
+
 .blank-page {
 
 	position: fixed;

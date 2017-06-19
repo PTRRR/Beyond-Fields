@@ -12,6 +12,7 @@ export class GameManager {
 		// General
 
 		this.currentLevel = null;
+		this.soundManager = _options.soundManager;
 
 	}
 
@@ -109,6 +110,7 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
+					soundManager: this.soundManager,
 
 				} );
 
@@ -120,6 +122,7 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
+					soundManager: this.soundManager,
 
 				} );
 
@@ -131,6 +134,7 @@ export class GameManager {
 
 					renderer: this.renderer, 
 					levelFile: clone ( _levelFile ),
+					soundManager: this.soundManager,
 
 				} );
 
@@ -146,6 +150,12 @@ export class GameManager {
 
 			} );
 
+			this.currentLevel.onWin ( function ( levelFile ) {
+
+				if ( this.onWinCallBack ) this.onWinCallBack ( _levelFile );
+
+			}.bind ( this ) )
+
 		}
 
 	}
@@ -159,6 +169,12 @@ export class GameManager {
 			this.currentLevel = null;
 
 		}
+
+	}
+
+	onWin ( _callback ) {
+
+		if ( !this.onWinCallBack ) this.onWinCallBack = _callback;
 
 	}
 

@@ -21,6 +21,8 @@ export class GravityElectricLevel extends LevelCore {
 		this.activePlanet = null;
 		this.canUpdateTexts = true;
 
+		this.won = false;
+
 	}
 
 	build () {
@@ -172,13 +174,18 @@ export class GravityElectricLevel extends LevelCore {
 				this.arrivedInGame = false;
 				this.buildCharges ();
 
-				console.log(this.gameElements.planets);
-
 			} else {
 
 				return;
 
 			}
+
+		}
+
+		if ( !this.won && this.levelCompleted ) {
+
+			if ( this.onWinCallback ) this.onWinCallback ( this.levelFile );
+			this.won = true;
 
 		}
 
@@ -191,7 +198,7 @@ export class GravityElectricLevel extends LevelCore {
 		// main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
+		if ( this.checkEdges ( player.position, 0.2 ) && !this.levelCompleted ) this.resetPlayer ();
 		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -302,7 +309,7 @@ export class GravityElectricLevel extends LevelCore {
 
 		// Update the player according to the resulting of all forces merged together.
 
-		player.applyForce ( resultForce );
+		if ( !this.levelCompleted ) player.applyForce ( resultForce );
 
 		// Update particles emitted by the player.
 

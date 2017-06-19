@@ -48,6 +48,7 @@ export class ElectricLevel extends LevelCore {
 		this.scanMaterial.extensions.derivatives = true;
 
 		this.canUpdateTexts = true;
+		this.won = false;
 
 	}
 
@@ -193,12 +194,38 @@ export class ElectricLevel extends LevelCore {
 
 		super.update ();
 
+		if ( !this.won && this.levelCompleted ) {
+
+			if ( this.onWinCallback ) this.onWinCallback ( this.levelFile );
+			this.won = true;
+
+		}
+
+		if ( this.levelCompleted ) {
+
+			let charges = this.gameElements.charges.instances;
+			let fixedCharges = this.gameElements.fixedCharges.instances;
+
+			for ( let i = 0; i < charges.length; i ++ ) {
+
+				charges[ i ].kill ();
+
+			}
+
+			for ( let i = 0; i < fixedCharges.length; i ++ ) {
+
+				fixedCharges[ i ].kill ();
+
+			}
+
+			// return;
+
+		}
+
 		// main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
-		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
-		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+		if ( this.checkEdges ( player.position, 0.2 ) && !this.levelCompleted ) this.resetPlayer ();
 
 		// Obstacles
 
@@ -210,7 +237,9 @@ export class ElectricLevel extends LevelCore {
 
 			if ( this.isInBox ( obstacle, player.position ) ) {
 
-				this.resetPlayer ();
+				this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
+				this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
+				if ( !this.levelCompleted ) this.resetPlayer ();
 				break;
 
 			}
@@ -241,7 +270,7 @@ export class ElectricLevel extends LevelCore {
 
 			if ( dist < charge.radius ) {
 
-				this.resetPlayer ();
+				if ( !this.levelCompleted ) this.resetPlayer ();
 
 			} else {
 
@@ -344,7 +373,7 @@ export class ElectricLevel extends LevelCore {
 
 		}
 
-		player.applyForce ( forceResult );
+		if ( !this.levelCompleted ) player.applyForce ( forceResult );
 
 		// Update the particles emitted by the player.
 

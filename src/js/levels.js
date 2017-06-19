@@ -6,6 +6,7 @@ let levels = {
 
 			chapter: 'gravity',
 			textIntro: 'G\n\n----------\n\nTry to change the vehicle\'s trajectory by placing objects along it\'s road.\n\nJust drag on the screen to counterbalance the attractive forces emitted by the big circles.\n\nClick to start',
+			playerDrag: 0.99,
 			elements: {
 
 				planets: {
@@ -57,18 +58,18 @@ let levels = {
 
 					instances: {
 
-						0: {
+						// 0: {
 
-							infoPointIndex: 16 * 7 + 3,
-							enabled: true,
-                            position: [ -2, 0, 0 ],
-                            radius: 4,
-                            mass: 500000,
-                            scale: [ 1.8, 1.8, 1.8 ],
-                            color: [ 255/255, 222/255, 40/255, 1 ],
-                            rotation: [ 0, 0, 0 ],
+						// 	infoPointIndex: 16 * 7 + 3,
+						// 	enabled: true,
+      //                       position: [ -2, 0, 0 ],
+      //                       radius: 4,
+      //                       mass: 500000,
+      //                       scale: [ 1.8, 1.8, 1.8 ],
+      //                       color: [ 255/255, 222/255, 40/255, 1 ],
+      //                       rotation: [ 0, 0, 0 ],
 
-                        },
+      //                   },
 
 					}
 
@@ -1658,7 +1659,7 @@ let levels = {
 
 	},
 
-	gravityElectric: {
+	'gravity-electric': {
 
 		0: {
 

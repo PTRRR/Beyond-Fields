@@ -1,5 +1,6 @@
 import { resourcesList } from "./resourcesList";
 import { GameManager } from "./GameManager";
+import { SoundManager } from "./SoundManager";
 import { addEvent, removeEvent } from "./utils";
 import { levels } from "./levels";
 import { IntroScene } from "./IntroScene";
@@ -10,7 +11,13 @@ let loop = require ( 'raf-loop' );
 
 ( function () {
 
-	function init () {
+	function init ( _soundManager ) {
+
+		setTimeout ( function () {
+
+			// backSound.volume = 1.0;
+
+		}, 1000 );
 
 		// Cross browser variables
 
@@ -57,6 +64,18 @@ let loop = require ( 'raf-loop' );
 		let mainMenu = document.querySelector('#main-menu');
 		let loadingPanel = document.querySelector('#loading-panel');
 		let loadingLevelPanel = document.querySelector('#loading-level-panel');
+
+		// update levels
+
+		for ( let level in levels ) {
+
+			for ( let n in levels[ level ] ) {
+
+				levels[ level ][ n ][ 'levelIndex' ] = parseInt ( n ) + 1;
+
+			}
+
+		}
 
 		// Set events on the buttons.
 
@@ -157,7 +176,7 @@ let loop = require ( 'raf-loop' );
 												}, 500 );
 
 											} );
-
+											
 										}, 500 );
 
 									}
@@ -502,48 +521,101 @@ let loop = require ( 'raf-loop' );
 		
 		// Game
 
-		let gameManager = new GameManager ( { renderer: renderer } );
+		let gameManager = new GameManager ( { renderer: renderer, soundManager: _soundManager } );
 
-		// Debug
+		gameManager.onWin ( function ( levelFile ) {
 
-		// gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
+			( function ( chapter, level ) {
 
-		// 	setTimeout ( function () {
+				let winPage = null;
 
-		// 		menu.classList.add ( 'hidden' );
-		// 		activePage.classList.remove ( 'active' );
+				switch ( chapter ) {
 
-		// 	}, 200 );
+					case 'gravity':
 
-		// } );
+						winPage = document.querySelector('#gravity-end');
 
-		// gameManager.startLevel ( levels[ 'electric' ][ 2 ], function () {
+					break;
 
-		// 	setTimeout ( function () {
+					case 'electric':
 
-		// 		menu.classList.add ( 'hidden' );
-		// 		activePage.classList.remove ( 'active' );
+						winPage = document.querySelector('#electric-end');
 
-		// 	}, 200 );
+					break;
 
-		// } );
+					case 'gravity-electric':
 
-		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 3 ], function () {
+						winPage = document.querySelector('#gravity-electric-end');
 
-		// 	setTimeout ( function () {
+					break;
 
-		// 		menu.classList.add ( 'hidden' );
-		// 		activePage.classList.remove ( 'active' );
+				}
 
-		// 	}, 200 );
+				let content = winPage.querySelector('.content');
+				let levelInfo = content.querySelector('.level-info');
+				levelInfo.innerHTML = 'Level ' + level + ' completed!';
+				let nextLevel = content.querySelector('.next-level');
 
-		// } );
-		// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-		// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+				if ( nextLevel ) content.removeChild ( nextLevel );
+
+				let newNextLevelButton = document.createElement('div');
+				newNextLevelButton.className = 'next-level';
+				newNextLevelButton.innerHTML = 'Next level';
+				newNextLevelButton.style.cursor = 'pointer';
+
+				let nextLevelFile = levels[ chapter ][ level ] || levels[ chapter ][ 0 ];
+
+				newNextLevelButton.addEventListener ( 'mousedown', function () {
+
+					let onMouseUp = function () {
+
+						setPageActive ( document.querySelector( '#' + chapter + '-blank' ) );
+						backPage = document.querySelector('#' + chapter + '-levels');;
+						loadingLevelPanel.style.opacity = 1;
+						loadingLevelPanel.style.pointerEvents = 'auto';
+
+						setTimeout ( function () {
+
+							gameManager.startLevel ( nextLevelFile, function () {
+
+								isRuning = true;
+
+								setTimeout ( function () {
+
+									loadingLevelPanel.style.opacity = 0;
+									loadingLevelPanel.style.pointerEvents = 'none';
+
+								}, 500 );
+
+							} );
+							
+						}, 500 );
+
+						newNextLevelButton.removeEventListener ( 'mouseup', onMouseUp );
+
+					}
+
+					newNextLevelButton.addEventListener ( 'mouseup', onMouseUp );
+
+				} );
+
+				content.appendChild ( newNextLevelButton );
+
+				setTimeout ( function () {
+
+					setPageActive ( winPage );
+
+				}, 300 );
+
+			} )( levelFile.chapter, levelFile.levelIndex );
+
+		} );
 
 		// Create intro scene
 
 		let introScene = new IntroScene ( renderer );
+		let mainBackgroundSound = null;
+		let mainPlayerSound = _soundManager.play ( 'Player_sound_0', { loop: -1, volume: 0 } );
 
 		// Delay all transition in order to prevent overloading the gpu.
 
@@ -559,8 +631,13 @@ let loop = require ( 'raf-loop' );
 
 						introScene.initIntro ( function () {
 
+							_soundManager.play ( 'Goal_sound_3', { volume: 0.2 } );
+							_soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 5 ), { volume: 0.1 } );
+							mainBackgroundSound = _soundManager.play ( 'Back_sound_' + Math.floor ( Math.random () * 4 ), { loop: -1 } );
+
 							setTimeout ( function () {
 
+								// setPageActive ( document.querySelector('#gravity-end') );
 								setPageActive ( mainMenu );
 
 							}, 100 );
@@ -580,10 +657,14 @@ let loop = require ( 'raf-loop' );
 			if ( isRuning ) {
 
 				gameManager.update ( _deltaTime );
-				
+				mainPlayerSound.volume += ( 0.0 - mainPlayerSound.volume ) * 0.03;
+				if ( mainBackgroundSound ) mainBackgroundSound.volume += ( 0.0 - mainBackgroundSound.volume ) * 0.08;
+
 			} else {
 
 				introScene.update ();
+				mainPlayerSound.volume += ( 0.3 - mainPlayerSound.volume ) * 0.03;
+				if ( mainBackgroundSound ) mainBackgroundSound.volume += ( 1.0 - mainBackgroundSound.volume ) * 0.08;
 				
 			}
 
@@ -616,6 +697,11 @@ let loop = require ( 'raf-loop' );
 
 	}
 
-	init ();
+	let soundManager = new SoundManager ();
+	soundManager.onLoad ( function () {
+
+		init ( this );
+
+	} );
 
 } )();

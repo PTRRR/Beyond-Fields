@@ -53,6 +53,8 @@ export class GravityLevel extends LevelCore {
 		this.canDraw = true;
 		this.canUpdateTexts = true;
 
+		this.won = false;
+
 	}
 
 	build () {
@@ -81,17 +83,23 @@ export class GravityLevel extends LevelCore {
 
 	onClick ( _position ) {
 
+		if ( this.levelCompleted ) return;
+
 		super.onClick ( _position );
 
 	}
 
 	onMove ( _position ) {
 
+		if ( this.levelCompleted ) return;
+
 		super.onMove ( _position );
 
 	} 
 
 	onDrag ( _position ) {
+
+		if ( this.levelCompleted ) return;
 
 		super.onDrag ( _position );
 
@@ -174,14 +182,27 @@ export class GravityLevel extends LevelCore {
 
 		};
 
-		// Here all the objects's geometries are updated.
-
 		super.update ( _deltaTime );
 
+		if ( !this.won && this.levelCompleted ) {
+
+			this.won = true;
+			this.onWinCallback ( this.levelFile );
+
+		}
+
+		if ( this.levelCompleted ) {
+
+			// console.log('sfélkjélkj');
+			return;
+
+		}
+
+		// Here all the objects's geometries are updated.
 		// Main player
 
 		let player = this.gameElements.player.instances[ 0 ];
-		if ( this.checkEdges ( player.position, 0.2 ) ) this.resetPlayer ();
+		if ( this.checkEdges ( player.position, 0.2 ) && !this.levelCompleted ) this.resetPlayer ();
 		// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 		// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -216,7 +237,7 @@ export class GravityLevel extends LevelCore {
 
 			} else {
 
-				this.resetPlayer ();
+				if ( !this.levelCompleted ) this.resetPlayer ();
 
 			}
 
@@ -244,7 +265,7 @@ export class GravityLevel extends LevelCore {
 
 			} else {
 
-				this.resetPlayer ();
+				if ( !this.levelCompleted ) this.resetPlayer ();
 
 			}
 

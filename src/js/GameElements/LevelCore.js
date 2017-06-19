@@ -34,6 +34,7 @@ export class LevelCore {
 
 		// Core elements
 
+		this.levelCompleted = false;
 		this.loadObjects = 0;
 		this.levelLoaded = false;
 		this.levelStarted = false;
@@ -43,6 +44,7 @@ export class LevelCore {
 		this.renderer = _options.renderer;
 		this.renderer.autoClear = false;
 		this.onWinCallback = function () { console.log( 'you won' ) };
+		this.soundManager = _options.soundManager;
 
 		this.glMouse = vec3.create ();
 		this.glMouseWorld = vec3.create ();
@@ -162,6 +164,30 @@ export class LevelCore {
 
 		this.player = new THREE.Object3D ();
 		this.gameElements = {};
+
+		// End circle
+
+		this.arrivalScaleTarget = 0.4;
+		this.endCircleTargetScale = 0.0;
+		this.endCircleAlphaTarget = 1.0;
+		this.endCircleMaterial = new THREE.ShaderMaterial ( {
+
+			vertexShader: shaderHelper.introEndCircles.vertex,
+			fragmentShader: shaderHelper.introEndCircles.fragment,
+
+			uniforms: {
+
+				alpha: { value: 1.0 },
+				scale: { value: 1.0 },
+
+			},
+
+			transparent: true,
+
+		} );
+
+		this.endCircle = new THREE.Mesh ( this.quadGeometry, this.endCircleMaterial );
+		this.mainScene.add ( this.endCircle );
 		
 	}
 
@@ -287,6 +313,11 @@ export class LevelCore {
 	}
 
 	build () {
+
+		// Sound
+
+		this.backgroundSound = this.soundManager.play ( 'Back_sound_' + Math.floor ( Math.random () * 4 ), { loop: -1, volume: 0.3 } ); 
+		this.playerSound = this.soundManager.play ( 'Player_sound_0', { loop: -1, volume: 0.15 } );
 
 		// Update screns size & position.
 
@@ -660,7 +691,7 @@ export class LevelCore {
 					scale: vec3.fromValues ( 0.12, 0.12, 1.0 ),
 					velocity: vec3.create(),
 					mass: 30000,
-					drag: 0.999999,
+					drag: this.levelFile.playerDrag || 0.999999,
 
 				}
 
@@ -2092,6 +2123,31 @@ export class LevelCore {
 
 		}
 
+		// Update end circle
+
+		let aPos = this.gameElements.arrival.instances[ 0 ].position;
+		let aSca = this.gameElements.arrival.instances[ 0 ].scale;
+
+		aSca[ 0 ] += ( this.arrivalScaleTarget - aSca[ 0 ] ) * 0.05;
+		aSca[ 1 ] += ( this.arrivalScaleTarget - aSca[ 1 ] ) * 0.05;
+
+		this.endCircle.position.set ( aPos[ 0 ], aPos[ 1 ], aPos[ 2 ] );
+		this.endCircleMaterial.uniforms.alpha.value += ( this.endCircleAlphaTarget - this.endCircleMaterial.uniforms.alpha.value ) * 0.05;
+		this.endCircleMaterial.uniforms.scale.value += ( this.endCircleTargetScale - this.endCircleMaterial.uniforms.scale.value ) * 0.05;
+
+		// Check finish
+
+		let dist = vec3.length ( vec3.sub ( [ 0, 0, 0 ], this.gameElements.arrival.instances[ 0 ].position, this.gameElements.player.instances[ 0 ].position ) );
+
+		if ( dist < this.gameElements.arrival.instances[ 0 ].scale[ 0 ] ) {
+
+			this.levelCompleted = true;
+			this.endCircleTargetScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 4 : this.getWorldTop () * 4;
+			this.endCircleAlphaTarget = 0.0;
+			this.arrivalScaleTarget = 0.0;
+
+		}
+
 		// Update text intro
 
 		if ( this.textBackground ) this.textBackground.material.opacity += ( this.textBackground.material.alphaTarget - this.textBackground.material.opacity ) * 0.1;
@@ -2169,6 +2225,8 @@ export class LevelCore {
 			}
 
 			if ( _onClear ) _onClear ();
+
+			this.backgroundSound.stop ();
 
 		}.bind ( this ), 1000 );
 

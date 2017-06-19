@@ -5555,6 +5555,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				_this.scanMaterial.extensions.derivatives = true;
 
 				_this.canUpdateTexts = true;
+				_this.won = false;
 
 				return _this;
 		}
@@ -5695,24 +5696,48 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "update", this).call(this);
 
+						if (!this.won && this.levelCompleted) {
+
+								if (this.onWinCallback) this.onWinCallback(this.levelFile);
+								this.won = true;
+						}
+
+						if (this.levelCompleted) {
+
+								var _charges = this.gameElements.charges.instances;
+								var _fixedCharges = this.gameElements.fixedCharges.instances;
+
+								for (var i = 0; i < _charges.length; i++) {
+
+										_charges[i].kill();
+								}
+
+								for (var _i = 0; _i < _fixedCharges.length; _i++) {
+
+										_fixedCharges[_i].kill();
+								}
+
+								// return;
+						}
+
 						// main player
 
 						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
-						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
-						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
+						if (this.checkEdges(player.position, 0.2) && !this.levelCompleted) this.resetPlayer();
 
 						// Obstacles
 
 						var obstacles = this.gameElements.obstacles.instances;
 
-						for (var i = 0; i < obstacles.length; i++) {
+						for (var _i2 = 0; _i2 < obstacles.length; _i2++) {
 
-								var obstacle = obstacles[i];
+								var obstacle = obstacles[_i2];
 
 								if (this.isInBox(obstacle, player.position)) {
 
-										this.resetPlayer();
+										this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
+										this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
+										if (!this.levelCompleted) this.resetPlayer();
 										break;
 								}
 						}
@@ -5729,9 +5754,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						var fixedCharges = this.gameElements.fixedCharges.instances;
 						var chargesUniform = [];
 
-						for (var _i = 0; _i < fixedCharges.length; _i++) {
+						for (var _i3 = 0; _i3 < fixedCharges.length; _i3++) {
 
-								var charge = fixedCharges[_i];
+								var charge = fixedCharges[_i3];
 
 								chargesUniform.push(charge.position[0]);
 								chargesUniform.push(charge.position[1]);
@@ -5741,7 +5766,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								if (dist < charge.radius) {
 
-										this.resetPlayer();
+										if (!this.levelCompleted) this.resetPlayer();
 								} else {
 
 										var force = this.computeElectricForce(charge, player);
@@ -5761,9 +5786,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						var charges = this.gameElements.charges.instances;
 
-						for (var _i2 = 0; _i2 < charges.length; _i2++) {
+						for (var _i4 = 0; _i4 < charges.length; _i4++) {
 
-								var _charge = charges[_i2];
+								var _charge = charges[_i4];
 
 								if (this.checkEdges(_charge.position, 0.2)) {
 
@@ -5793,7 +5818,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								for (var j = 0; j < charges.length; j++) {
 
-										if (j != _i2) {
+										if (j != _i4) {
 
 												var _dir = vec3.sub(vec3.create(), _charge.position, charges[j].position);
 												var _dist3 = vec3.length(_dir);
@@ -5829,7 +5854,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								this.scanMaterial.uniforms.charges.value = chargesUniform;
 						}
 
-						player.applyForce(forceResult);
+						if (!this.levelCompleted) player.applyForce(forceResult);
 
 						// Update the particles emitted by the player.
 
@@ -5847,9 +5872,9 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								particle.applyForce(_dir3);
 
-								for (var _i3 = 0; _i3 < charges.length; _i3++) {
+								for (var _i5 = 0; _i5 < charges.length; _i5++) {
 
-										var _charge2 = charges[_i3];
+										var _charge2 = charges[_i5];
 
 										var _dir4 = vec3.sub(vec3.create(), _charge2.position, particle.position);
 										var _minDist2 = _charge2.scale[0] + particle.scale[0];
@@ -5869,7 +5894,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						// Update FX particles
 
-						for (var _i4 = 0; _i4 < 2; _i4++) {
+						for (var _i6 = 0; _i6 < 2; _i6++) {
 
 								var instance = this.addInstanceOf('playerParticles', {
 
@@ -5972,10 +5997,10 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								var _totalForce = 0;
 								var _totalMass = 0;
 
-								for (var _i5 = 0; _i5 < _instances.length; _i5++) {
+								for (var _i7 = 0; _i7 < _instances.length; _i7++) {
 
-										_totalForce += vec3.length(this.computeElectricForce(_instances[_i5], player));
-										_totalMass += _instances[_i5].mass;
+										_totalForce += vec3.length(this.computeElectricForce(_instances[_i7], player));
+										_totalMass += _instances[_i7].mass;
 								}
 
 								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
@@ -6473,6 +6498,8 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				_this.activePlanet = null;
 				_this.canUpdateTexts = true;
 
+				_this.won = false;
+
 				return _this;
 		}
 
@@ -6623,12 +6650,16 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
 										this.arrivedInGame = false;
 										this.buildCharges();
-
-										console.log(this.gameElements.planets);
 								} else {
 
 										return;
 								}
+						}
+
+						if (!this.won && this.levelCompleted) {
+
+								if (this.onWinCallback) this.onWinCallback(this.levelFile);
+								this.won = true;
 						}
 
 						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'update', this).call(this);
@@ -6640,7 +6671,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						// main player
 
 						var player = this.gameElements.player.instances[0];
-						if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
+						if (this.checkEdges(player.position, 0.2) && !this.levelCompleted) this.resetPlayer();
 						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
 						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
@@ -6740,7 +6771,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						// Update the player according to the resulting of all forces merged together.
 
-						player.applyForce(resultForce);
+						if (!this.levelCompleted) player.applyForce(resultForce);
 
 						// Update particles emitted by the player.
 
@@ -7011,11 +7042,11 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 		return GravityElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"../utils":75,"./LevelCore":61,"./Text":67,"./shaderHelper":69}],60:[function(require,module,exports){
+},{"../utils":76,"./LevelCore":61,"./Text":67,"./shaderHelper":69}],60:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-			value: true
+		value: true
 });
 exports.GravityLevel = undefined;
 
@@ -7036,471 +7067,490 @@ function _possibleConstructorReturn(self, call) { if (!self) { throw new Referen
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
 var GravityLevel = exports.GravityLevel = function (_LevelCore) {
-			_inherits(GravityLevel, _LevelCore);
+		_inherits(GravityLevel, _LevelCore);
 
-			function GravityLevel(_options) {
-						_classCallCheck(this, GravityLevel);
+		function GravityLevel(_options) {
+				_classCallCheck(this, GravityLevel);
 
-						try {
-									var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
+				try {
+						var _this = _possibleConstructorReturn(this, (GravityLevel.__proto__ || Object.getPrototypeOf(GravityLevel)).call(this, _options));
 
-									_this.build();
-						} catch (e) {
+						_this.build();
+				} catch (e) {
 
-									console.error(e);
+						console.error(e);
+				}
+
+				_this.ready = false;
+
+				// build a grid
+
+				var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
+				var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 80, 80);
+				_this.gridMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.grid.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
+						transparent: true,
+
+						uniforms: {
+
+								mainAlpha: { value: 1.0 },
+								gridSubdivisions: { value: 60 },
+								numMasses: { value: 0 },
+								masses: { value: [0, 0, 0] }
+
 						}
 
-						_this.ready = false;
+						// side: THREE.DoubleSide,
 
-						// build a grid
+				});
 
-						var maxScale = _this.getWorldRight() > _this.getWorldTop() ? _this.getWorldRight() * 2 : _this.getWorldTop() * 2;
-						var gridGeometry = new THREE.PlaneBufferGeometry(1, 1, 80, 80);
-						_this.gridMaterial = new THREE.ShaderMaterial({
+				_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
+				_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
+				_this.grid.renderOrder = 0;
+				_this.scanScene.add(_this.grid);
+				_this.gridMaterial.extensions.derivatives = true;
 
-									vertexShader: _shaderHelper.shaderHelper.grid.vertex,
-									fragmentShader: _shaderHelper.shaderHelper.grid.fragment,
-									transparent: true,
+				// Blackmatter
 
-									uniforms: {
+				_this.canDraw = true;
+				_this.canUpdateTexts = true;
 
-												mainAlpha: { value: 1.0 },
-												gridSubdivisions: { value: 60 },
-												numMasses: { value: 0 },
-												masses: { value: [0, 0, 0] }
+				_this.won = false;
 
-									}
+				return _this;
+		}
 
-									// side: THREE.DoubleSide,
+		_createClass(GravityLevel, [{
+				key: "build",
+				value: function build() {
 
-						});
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
 
-						_this.grid = new THREE.Mesh(gridGeometry, _this.gridMaterial);
-						_this.grid.scale.set(maxScale * 1.4, maxScale * 1.4, 1);
-						_this.grid.renderOrder = 0;
-						_this.scanScene.add(_this.grid);
-						_this.gridMaterial.extensions.derivatives = true;
+						this.onLoad(function () {
 
-						// Blackmatter
+								this.render();
+						}.bind(this));
+				}
+		}, {
+				key: "onUp",
+				value: function onUp(_position) {
 
-						_this.canDraw = true;
-						_this.canUpdateTexts = true;
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onUp", this).call(this, _position);
+				}
+		}, {
+				key: "onDown",
+				value: function onDown(_position) {
 
-						return _this;
-			}
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDown", this).call(this, _position);
+				}
+		}, {
+				key: "onClick",
+				value: function onClick(_position) {
 
-			_createClass(GravityLevel, [{
-						key: "build",
-						value: function build() {
+						if (this.levelCompleted) return;
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "build", this).call(this);
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onClick", this).call(this, _position);
+				}
+		}, {
+				key: "onMove",
+				value: function onMove(_position) {
 
-									this.onLoad(function () {
+						if (this.levelCompleted) return;
 
-												this.render();
-									}.bind(this));
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onMove", this).call(this, _position);
+				}
+		}, {
+				key: "onDrag",
+				value: function onDrag(_position) {
+
+						if (this.levelCompleted) return;
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
+
+						if (!this.activeScreen && this.canDraw) {
+
+								var r = rc();
+								var s = Math.random() * 0.3 + 0.2;
+
+								// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
+
+								if (this.gameElements.blackMatter.instances.length < 108) {
+
+										this.addInstanceOf('blackMatter', {
+
+												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
+												scale: [s, s, s],
+												color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
+												rotation: [0, 0, Math.random() * Math.PI * 2],
+												mass: 20000,
+												drag: 0.95,
+												lifeSpan: Math.random() * 4000 + 6000,
+												canDye: true,
+												targetLinePosition: [-2.0, 2.0, 0.0]
+
+										});
+								}
 						}
-			}, {
-						key: "onUp",
-						value: function onUp(_position) {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onUp", this).call(this, _position);
+						if (this.canDraw) {
+
+								this.canDraw = false;
+
+								setTimeout(function () {
+
+										this.canDraw = true;
+								}.bind(this), 100);
 						}
-			}, {
-						key: "onDown",
-						value: function onDown(_position) {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDown", this).call(this, _position);
+						function rc() {
+
+								return (Math.random() - 0.5) * 0.07;
 						}
-			}, {
-						key: "onClick",
-						value: function onClick(_position) {
+				}
+		}, {
+				key: "onResize",
+				value: function onResize() {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onClick", this).call(this, _position);
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
+
+						var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
+						this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1.0);
+				}
+		}, {
+				key: "update",
+				value: function update(_deltaTime) {
+
+						// Check if all is loaded.
+
+						if (!this.ready) {
+
+								if (this.levelLoaded && this.levelStarted) {
+
+										this.ready = true;
+										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
+										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
+										this.arrivedInGame = false;
+										this.gameElements.player.instances[0].enabled = true;
+										this.resetPlayer();
+								} else {
+
+										return;
+								}
+						};
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this, _deltaTime);
+
+						if (!this.won && this.levelCompleted) {
+
+								this.won = true;
+								this.onWinCallback(this.levelFile);
 						}
-			}, {
-						key: "onMove",
-						value: function onMove(_position) {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onMove", this).call(this, _position);
+						if (this.levelCompleted) {
+
+								// console.log('sfélkjélkj');
+								return;
 						}
-			}, {
-						key: "onDrag",
-						value: function onDrag(_position) {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
+						// Here all the objects's geometries are updated.
+						// Main player
 
-									if (!this.activeScreen && this.canDraw) {
+						var player = this.gameElements.player.instances[0];
+						if (this.checkEdges(player.position, 0.2) && !this.levelCompleted) this.resetPlayer();
+						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
+						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
-												var r = rc();
-												var s = Math.random() * 0.3 + 0.2;
+						// Compute the gravitational field.
+						//
+						// G = 6.674 * 10-11 ( m3 kg-1 s-2 )
+						//
+						// F = G * ( m1 * m2 ) / r^2
+						//
 
-												// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
+						var forceResult = vec3.create();
 
-												if (this.gameElements.blackMatter.instances.length < 108) {
+						// Black matter
 
-															this.addInstanceOf('blackMatter', {
+						var massesUniforms = [];
+						var blackMatterInstances = this.gameElements.blackMatter.instances;
 
-																		position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
-																		scale: [s, s, s],
-																		color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
-																		rotation: [0, 0, Math.random() * Math.PI * 2],
-																		mass: 20000,
-																		drag: 0.95,
-																		lifeSpan: Math.random() * 4000 + 6000,
-																		canDye: true,
-																		targetLinePosition: [-2.0, 2.0, 0.0]
+						for (var i = 0; i < blackMatterInstances.length; i++) {
 
-															});
-												}
-									}
+								var bC = blackMatterInstances[i];
+								var dir = vec3.sub(vec3.create(), bC.position, player.position);
+								var dist = vec3.length(dir);
 
-									if (this.canDraw) {
+								massesUniforms.push(bC.position[0]);
+								massesUniforms.push(bC.position[1]);
+								massesUniforms.push(bC.mass / bC.maxMass);
 
-												this.canDraw = false;
+								if (dist > bC.scale[0]) {
 
-												setTimeout(function () {
+										var force = this.computeGravityAttraction(bC, player);
+										vec3.add(forceResult, forceResult, force);
+								} else {
 
-															this.canDraw = true;
-												}.bind(this), 100);
-									}
-
-									function rc() {
-
-												return (Math.random() - 0.5) * 0.07;
-									}
+										if (!this.levelCompleted) this.resetPlayer();
+								}
 						}
-			}, {
-						key: "onResize",
-						value: function onResize() {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onResize", this).call(this);
+						// Planets & particles
 
-									var maxScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 2 : this.getWorldTop() * 2;
-									this.grid.scale.set(maxScale * 1.5, maxScale * 1.5, 1.0);
+						var playerParticles = this.gameElements.playerParticles.instances;
+						var planetsInstances = this.gameElements.planets.instances;
+
+						for (var _i = 0; _i < planetsInstances.length; _i++) {
+
+								var planet = planetsInstances[_i];
+								var _dir = vec3.sub(vec3.create(), planet.position, player.position);
+								var _dist = vec3.length(_dir);
+
+								massesUniforms.push(planet.position[0]);
+								massesUniforms.push(planet.position[1]);
+								massesUniforms.push(planet.mass / planet.maxMass * 2.0);
+
+								if (_dist > planet.scale[0]) {
+
+										var _force = this.computeGravityAttraction(planet, player);
+										vec3.add(forceResult, forceResult, _force);
+								} else {
+
+										if (!this.levelCompleted) this.resetPlayer();
+								}
+
+								// for ( let j = 0; j < playerParticles.length; j ++ ) {
+
+								// 	let particle = playerParticles[ j ];
+
+								// 	let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
+								// 	let distToPlanet = vec3.length ( dirToPlanet );
+								// 	let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
+								// 	let force = null;
+
+								// 	if ( distToPlanet < minDistToPlanet ) {
+
+								// 		let mag = ( minDistToPlanet - distToPlanet ) * 50;
+								// 		vec3.normalize ( distToPlanet, distToPlanet );
+								// 		force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
+
+								// 	} else {
+
+								// 		force = this.computeGravityAttraction ( planet, particle );
+
+								// 		if ( vec3.length ( force ) > 1 ) {
+
+								// 			vec3.normalize ( force, force );
+								// 			vec3.scale ( force, force, 1 );
+
+								// 		}
+
+								// 	}
+
+								// 	particle.applyForce ( force );
+
+								// }
 						}
-			}, {
-						key: "update",
-						value: function update(_deltaTime) {
 
-									// Check if all is loaded.
+						// Update the grid in the scan scene.
 
-									if (!this.ready) {
+						if (massesUniforms.length > 0) {
 
-												if (this.levelLoaded && this.levelStarted) {
-
-															this.ready = true;
-															// this.start = this.getInstanceByName ( 'goals', 'bottom' );
-															// this.arrival = this.getInstanceByName ( 'goals', 'top' );
-															this.arrivedInGame = false;
-															this.gameElements.player.instances[0].enabled = true;
-															this.resetPlayer();
-												} else {
-
-															return;
-												}
-									};
-
-									// Here all the objects's geometries are updated.
-
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "update", this).call(this, _deltaTime);
-
-									// Main player
-
-									var player = this.gameElements.player.instances[0];
-									if (this.checkEdges(player.position, 0.2)) this.resetPlayer();
-									// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
-									// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
-
-									// Compute the gravitational field.
-									//
-									// G = 6.674 * 10-11 ( m3 kg-1 s-2 )
-									//
-									// F = G * ( m1 * m2 ) / r^2
-									//
-
-									var forceResult = vec3.create();
-
-									// Black matter
-
-									var massesUniforms = [];
-									var blackMatterInstances = this.gameElements.blackMatter.instances;
-
-									for (var i = 0; i < blackMatterInstances.length; i++) {
-
-												var bC = blackMatterInstances[i];
-												var dir = vec3.sub(vec3.create(), bC.position, player.position);
-												var dist = vec3.length(dir);
-
-												massesUniforms.push(bC.position[0]);
-												massesUniforms.push(bC.position[1]);
-												massesUniforms.push(bC.mass / bC.maxMass);
-
-												if (dist > bC.scale[0]) {
-
-															var force = this.computeGravityAttraction(bC, player);
-															vec3.add(forceResult, forceResult, force);
-												} else {
-
-															this.resetPlayer();
-												}
-									}
-
-									// Planets & particles
-
-									var playerParticles = this.gameElements.playerParticles.instances;
-									var planetsInstances = this.gameElements.planets.instances;
-
-									for (var _i = 0; _i < planetsInstances.length; _i++) {
-
-												var planet = planetsInstances[_i];
-												var _dir = vec3.sub(vec3.create(), planet.position, player.position);
-												var _dist = vec3.length(_dir);
-
-												massesUniforms.push(planet.position[0]);
-												massesUniforms.push(planet.position[1]);
-												massesUniforms.push(planet.mass / planet.maxMass * 2.0);
-
-												if (_dist > planet.scale[0]) {
-
-															var _force = this.computeGravityAttraction(planet, player);
-															vec3.add(forceResult, forceResult, _force);
-												} else {
-
-															this.resetPlayer();
-												}
-
-												// for ( let j = 0; j < playerParticles.length; j ++ ) {
-
-												// 	let particle = playerParticles[ j ];
-
-												// 	let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
-												// 	let distToPlanet = vec3.length ( dirToPlanet );
-												// 	let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
-												// 	let force = null;
-
-												// 	if ( distToPlanet < minDistToPlanet ) {
-
-												// 		let mag = ( minDistToPlanet - distToPlanet ) * 50;
-												// 		vec3.normalize ( distToPlanet, distToPlanet );
-												// 		force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
-
-												// 	} else {
-
-												// 		force = this.computeGravityAttraction ( planet, particle );
-
-												// 		if ( vec3.length ( force ) > 1 ) {
-
-												// 			vec3.normalize ( force, force );
-												// 			vec3.scale ( force, force, 1 );
-
-												// 		}
-
-												// 	}
-
-												// 	particle.applyForce ( force );
-
-												// }
-									}
-
-									// Update the grid in the scan scene.
-
-									if (massesUniforms.length > 0) {
-
-												this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
-												this.gridMaterial.uniforms.masses.value = massesUniforms;
-									}
-
-									for (var j = 0; j < playerParticles.length; j++) {
-
-												var particle = playerParticles[j];
-
-												var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
-												var _dist2 = vec3.length(_dir2);
-
-												vec3.normalize(_dir2, _dir2);
-												vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
-
-												particle.applyForce(_dir2);
-									}
-
-									player.applyForce(forceResult);
-
-									// Update FX particles
-
-									for (var _i2 = 0; _i2 < 1; _i2++) {
-
-												var instance = this.addInstanceOf('playerParticles', {
-
-															enabled: Math.random() > 0.05 ? true : false,
-															position: vec3.clone(player.position),
-															canDye: true,
-															lifeSpan: Math.random() * 1000 + 1000,
-															drag: 0.95,
-															mass: Math.random() * 100 + 200,
-															initialRadius: Math.random() * 0.06 + 0.03,
-															velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
-
-												});
-
-												instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
-									}
-
-									if (!this.infoScreenOpened) return;
-
-									// Update text
-
-									if (this.canUpdateTexts) {
-
-												this.canUpdateTexts = false;
-												this.updateTexts();
-												setTimeout(function () {
-
-															this.canUpdateTexts = true;
-												}.bind(this), 5);
-									}
+								this.gridMaterial.uniforms.numMasses.value = massesUniforms.length / 3;
+								this.gridMaterial.uniforms.masses.value = massesUniforms;
 						}
-			}, {
-						key: "updateTexts",
-						value: function updateTexts() {
 
-									if (!this.textsGeometry) return;
+						for (var j = 0; j < playerParticles.length; j++) {
 
-									var player = this.gameElements.player.instances[0];
-									var points = this.gameElements.blackMatter.textPoints;
+								var particle = playerParticles[j];
 
-									var indices = [];
-									var positions = [];
-									var uvs = [];
+								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist2 = vec3.length(_dir2);
 
-									var modelMatrix = mat4.create();
+								vec3.normalize(_dir2, _dir2);
+								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
 
-									var planetPoints = this.gameElements.planets.textPoints;
-
-									for (var pp in planetPoints) {
-
-												var point = planetPoints[pp].point;
-												var instances = planetPoints[pp].instances;
-
-												var totalForce = 0;
-												var totalMass = 0;
-
-												for (var i = 0; i < instances.length; i++) {
-
-															totalForce += vec3.length(this.computeGravityAttraction(instances[i], player));
-															totalMass += instances[i].mass;
-												}
-
-												var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
-
-												mat4.identity(modelMatrix);
-												mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
-												mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
-
-												for (var j = 0; j < textData.indices.length; j++) {
-
-															indices.push(textData.indices[j] + positions.length / 2);
-												}
-
-												for (var _j = 0; _j < textData.positions.length; _j += 2) {
-
-															var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
-															vec3.transformMat4(v, v, modelMatrix);
-
-															positions.push(v[0]);
-															positions.push(v[1]);
-												}
-
-												for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
-
-															uvs.push(textData.uvs[_j2]);
-												}
-									}
-
-									for (var p in points) {
-
-												var _point = points[p].point;
-												var _instances = points[p].instances;
-
-												var _totalForce = 0;
-												var _totalMass = 0;
-
-												for (var _i3 = 0; _i3 < _instances.length; _i3++) {
-
-															_totalForce += vec3.length(this.computeGravityAttraction(_instances[_i3], player));
-															_totalMass += _instances[_i3].mass;
-												}
-
-												var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
-
-												mat4.identity(modelMatrix);
-												mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
-												mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
-
-												for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
-
-															indices.push(_textData.indices[_j3] + positions.length / 2);
-												}
-
-												for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
-
-															var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
-															vec3.transformMat4(_v, _v, modelMatrix);
-
-															positions.push(_v[0]);
-															positions.push(_v[1]);
-												}
-
-												for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
-
-															uvs.push(_textData.uvs[_j5]);
-												}
-									}
-
-									if (positions.length > 0) {
-
-												this.dynamicBuffer.index(this.textsGeometry, indices, 1);
-												this.dynamicBuffer.attr(this.textsGeometry, 'position', positions, 2);
-												this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
-									} else {
-
-												var _textData2 = this.textsGeometry.getTextData('');
-
-												this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
-												this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
-												this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
-									}
+								particle.applyForce(_dir2);
 						}
-			}, {
-						key: "computeGravityAttraction",
-						value: function computeGravityAttraction(_e1, _e2) {
 
-									var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
-									var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
-									var dist = vec3.length(dir);
+						player.applyForce(forceResult);
 
-									vec3.normalize(dir, dir);
-									var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
+						// Update FX particles
 
-									return vec3.scale(dir, dir, mag);
+						for (var _i2 = 0; _i2 < 1; _i2++) {
+
+								var instance = this.addInstanceOf('playerParticles', {
+
+										enabled: Math.random() > 0.05 ? true : false,
+										position: vec3.clone(player.position),
+										canDye: true,
+										lifeSpan: Math.random() * 1000 + 1000,
+										drag: 0.95,
+										mass: Math.random() * 100 + 200,
+										initialRadius: Math.random() * 0.06 + 0.03,
+										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
+
+								});
+
+								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
 						}
-			}, {
-						key: "resetPlayer",
-						value: function resetPlayer() {
 
-									this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
-									this.gameElements.player.instances[0].velocity = vec3.create();
-									this.gameElements.player.instances[0].applyForce([0, 1000, 0]);
+						if (!this.infoScreenOpened) return;
+
+						// Update text
+
+						if (this.canUpdateTexts) {
+
+								this.canUpdateTexts = false;
+								this.updateTexts();
+								setTimeout(function () {
+
+										this.canUpdateTexts = true;
+								}.bind(this), 5);
 						}
-			}, {
-						key: "render",
-						value: function render() {
+				}
+		}, {
+				key: "updateTexts",
+				value: function updateTexts() {
 
-									_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
+						if (!this.textsGeometry) return;
+
+						var player = this.gameElements.player.instances[0];
+						var points = this.gameElements.blackMatter.textPoints;
+
+						var indices = [];
+						var positions = [];
+						var uvs = [];
+
+						var modelMatrix = mat4.create();
+
+						var planetPoints = this.gameElements.planets.textPoints;
+
+						for (var pp in planetPoints) {
+
+								var point = planetPoints[pp].point;
+								var instances = planetPoints[pp].instances;
+
+								var totalForce = 0;
+								var totalMass = 0;
+
+								for (var i = 0; i < instances.length; i++) {
+
+										totalForce += vec3.length(this.computeGravityAttraction(instances[i], player));
+										totalMass += instances[i].mass;
+								}
+
+								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+
+								mat4.identity(modelMatrix);
+								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
+								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+								for (var j = 0; j < textData.indices.length; j++) {
+
+										indices.push(textData.indices[j] + positions.length / 2);
+								}
+
+								for (var _j = 0; _j < textData.positions.length; _j += 2) {
+
+										var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+										vec3.transformMat4(v, v, modelMatrix);
+
+										positions.push(v[0]);
+										positions.push(v[1]);
+								}
+
+								for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+
+										uvs.push(textData.uvs[_j2]);
+								}
 						}
-			}]);
 
-			return GravityLevel;
+						for (var p in points) {
+
+								var _point = points[p].point;
+								var _instances = points[p].instances;
+
+								var _totalForce = 0;
+								var _totalMass = 0;
+
+								for (var _i3 = 0; _i3 < _instances.length; _i3++) {
+
+										_totalForce += vec3.length(this.computeGravityAttraction(_instances[_i3], player));
+										_totalMass += _instances[_i3].mass;
+								}
+
+								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
+
+								mat4.identity(modelMatrix);
+								mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
+								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+
+								for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
+
+										indices.push(_textData.indices[_j3] + positions.length / 2);
+								}
+
+								for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
+
+										var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
+										vec3.transformMat4(_v, _v, modelMatrix);
+
+										positions.push(_v[0]);
+										positions.push(_v[1]);
+								}
+
+								for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
+
+										uvs.push(_textData.uvs[_j5]);
+								}
+						}
+
+						if (positions.length > 0) {
+
+								this.dynamicBuffer.index(this.textsGeometry, indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
+						} else {
+
+								var _textData2 = this.textsGeometry.getTextData('');
+
+								this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
+						}
+				}
+		}, {
+				key: "computeGravityAttraction",
+				value: function computeGravityAttraction(_e1, _e2) {
+
+						var G = 6.674 * Math.pow(10, -9); // Here we tweak a little bit the real values.
+						var dir = vec3.sub(vec3.create(), _e1.position, _e2.position);
+						var dist = vec3.length(dir);
+
+						vec3.normalize(dir, dir);
+						var mag = G * (_e1.mass * _e2.mass) / Math.pow(dist, 2);
+
+						return vec3.scale(dir, dir, mag);
+				}
+		}, {
+				key: "resetPlayer",
+				value: function resetPlayer() {
+
+						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
+						this.gameElements.player.instances[0].velocity = vec3.create();
+						this.gameElements.player.instances[0].applyForce([0, 1000, 0]);
+				}
+		}, {
+				key: "render",
+				value: function render() {
+
+						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "render", this).call(this);
+				}
+		}]);
+
+		return GravityLevel;
 }(_LevelCore2.LevelCore);
 
 },{"./LevelCore":61,"./PhysicalElement":64,"./shaderHelper":69}],61:[function(require,module,exports){
@@ -7551,6 +7601,7 @@ var LevelCore = exports.LevelCore = function () {
 
 				// Core elements
 
+				this.levelCompleted = false;
 				this.loadObjects = 0;
 				this.levelLoaded = false;
 				this.levelStarted = false;
@@ -7562,6 +7613,7 @@ var LevelCore = exports.LevelCore = function () {
 				this.onWinCallback = function () {
 						console.log('you won');
 				};
+				this.soundManager = _options.soundManager;
 
 				this.glMouse = vec3.create();
 				this.glMouseWorld = vec3.create();
@@ -7680,6 +7732,30 @@ var LevelCore = exports.LevelCore = function () {
 
 				this.player = new THREE.Object3D();
 				this.gameElements = {};
+
+				// End circle
+
+				this.arrivalScaleTarget = 0.4;
+				this.endCircleTargetScale = 0.0;
+				this.endCircleAlphaTarget = 1.0;
+				this.endCircleMaterial = new THREE.ShaderMaterial({
+
+						vertexShader: _shaderHelper.shaderHelper.introEndCircles.vertex,
+						fragmentShader: _shaderHelper.shaderHelper.introEndCircles.fragment,
+
+						uniforms: {
+
+								alpha: { value: 1.0 },
+								scale: { value: 1.0 }
+
+						},
+
+						transparent: true
+
+				});
+
+				this.endCircle = new THREE.Mesh(this.quadGeometry, this.endCircleMaterial);
+				this.mainScene.add(this.endCircle);
 		}
 
 		_createClass(LevelCore, [{
@@ -7799,6 +7875,11 @@ var LevelCore = exports.LevelCore = function () {
 		}, {
 				key: 'build',
 				value: function build() {
+
+						// Sound
+
+						this.backgroundSound = this.soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1, volume: 0.3 });
+						this.playerSound = this.soundManager.play('Player_sound_0', { loop: -1, volume: 0.15 });
 
 						// Update screns size & position.
 
@@ -8165,7 +8246,7 @@ var LevelCore = exports.LevelCore = function () {
 												scale: vec3.fromValues(0.12, 0.12, 1.0),
 												velocity: vec3.create(),
 												mass: 30000,
-												drag: 0.999999
+												drag: this.levelFile.playerDrag || 0.999999
 
 										}
 
@@ -9489,6 +9570,30 @@ var LevelCore = exports.LevelCore = function () {
 								}
 						}
 
+						// Update end circle
+
+						var aPos = this.gameElements.arrival.instances[0].position;
+						var aSca = this.gameElements.arrival.instances[0].scale;
+
+						aSca[0] += (this.arrivalScaleTarget - aSca[0]) * 0.05;
+						aSca[1] += (this.arrivalScaleTarget - aSca[1]) * 0.05;
+
+						this.endCircle.position.set(aPos[0], aPos[1], aPos[2]);
+						this.endCircleMaterial.uniforms.alpha.value += (this.endCircleAlphaTarget - this.endCircleMaterial.uniforms.alpha.value) * 0.05;
+						this.endCircleMaterial.uniforms.scale.value += (this.endCircleTargetScale - this.endCircleMaterial.uniforms.scale.value) * 0.05;
+
+						// Check finish
+
+						var dist = vec3.length(vec3.sub([0, 0, 0], this.gameElements.arrival.instances[0].position, this.gameElements.player.instances[0].position));
+
+						if (dist < this.gameElements.arrival.instances[0].scale[0]) {
+
+								this.levelCompleted = true;
+								this.endCircleTargetScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 4 : this.getWorldTop() * 4;
+								this.endCircleAlphaTarget = 0.0;
+								this.arrivalScaleTarget = 0.0;
+						}
+
 						// Update text intro
 
 						if (this.textBackground) this.textBackground.material.opacity += (this.textBackground.material.alphaTarget - this.textBackground.material.opacity) * 0.1;
@@ -9562,6 +9667,8 @@ var LevelCore = exports.LevelCore = function () {
 								}
 
 								if (_onClear) _onClear();
+
+								this.backgroundSound.stop();
 						}.bind(this), 1000);
 				}
 		}, {
@@ -9668,7 +9775,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":75,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
+},{"../utils":76,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9942,7 +10049,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 		return Planet;
 }(_PhysicalElement2.PhysicalElement);
 
-},{"../utils":75,"./PhysicalElement":64}],66:[function(require,module,exports){
+},{"../utils":76,"./PhysicalElement":64}],66:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -10506,6 +10613,7 @@ var GameManager = exports.GameManager = function () {
 		// General
 
 		this.currentLevel = null;
+		this.soundManager = _options.soundManager;
 	}
 
 	_createClass(GameManager, [{
@@ -10595,7 +10703,8 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityLevel.GravityLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile)
+						levelFile: (0, _utils.clone)(_levelFile),
+						soundManager: this.soundManager
 
 					});
 
@@ -10606,7 +10715,8 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _ElectricLevel.ElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile)
+						levelFile: (0, _utils.clone)(_levelFile),
+						soundManager: this.soundManager
 
 					});
 
@@ -10617,7 +10727,8 @@ var GameManager = exports.GameManager = function () {
 					this.currentLevel = new _GravityElectricLevel.GravityElectricLevel({
 
 						renderer: this.renderer,
-						levelFile: (0, _utils.clone)(_levelFile)
+						levelFile: (0, _utils.clone)(_levelFile),
+						soundManager: this.soundManager
 
 					});
 
@@ -10631,6 +10742,11 @@ var GameManager = exports.GameManager = function () {
 
 					if (_onStart) _onStart();
 				});
+
+				this.currentLevel.onWin(function (levelFile) {
+
+					if (this.onWinCallBack) this.onWinCallBack(_levelFile);
+				}.bind(this));
 			}
 		}
 	}, {
@@ -10643,6 +10759,12 @@ var GameManager = exports.GameManager = function () {
 				delete this.currentLevel;
 				this.currentLevel = null;
 			}
+		}
+	}, {
+		key: "onWin",
+		value: function onWin(_callback) {
+
+			if (!this.onWinCallBack) this.onWinCallBack = _callback;
 		}
 	}, {
 		key: "pauseCurrentLevel",
@@ -10664,7 +10786,7 @@ var GameManager = exports.GameManager = function () {
 	return GameManager;
 }();
 
-},{"./GameElements/ElectricLevel":55,"./GameElements/GravityElectricLevel":59,"./GameElements/GravityLevel":60,"./utils":75}],71:[function(require,module,exports){
+},{"./GameElements/ElectricLevel":55,"./GameElements/GravityElectricLevel":59,"./GameElements/GravityLevel":60,"./utils":76}],71:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -11862,9 +11984,77 @@ var IntroScene = exports.IntroScene = function () {
 },{"./GameElements/ElectricParticle":56,"./GameElements/PhysicalElement":64,"./GameElements/Planet":65,"./GameElements/shaderHelper":69,"three-bmfont-text/shaders/sdf":45}],72:[function(require,module,exports){
 "use strict";
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var SoundManager = exports.SoundManager = function () {
+  function SoundManager() {
+    _classCallCheck(this, SoundManager);
+
+    var instances = {};
+
+    var audioPath = "./resources/sounds/";
+    var sounds = [{ id: "Back_sound_0", src: "Back_sound_0.mp3" }, { id: "Back_sound_1", src: "Back_sound_1.mp3" }, { id: "Back_sound_2", src: "Back_sound_2.mp3" }, { id: "Back_sound_3", src: "Back_sound_3.mp3" }, { id: "Goal_sound_0", src: "Goal_sound_0.mp3" }, { id: "Goal_sound_1", src: "Goal_sound_1.mp3" }, { id: "Goal_sound_2", src: "Goal_sound_2.mp3" }, { id: "Goal_sound_3", src: "Goal_sound_3.mp3" }, { id: "Hit_sound_0", src: "Hit_sound_0.mp3" }, { id: "Hit_sound_1", src: "Hit_sound_1.mp3" }, { id: "Hit_sound_2", src: "Hit_sound_2.mp3" }, { id: "Hit_sound_3", src: "Hit_sound_3.mp3" }, { id: "Hit_sound_4", src: "Hit_sound_4.mp3" }, { id: "Explosion_sound_0", src: "Explosion_sound_0.mp3" }, { id: "Explosion_sound_1", src: "Explosion_sound_1.mp3" }, { id: "Explosion_sound_2", src: "Explosion_sound_2.mp3" }, { id: "Gong_sound_0", src: "Gong_sound_0.mp3" }, { id: "Gong_sound_1", src: "Gong_sound_1.mp3" }, { id: "Gong_sound_2", src: "Gong_sound_2.mp3" }, { id: "Gong_sound_3", src: "Gong_sound_3.mp3" }, { id: "Triangle_sound_0", src: "Triangle_sound_0.mp3" }, { id: "Triangle_sound_1", src: "Triangle_sound_1.mp3" }, { id: "Player_sound_0", src: "Player_sound_0.mp3" }];
+
+    // if initializeDefaultPlugins returns false, we cannot play sound in this browser
+    if (!createjs.Sound.initializeDefaultPlugins()) {
+      return;
+    }
+
+    createjs.Sound.alternateExtensions = ["mp3"];
+    createjs.Sound.addEventListener("fileload", handleLoad);
+    createjs.Sound.registerSounds(sounds, audioPath);
+
+    var self = this;
+    var numSounds = Object.keys(sounds).length;
+
+    function handleLoad(event) {
+
+      instances[event.id] = event;
+
+      if (Object.keys(instances).length == numSounds) {
+
+        if (self.onLoadCallback) self.onLoadCallback();
+      }
+    }
+  }
+
+  _createClass(SoundManager, [{
+    key: "getInstance",
+    value: function getInstance(_id) {
+
+      return instances[_id];
+    }
+  }, {
+    key: "play",
+    value: function play(_id, _options) {
+
+      return createjs.Sound.play(_id, _options || {});
+    }
+  }, {
+    key: "onLoad",
+    value: function onLoad(_callback) {
+
+      this.onLoadCallback = _callback;
+    }
+  }]);
+
+  return SoundManager;
+}();
+
+},{}],73:[function(require,module,exports){
+"use strict";
+
 var _resourcesList = require("./resourcesList");
 
 var _GameManager = require("./GameManager");
+
+var _SoundManager = require("./SoundManager");
 
 var _utils = require("./utils");
 
@@ -11878,7 +12068,13 @@ var loop = require('raf-loop');
 
 (function () {
 
-		function init() {
+		function init(_soundManager) {
+
+				setTimeout(function () {
+
+						// backSound.volume = 1.0;
+
+				}, 1000);
 
 				// Cross browser variables
 
@@ -11915,6 +12111,16 @@ var loop = require('raf-loop');
 				var loadingPanel = document.querySelector('#loading-panel');
 				var loadingLevelPanel = document.querySelector('#loading-level-panel');
 
+				// update levels
+
+				for (var level in _levels.levels) {
+
+						for (var n in _levels.levels[level]) {
+
+								_levels.levels[level][n]['levelIndex'] = parseInt(n) + 1;
+						}
+				}
+
 				// Set events on the buttons.
 
 				for (var i = 0; i < pages.length; i++) {
@@ -11942,14 +12148,14 @@ var loop = require('raf-loop');
 																		if (button.attributes.chapter) {
 
 																				var chapter = button.attributes.chapter.value;
-																				var level = button.attributes.level.value;
+																				var _level = button.attributes.level.value;
 
 																				loadingLevelPanel.style.opacity = 1;
 																				loadingLevelPanel.style.pointerEvents = 'auto';
 
 																				setTimeout(function () {
 
-																						gameManager.startLevel(_levels.levels[chapter][level], function () {
+																						gameManager.startLevel(_levels.levels[chapter][_level], function () {
 
 																								isRuning = true;
 
@@ -11986,14 +12192,14 @@ var loop = require('raf-loop');
 																		if (button.attributes.chapter) {
 
 																				var chapter = button.attributes.chapter.value;
-																				var level = button.attributes.level.value;
+																				var _level2 = button.attributes.level.value;
 
 																				loadingLevelPanel.style.opacity = 1;
 																				loadingLevelPanel.style.pointerEvents = 'auto';
 
 																				setTimeout(function () {
 
-																						gameManager.startLevel(_levels.levels[chapter][level], function () {
+																						gameManager.startLevel(_levels.levels[chapter][_level2], function () {
 
 																								isRuning = true;
 
@@ -12299,48 +12505,93 @@ var loop = require('raf-loop');
 
 				// Game
 
-				var gameManager = new _GameManager.GameManager({ renderer: renderer });
+				var gameManager = new _GameManager.GameManager({ renderer: renderer, soundManager: _soundManager });
 
-				// Debug
+				gameManager.onWin(function (levelFile) {
 
-				// gameManager.startLevel ( levels[ 'gravity' ][ 0 ], function () {
+						(function (chapter, level) {
 
-				// 	setTimeout ( function () {
+								var winPage = null;
 
-				// 		menu.classList.add ( 'hidden' );
-				// 		activePage.classList.remove ( 'active' );
+								switch (chapter) {
 
-				// 	}, 200 );
+										case 'gravity':
 
-				// } );
+												winPage = document.querySelector('#gravity-end');
 
-				// gameManager.startLevel ( levels[ 'electric' ][ 2 ], function () {
+												break;
 
-				// 	setTimeout ( function () {
+										case 'electric':
 
-				// 		menu.classList.add ( 'hidden' );
-				// 		activePage.classList.remove ( 'active' );
+												winPage = document.querySelector('#electric-end');
 
-				// 	}, 200 );
+												break;
 
-				// } );
+										case 'gravity-electric':
 
-				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 3 ], function () {
+												winPage = document.querySelector('#gravity-electric-end');
 
-				// 	setTimeout ( function () {
+												break;
 
-				// 		menu.classList.add ( 'hidden' );
-				// 		activePage.classList.remove ( 'active' );
+								}
 
-				// 	}, 200 );
+								var content = winPage.querySelector('.content');
+								var levelInfo = content.querySelector('.level-info');
+								levelInfo.innerHTML = 'Level ' + level + ' completed!';
+								var nextLevel = content.querySelector('.next-level');
 
-				// } );
-				// gameManager.startLevel ( levels[ 'electric' ][ 0 ] );
-				// gameManager.startLevel ( levels[ 'gravityElectric' ][ 0 ] );
+								if (nextLevel) content.removeChild(nextLevel);
+
+								var newNextLevelButton = document.createElement('div');
+								newNextLevelButton.className = 'next-level';
+								newNextLevelButton.innerHTML = 'Next level';
+								newNextLevelButton.style.cursor = 'pointer';
+
+								var nextLevelFile = _levels.levels[chapter][level] || _levels.levels[chapter][0];
+
+								newNextLevelButton.addEventListener('mousedown', function () {
+
+										var onMouseUp = function onMouseUp() {
+
+												setPageActive(document.querySelector('#' + chapter + '-blank'));
+												backPage = document.querySelector('#' + chapter + '-levels');;
+												loadingLevelPanel.style.opacity = 1;
+												loadingLevelPanel.style.pointerEvents = 'auto';
+
+												setTimeout(function () {
+
+														gameManager.startLevel(nextLevelFile, function () {
+
+																isRuning = true;
+
+																setTimeout(function () {
+
+																		loadingLevelPanel.style.opacity = 0;
+																		loadingLevelPanel.style.pointerEvents = 'none';
+																}, 500);
+														});
+												}, 500);
+
+												newNextLevelButton.removeEventListener('mouseup', onMouseUp);
+										};
+
+										newNextLevelButton.addEventListener('mouseup', onMouseUp);
+								});
+
+								content.appendChild(newNextLevelButton);
+
+								setTimeout(function () {
+
+										setPageActive(winPage);
+								}, 300);
+						})(levelFile.chapter, levelFile.levelIndex);
+				});
 
 				// Create intro scene
 
 				var introScene = new _IntroScene.IntroScene(renderer);
+				var mainBackgroundSound = null;
+				var mainPlayerSound = _soundManager.play('Player_sound_0', { loop: -1, volume: 0 });
 
 				// Delay all transition in order to prevent overloading the gpu.
 
@@ -12356,8 +12607,13 @@ var loop = require('raf-loop');
 
 												introScene.initIntro(function () {
 
+														_soundManager.play('Goal_sound_3', { volume: 0.2 });
+														_soundManager.play('Hit_sound_' + Math.floor(Math.random() * 5), { volume: 0.1 });
+														mainBackgroundSound = _soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1 });
+
 														setTimeout(function () {
 
+																// setPageActive ( document.querySelector('#gravity-end') );
 																setPageActive(mainMenu);
 														}, 100);
 												});
@@ -12371,9 +12627,13 @@ var loop = require('raf-loop');
 						if (isRuning) {
 
 								gameManager.update(_deltaTime);
+								mainPlayerSound.volume += (0.0 - mainPlayerSound.volume) * 0.03;
+								if (mainBackgroundSound) mainBackgroundSound.volume += (0.0 - mainBackgroundSound.volume) * 0.08;
 						} else {
 
 								introScene.update();
+								mainPlayerSound.volume += (0.3 - mainPlayerSound.volume) * 0.03;
+								if (mainBackgroundSound) mainBackgroundSound.volume += (1.0 - mainBackgroundSound.volume) * 0.08;
 						}
 				}
 
@@ -12399,10 +12659,14 @@ var loop = require('raf-loop');
 				}).start();
 		}
 
-		init();
+		var soundManager = new _SoundManager.SoundManager();
+		soundManager.onLoad(function () {
+
+				init(this);
+		});
 })();
 
-},{"./GameManager":70,"./IntroScene":71,"./levels":73,"./resourcesList":74,"./utils":75,"raf-loop":38}],73:[function(require,module,exports){
+},{"./GameManager":70,"./IntroScene":71,"./SoundManager":72,"./levels":74,"./resourcesList":75,"./utils":76,"raf-loop":38}],74:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -12421,6 +12685,7 @@ var levels = {
 
 																		chapter: 'gravity',
 																		textIntro: 'G\n\n----------\n\nTry to change the vehicle\'s trajectory by placing objects along it\'s road.\n\nJust drag on the screen to counterbalance the attractive forces emitted by the big circles.\n\nClick to start',
+																		playerDrag: 0.99,
 																		elements: {
 
 																								planets: {
@@ -12471,18 +12736,18 @@ var levels = {
 
 																														instances: {
 
-																																				0: {
+																																				// 0: {
 
-																																										infoPointIndex: 16 * 7 + 3,
-																																										enabled: true,
-																																										position: [-2, 0, 0],
-																																										radius: 4,
-																																										mass: 500000,
-																																										scale: [1.8, 1.8, 1.8],
-																																										color: [255 / 255, 222 / 255, 40 / 255, 1],
-																																										rotation: [0, 0, 0]
+																																				// 	infoPointIndex: 16 * 7 + 3,
+																																				// 	enabled: true,
+																																				//                       position: [ -2, 0, 0 ],
+																																				//                       radius: 4,
+																																				//                       mass: 500000,
+																																				//                       scale: [ 1.8, 1.8, 1.8 ],
+																																				//                       color: [ 255/255, 222/255, 40/255, 1 ],
+																																				//                       rotation: [ 0, 0, 0 ],
 
-																																				}
+																																				//                   },
 
 																														}
 
@@ -14020,7 +14285,7 @@ var levels = {
 
 						},
 
-						gravityElectric: {
+						'gravity-electric': {
 
 												0: {
 
@@ -14699,7 +14964,7 @@ var levels = {
 
 exports.levels = levels;
 
-},{}],74:[function(require,module,exports){
+},{}],75:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -14746,7 +15011,7 @@ var resourcesList = {
 
 exports.resourcesList = resourcesList;
 
-},{}],75:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -14992,4 +15257,4 @@ function clone(obj) {
     throw new Error("Unable to copy obj! Its type isn't supported.");
 }
 
-},{}]},{},[72]);
+},{}]},{},[73]);
