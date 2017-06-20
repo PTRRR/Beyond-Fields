@@ -562,6 +562,8 @@ let loop = require ( 'raf-loop' );
 				newNextLevelButton.className = 'next-level';
 				newNextLevelButton.innerHTML = 'Next level';
 				newNextLevelButton.style.cursor = 'pointer';
+				newNextLevelButton.style.zIndex = '1000';
+				newNextLevelButton.style.padding = '20px';
 
 				let nextLevelFile = levels[ chapter ][ level ] || levels[ chapter ][ 0 ];
 

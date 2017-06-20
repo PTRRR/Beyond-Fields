@@ -7616,6 +7616,7 @@ var LevelCore = exports.LevelCore = function () {
 				};
 				this.soundManager = _options.soundManager;
 
+				this.mouseDown = false;
 				this.glMouse = vec3.create();
 				this.glMouseWorld = vec3.create();
 				this.mouse = new THREE.Vector2();
@@ -7804,6 +7805,8 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'onDown',
 				value: function onDown(_position) {
 
+						this.mouseDown = true;
+
 						if (!this.levelStarted) {
 
 								this.levelStarted = true;
@@ -7831,28 +7834,7 @@ var LevelCore = exports.LevelCore = function () {
 						this.updateMouseWorld(this.mouse);
 
 						this.activeScreen = null;
-
-						// Check screens limits.
-
-						if (this.scanScreenButton.position.x > this.getWorldRight() * 0.7) {
-
-								this.scanScreenTargetPosition.x = this.getWorldRight() * 2.0;
-						}
-
-						if (this.scanScreenButton.position.x < this.getWorldLeft() * 0.7) {
-
-								this.scanScreenTargetPosition.x = 0.0;
-						}
-
-						if (this.infoScreenButton.position.x < this.getWorldLeft() * 0.7) {
-
-								this.infoScreenTargetPosition.x = this.getWorldLeft() * 2.0;
-						}
-
-						if (this.infoScreenButton.position.x > this.getWorldRight() * 0.7) {
-
-								this.infoScreenTargetPosition.x = 0.0;
-						}
+						this.mouseDown = false;
 				}
 		}, {
 				key: 'onResize',
@@ -7879,8 +7861,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Sound
 
-						this.backgroundSound = this.soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1, volume: 0.3 });
-						this.playerSound = this.soundManager.play('Player_sound_0', { loop: -1, volume: 0.15 });
+						this.backgroundSound = this.soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1, volume: 0.5 });
+						this.playerSound = this.soundManager.play('Player_sound_0', { loop: -1, volume: 0.10 });
 
 						// Update screns size & position.
 
@@ -7992,68 +7974,6 @@ var LevelCore = exports.LevelCore = function () {
 								}
 						}.bind(this));
 
-						// Add base elements.
-						// Add the scale square in the background.
-
-						// this.addElement ( 'scaleSquare', {
-
-						// 	static: true,
-						// 	manualMode: false,
-						// 	renderOrder: 0,
-
-						// 	shaders: {
-
-						// 		main: null,
-
-						// 		normal: {
-
-						// 			name: 'solidQuad',
-						// 			uniforms: {
-
-						// 				solidColor: { value: [ 0.9, 0.9, 0.9, 1.0 ] },
-
-						// 			}
-
-						// 		},
-
-						// 		scan: {
-
-						// 			name: 'simpleTexture',
-						// 			transparent: true,
-						// 			textureUrl: './resources/textures/scale_square.png',
-
-						// 		},
-
-						// 		infos: {
-
-						// 			name: 'coloredTexture',
-						// 			transparent: true,
-						// 			textureUrl: './resources/textures/scale_square.png',
-						// 			uniforms: {
-
-						// 				solidColor: { value: [ 0.0, 0.0, 0.0, 1.0 ] },
-
-						// 			}
-
-						// 		},
-
-						// 	},
-
-						// 	instances: {
-
-						// 		0: {
-
-						// 			enabled: true,
-						// 			position: [ 0, 0, 0 ],
-						// 			rotation: [ 0, 0, 0 ],
-						// 			scale: [ 2, 2, 1 ],
-
-						// 		}
-
-						// 	}
-
-						// } );
-
 						// Add the goals elements.
 
 						this.addElement('arrival', {
@@ -8103,51 +8023,6 @@ var LevelCore = exports.LevelCore = function () {
 								}
 
 						});
-
-						// this.addElement ( 'departure', {
-
-						// 	static: true,
-						// 	manualMode: false,
-						// 	renderOrder: 0,
-
-						// 	shaders: {
-
-						// 		main: null,
-
-						// 		normal: {
-
-						// 			name: 'departure',
-						// 			blending: 'NormalBlending',
-						// 			uniforms: {
-
-						// 				solidColor: { value: [ 0.8, 0.8, 0.8, 1.0 ] },
-
-						// 			},
-
-						// 			transparent: true,
-
-						// 		},
-
-						// 		scan: null,
-						// 		infos: null,
-
-						// 	},
-
-						// 	instances: {
-
-						// 		0: {
-
-						// 			enabled: true,
-						// 			name: 'bottom',
-						// 			position: vec3.fromValues ( 0, this.getWorldBottom (), 0 ),
-						// 			rotation: vec3.fromValues ( 0.0, 0.0, 0.0 ),
-						// 			scale: vec3.fromValues ( 0.4, 0.4, 0.5 ),
-
-						// 		},
-
-						// 	}
-
-						// } );
 
 						// Add level elements
 
@@ -9465,6 +9340,31 @@ var LevelCore = exports.LevelCore = function () {
 						this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight();
 						this.infoScreenButton.position.y = this.infoScreen.position.y;
 
+						if (!this.mouseDown) {
+
+								// Check screens limits.
+
+								if (this.scanScreenButton.position.x > this.getWorldRight() * 0.7) {
+
+										this.scanScreenTargetPosition.x = this.getWorldRight() * 2.0;
+								}
+
+								if (this.scanScreenButton.position.x < this.getWorldLeft() * 0.7) {
+
+										this.scanScreenTargetPosition.x = 0.0;
+								}
+
+								if (this.infoScreenButton.position.x < this.getWorldLeft() * 0.7) {
+
+										this.infoScreenTargetPosition.x = this.getWorldLeft() * 2.0;
+								}
+
+								if (this.infoScreenButton.position.x > this.getWorldRight() * 0.7) {
+
+										this.infoScreenTargetPosition.x = 0.0;
+								}
+						}
+
 						// Update the game elements.
 
 						for (var elementName in this.gameElements) {
@@ -9587,7 +9487,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						var dist = vec3.length(vec3.sub([0, 0, 0], this.gameElements.arrival.instances[0].position, this.gameElements.player.instances[0].position));
 
-						if (dist < this.gameElements.arrival.instances[0].scale[0] && !this.levelCompleted) {
+						if (dist < this.gameElements.arrival.instances[0].scale[0] && !this.levelCompleted && this.scanScreenClosed && this.infoScreenClosed) {
 
 								this.levelCompleted = true;
 								this.endCircleTargetScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 4 : this.getWorldTop() * 4;
@@ -12567,6 +12467,8 @@ var loop = require('raf-loop');
 								newNextLevelButton.className = 'next-level';
 								newNextLevelButton.innerHTML = 'Next level';
 								newNextLevelButton.style.cursor = 'pointer';
+								newNextLevelButton.style.zIndex = '1000';
+								newNextLevelButton.style.padding = '20px';
 
 								var nextLevelFile = _levels.levels[chapter][level] || _levels.levels[chapter][0];
 
