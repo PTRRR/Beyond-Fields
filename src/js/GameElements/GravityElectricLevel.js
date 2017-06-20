@@ -578,6 +578,7 @@ export class GravityElectricLevel extends LevelCore {
 
 	resetPlayer () {
 
+		this.explosionSound ();
 		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldBottom () - 0.1, 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();
 		this.gameElements.player.instances[ 0 ].applyForce ( [ 0, 10000, 0 ] ); 

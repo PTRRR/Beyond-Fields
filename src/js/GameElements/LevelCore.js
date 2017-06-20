@@ -336,7 +336,7 @@ export class LevelCore {
 		// Load a font that will be used for font rendering in the level.
 
 		this.addLoadingObject ();
-		bmfontLoader ( './resources/fonts/GT-America.fnt', function ( err, font ) {
+		bmfontLoader ( './resources/fonts/GT-Walsheim.fnt', function ( err, font ) {
 
 
 			if ( err ) {
@@ -349,7 +349,7 @@ export class LevelCore {
 				this.objectOnLoad ( 'fnt' );
 
 				let textureLoader = new THREE.TextureLoader ();
-				textureLoader.load ( './resources/fonts/GT-America_sdf.png', function ( texture ) {
+				textureLoader.load ( './resources/fonts/GT-Walsheim_sdf.png', function ( texture ) {
 
 					this.objectOnLoad ( 'font texture' );
 
@@ -395,10 +395,10 @@ export class LevelCore {
 					this.infoScene.add ( this.textIntro );
 					this.textIntro.renderOrder = 6;
 					geometry.computeBoundingSphere ();
-					this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
-					this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+					this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0030;
+					this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0030;
 					this.textIntro.rotation.x = Math.PI;
-					this.textIntro.scale.set ( 0.0025, 0.0025, 0.0025 );
+					this.textIntro.scale.set ( 0.0030, 0.0030, 0.0030 );
 
 					// Texts
 
@@ -2139,12 +2139,16 @@ export class LevelCore {
 
 		let dist = vec3.length ( vec3.sub ( [ 0, 0, 0 ], this.gameElements.arrival.instances[ 0 ].position, this.gameElements.player.instances[ 0 ].position ) );
 
-		if ( dist < this.gameElements.arrival.instances[ 0 ].scale[ 0 ] ) {
+		if ( dist < this.gameElements.arrival.instances[ 0 ].scale[ 0 ] && !this.levelCompleted ) {
 
 			this.levelCompleted = true;
 			this.endCircleTargetScale = this.getWorldRight () > this.getWorldTop () ? this.getWorldRight () * 4 : this.getWorldTop () * 4;
 			this.endCircleAlphaTarget = 0.0;
 			this.arrivalScaleTarget = 0.0;
+
+			this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 2 ), { volume: 0.2 } );
+			this.soundManager.play ( 'Gong_sound_' + ( Math.floor ( Math.random () * 2 ) + 2 ), { volume: 0.2 } );
+			this.soundManager.play ( 'Triangle_sound_' + Math.floor ( Math.random () * 2 ), { volume: 0.2 } );
 
 		}
 
@@ -2173,6 +2177,14 @@ export class LevelCore {
 
 		this.linesGeometry.attributes.lineOpacity.array = new Float32Array ( linesData.lineOpacity );
 		this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
+
+	}
+
+	explosionSound () {
+
+		this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
+		this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 4 ), { volume: 0.05 } );
+		this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
 
 	}
 

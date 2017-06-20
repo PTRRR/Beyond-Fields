@@ -237,8 +237,6 @@ export class ElectricLevel extends LevelCore {
 
 			if ( this.isInBox ( obstacle, player.position ) ) {
 
-				this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
-				this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
 				if ( !this.levelCompleted ) this.resetPlayer ();
 				break;
 
@@ -317,7 +315,7 @@ export class ElectricLevel extends LevelCore {
 
 			if ( dist < charge.radius ) {
 
-				this.resetPlayer ();
+				if ( !this.levelCompleted ) this.resetPlayer ();
 
 			} else {
 
@@ -648,6 +646,7 @@ export class ElectricLevel extends LevelCore {
 
 	resetPlayer () {
 
+		this.explosionSound ();
 		this.gameElements.player.instances[ 0 ].color[ 3 ] = 0;
 		this.gameElements.player.instances[ 0 ].position = vec3.fromValues ( 0, this.getWorldTop () + 0.1, 0 );
 		this.gameElements.player.instances[ 0 ].velocity = vec3.create();

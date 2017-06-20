@@ -6,9 +6,10 @@ var SDFSHader = require('three-bmfont-text/shaders/sdf');
 
 export class IntroScene {
 
-	constructor ( _renderer ) {
+	constructor ( _options ) {
 
-		this.renderer = _renderer;
+		this.renderer = _options.renderer;
+		this.soundManager = _options.soundManager;
 
 		this.run = false;
 		let size = this.renderer.getSize ();
@@ -319,8 +320,8 @@ export class IntroScene {
 		this.run = true;
 		this.intro = true;
 		this.player.position = [ 0, this.getWorldTop () + 0.2, 0 ];
-		// this.player.acceleration = [ 0.05, -0.06, 0 ];
-		this.player.acceleration = [ 0, -0.06, 0 ];
+		this.player.acceleration = [ 0.06, -0.06, 0 ];
+		// this.player.acceleration = [ 0, -0.06, 0 ];
 		this.player.mass = 400;
 		this.player.drag = 0.985;
 		this.arrivalScaleTarget = 1.0;
@@ -1196,6 +1197,14 @@ export class IntroScene {
 	}
 
 	emitParticles ( _num, _mag ) {
+
+		if ( _num > 2 ) {
+
+			this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
+			this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 4 ), { volume: 0.2 } );
+			this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
+
+		}
 
 		// Add particles
 

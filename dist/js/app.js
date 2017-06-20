@@ -5735,8 +5735,6 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								if (this.isInBox(obstacle, player.position)) {
 
-										this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
-										this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
 										if (!this.levelCompleted) this.resetPlayer();
 										break;
 								}
@@ -5807,7 +5805,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								if (_dist2 < _charge.radius) {
 
-										this.resetPlayer();
+										if (!this.levelCompleted) this.resetPlayer();
 								} else {
 
 										var _force = this.computeElectricForce(_charge, player);
@@ -6104,6 +6102,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				key: "resetPlayer",
 				value: function resetPlayer() {
 
+						this.explosionSound();
 						this.gameElements.player.instances[0].color[3] = 0;
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop() + 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
@@ -7020,6 +7019,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				key: 'resetPlayer',
 				value: function resetPlayer() {
 
+						this.explosionSound();
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom() - 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
 						this.gameElements.player.instances[0].applyForce([0, 10000, 0]);
@@ -7538,6 +7538,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 				key: "resetPlayer",
 				value: function resetPlayer() {
 
+						this.explosionSound();
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
 						this.gameElements.player.instances[0].applyForce([0, 1000, 0]);
@@ -7898,7 +7899,7 @@ var LevelCore = exports.LevelCore = function () {
 						// Load a font that will be used for font rendering in the level.
 
 						this.addLoadingObject();
-						bmfontLoader('./resources/fonts/GT-America.fnt', function (err, font) {
+						bmfontLoader('./resources/fonts/GT-Walsheim.fnt', function (err, font) {
 
 								if (err) {
 
@@ -7909,7 +7910,7 @@ var LevelCore = exports.LevelCore = function () {
 										this.objectOnLoad('fnt');
 
 										var textureLoader = new THREE.TextureLoader();
-										textureLoader.load('./resources/fonts/GT-America_sdf.png', function (texture) {
+										textureLoader.load('./resources/fonts/GT-Walsheim_sdf.png', function (texture) {
 
 												this.objectOnLoad('font texture');
 
@@ -7955,10 +7956,10 @@ var LevelCore = exports.LevelCore = function () {
 												this.infoScene.add(this.textIntro);
 												this.textIntro.renderOrder = 6;
 												geometry.computeBoundingSphere();
-												this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0025;
-												this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0025;
+												this.textIntro.position.x -= geometry.boundingSphere.center.x * 0.0030;
+												this.textIntro.position.y += geometry.boundingSphere.center.y * 0.0030;
 												this.textIntro.rotation.x = Math.PI;
-												this.textIntro.scale.set(0.0025, 0.0025, 0.0025);
+												this.textIntro.scale.set(0.0030, 0.0030, 0.0030);
 
 												// Texts
 
@@ -9586,12 +9587,16 @@ var LevelCore = exports.LevelCore = function () {
 
 						var dist = vec3.length(vec3.sub([0, 0, 0], this.gameElements.arrival.instances[0].position, this.gameElements.player.instances[0].position));
 
-						if (dist < this.gameElements.arrival.instances[0].scale[0]) {
+						if (dist < this.gameElements.arrival.instances[0].scale[0] && !this.levelCompleted) {
 
 								this.levelCompleted = true;
 								this.endCircleTargetScale = this.getWorldRight() > this.getWorldTop() ? this.getWorldRight() * 4 : this.getWorldTop() * 4;
 								this.endCircleAlphaTarget = 0.0;
 								this.arrivalScaleTarget = 0.0;
+
+								this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 2), { volume: 0.2 });
+								this.soundManager.play('Gong_sound_' + (Math.floor(Math.random() * 2) + 2), { volume: 0.2 });
+								this.soundManager.play('Triangle_sound_' + Math.floor(Math.random() * 2), { volume: 0.2 });
 						}
 
 						// Update text intro
@@ -9619,6 +9624,14 @@ var LevelCore = exports.LevelCore = function () {
 
 						this.linesGeometry.attributes.lineOpacity.array = new Float32Array(linesData.lineOpacity);
 						this.linesGeometry.attributes.lineOpacity.needsUpdate = true;
+				}
+		}, {
+				key: 'explosionSound',
+				value: function explosionSound() {
+
+						this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
+						this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 4), { volume: 0.05 });
+						this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
 				}
 		}, {
 				key: 'removeTextIntro',
@@ -10809,10 +10822,11 @@ function _classCallCheck(instance, Constructor) { if (!(instance instanceof Cons
 var SDFSHader = require('three-bmfont-text/shaders/sdf');
 
 var IntroScene = exports.IntroScene = function () {
-		function IntroScene(_renderer) {
+		function IntroScene(_options) {
 				_classCallCheck(this, IntroScene);
 
-				this.renderer = _renderer;
+				this.renderer = _options.renderer;
+				this.soundManager = _options.soundManager;
 
 				this.run = false;
 				var size = this.renderer.getSize();
@@ -11121,8 +11135,8 @@ var IntroScene = exports.IntroScene = function () {
 						this.run = true;
 						this.intro = true;
 						this.player.position = [0, this.getWorldTop() + 0.2, 0];
-						// this.player.acceleration = [ 0.05, -0.06, 0 ];
-						this.player.acceleration = [0, -0.06, 0];
+						this.player.acceleration = [0.06, -0.06, 0];
+						// this.player.acceleration = [ 0, -0.06, 0 ];
 						this.player.mass = 400;
 						this.player.drag = 0.985;
 						this.arrivalScaleTarget = 1.0;
@@ -11916,6 +11930,13 @@ var IntroScene = exports.IntroScene = function () {
 				key: 'emitParticles',
 				value: function emitParticles(_num, _mag) {
 
+						if (_num > 2) {
+
+								this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
+								this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 4), { volume: 0.2 });
+								this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
+						}
+
 						// Add particles
 
 						if (this.particles.length < this.nParticles) {
@@ -11999,7 +12020,7 @@ var SoundManager = exports.SoundManager = function () {
     var instances = {};
 
     var audioPath = "./resources/sounds/";
-    var sounds = [{ id: "Back_sound_0", src: "Back_sound_0.mp3" }, { id: "Back_sound_1", src: "Back_sound_1.mp3" }, { id: "Back_sound_2", src: "Back_sound_2.mp3" }, { id: "Back_sound_3", src: "Back_sound_3.mp3" }, { id: "Goal_sound_0", src: "Goal_sound_0.mp3" }, { id: "Goal_sound_1", src: "Goal_sound_1.mp3" }, { id: "Goal_sound_2", src: "Goal_sound_2.mp3" }, { id: "Goal_sound_3", src: "Goal_sound_3.mp3" }, { id: "Hit_sound_0", src: "Hit_sound_0.mp3" }, { id: "Hit_sound_1", src: "Hit_sound_1.mp3" }, { id: "Hit_sound_2", src: "Hit_sound_2.mp3" }, { id: "Hit_sound_3", src: "Hit_sound_3.mp3" }, { id: "Hit_sound_4", src: "Hit_sound_4.mp3" }, { id: "Explosion_sound_0", src: "Explosion_sound_0.mp3" }, { id: "Explosion_sound_1", src: "Explosion_sound_1.mp3" }, { id: "Explosion_sound_2", src: "Explosion_sound_2.mp3" }, { id: "Gong_sound_0", src: "Gong_sound_0.mp3" }, { id: "Gong_sound_1", src: "Gong_sound_1.mp3" }, { id: "Gong_sound_2", src: "Gong_sound_2.mp3" }, { id: "Gong_sound_3", src: "Gong_sound_3.mp3" }, { id: "Triangle_sound_0", src: "Triangle_sound_0.mp3" }, { id: "Triangle_sound_1", src: "Triangle_sound_1.mp3" }, { id: "Player_sound_0", src: "Player_sound_0.mp3" }];
+    var sounds = [{ id: "Back_sound_0", src: "Back_long_sound_0.mp3" }, { id: "Back_sound_1", src: "Back_long_sound_1.mp3" }, { id: "Back_sound_2", src: "Back_long_sound_2.mp3" }, { id: "Back_sound_3", src: "Back_long_sound_3.mp3" }, { id: "Goal_sound_0", src: "Goal_sound_0.mp3" }, { id: "Goal_sound_1", src: "Goal_sound_1.mp3" }, { id: "Goal_sound_2", src: "Goal_sound_2.mp3" }, { id: "Goal_sound_3", src: "Goal_sound_3.mp3" }, { id: "Hit_sound_0", src: "Hit_sound_0.mp3" }, { id: "Hit_sound_1", src: "Hit_sound_1.mp3" }, { id: "Hit_sound_2", src: "Hit_sound_2.mp3" }, { id: "Hit_sound_3", src: "Hit_sound_3.mp3" }, { id: "Hit_sound_4", src: "Hit_sound_4.mp3" }, { id: "Explosion_sound_0", src: "Explosion_sound_0.mp3" }, { id: "Explosion_sound_1", src: "Explosion_sound_1.mp3" }, { id: "Explosion_sound_2", src: "Explosion_sound_2.mp3" }, { id: "Gong_sound_0", src: "Gong_sound_0.mp3" }, { id: "Gong_sound_1", src: "Gong_sound_1.mp3" }, { id: "Gong_sound_2", src: "Gong_sound_2.mp3" }, { id: "Gong_sound_3", src: "Gong_sound_3.mp3" }, { id: "Triangle_sound_0", src: "Triangle_sound_0.mp3" }, { id: "Triangle_sound_1", src: "Triangle_sound_1.mp3" }, { id: "Player_sound_0", src: "Player_sound_0.mp3" }];
 
     // if initializeDefaultPlugins returns false, we cannot play sound in this browser
     if (!createjs.Sound.initializeDefaultPlugins()) {
@@ -12400,7 +12421,7 @@ var loop = require('raf-loop');
 
 				var stats = new Stats();
 				stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-				document.body.appendChild(stats.dom);
+				// document.body.appendChild( stats.dom );
 
 				// Events
 
@@ -12589,7 +12610,7 @@ var loop = require('raf-loop');
 
 				// Create intro scene
 
-				var introScene = new _IntroScene.IntroScene(renderer);
+				var introScene = new _IntroScene.IntroScene({ renderer: renderer, soundManager: _soundManager });
 				var mainBackgroundSound = null;
 				var mainPlayerSound = _soundManager.play('Player_sound_0', { loop: -1, volume: 0 });
 
@@ -12607,7 +12628,9 @@ var loop = require('raf-loop');
 
 												introScene.initIntro(function () {
 
-														_soundManager.play('Goal_sound_3', { volume: 0.2 });
+														_soundManager.play('Gong_sound_3', { volume: 0.2 });
+														_soundManager.play('Gong_sound_1', { volume: 0.2 });
+														_soundManager.play('Triangle_sound_1', { volume: 0.2 });
 														_soundManager.play('Hit_sound_' + Math.floor(Math.random() * 5), { volume: 0.1 });
 														mainBackgroundSound = _soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1 });
 
@@ -12632,7 +12655,7 @@ var loop = require('raf-loop');
 						} else {
 
 								introScene.update();
-								mainPlayerSound.volume += (0.3 - mainPlayerSound.volume) * 0.03;
+								mainPlayerSound.volume += (0.15 - mainPlayerSound.volume) * 0.03;
 								if (mainBackgroundSound) mainBackgroundSound.volume += (1.0 - mainBackgroundSound.volume) * 0.08;
 						}
 				}
@@ -12684,8 +12707,8 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity',
-																		textIntro: 'G\n\n----------\n\nTry to change the vehicle\'s trajectory by placing objects along it\'s road.\n\nJust drag on the screen to counterbalance the attractive forces emitted by the big circles.\n\nClick to start',
-																		playerDrag: 0.99,
+																		textIntro: '- G -\n\n1\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+																		playerDrag: 0.9855,
 																		elements: {
 
 																								planets: {
@@ -12734,22 +12757,7 @@ var levels = {
 
 																														},
 
-																														instances: {
-
-																																				// 0: {
-
-																																				// 	infoPointIndex: 16 * 7 + 3,
-																																				// 	enabled: true,
-																																				//                       position: [ -2, 0, 0 ],
-																																				//                       radius: 4,
-																																				//                       mass: 500000,
-																																				//                       scale: [ 1.8, 1.8, 1.8 ],
-																																				//                       color: [ 255/255, 222/255, 40/255, 1 ],
-																																				//                       rotation: [ 0, 0, 0 ],
-
-																																				//                   },
-
-																														}
+																														instances: {}
 
 																								},
 
@@ -12810,7 +12818,131 @@ var levels = {
 												1: {
 
 																		chapter: 'gravity',
+																		textIntro: '- G -\n\n2\n\nDrag on the screen to place objects along the particles stream to change its trajectory \n\nTry to direct it to the target\n\nClick to start',
+																		elements: {
 
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 3,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										infoPointIndex: 16 * 7 + 3,
+																																										enabled: true,
+																																										position: [-2, 0, 0],
+																																										radius: 4,
+																																										mass: 500000,
+																																										scale: [1.8, 1.8, 1.8],
+																																										color: [255 / 255, 222 / 255, 40 / 255, 1],
+																																										rotation: [0, 0, 0]
+
+																																				}
+
+																														}
+
+																								},
+
+																								blackMatter: {
+
+																														elementType: 'BlackMatter',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 108,
+																														renderOrder: 3,
+																														drawInfos: true,
+																														mainInfoPointIndex: 3, // 0 - 8
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'blackMatter',
+																																										blending: 'MultiplyBlending',
+																																										// blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'blackMatterScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'blackMatterInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								}
+
+																		}
+
+												},
+
+												2: {
+
+																		chapter: 'gravity',
+																		textIntro: '- G -\n\n3\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -12951,10 +13083,10 @@ var levels = {
 
 												},
 
-												2: {
+												3: {
 
 																		chapter: 'gravity',
-
+																		textIntro: '- G -\n\n4\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -13095,10 +13227,10 @@ var levels = {
 
 												},
 
-												3: {
+												4: {
 
 																		chapter: 'gravity',
-
+																		textIntro: '- G -\n\n5\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -13226,150 +13358,6 @@ var levels = {
 
 																		}
 
-												},
-
-												4: {
-
-																		chapter: 'gravity',
-
-																		elements: {
-
-																								planets: {
-
-																														elementType: 'Planet',
-																														static: true,
-																														manualMode: false,
-																														transparent: true,
-																														renderOrder: 1,
-																														buildFromInstances: true,
-																														drawInfos: true,
-																														maxInstancesNum: 3,
-
-																														shaders: {
-
-																																				main: null,
-
-																																				normal: {
-
-																																										name: 'planet',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				scan: {
-
-																																										name: 'scanPlanet',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				infos: {
-
-																																										name: 'infoPlanet',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				}
-
-																														},
-
-																														instances: {
-
-																																				0: {
-
-																																										infoPointIndex: 16 * 7 + 3,
-																																										position: [0, -1.0, 0],
-																																										radius: 2,
-																																										mass: 400000,
-																																										scale: [0.9, 0.9, 0.9],
-																																										color: [150 / 255, 150 / 255, 150 / 255, 1]
-
-																																				},
-
-																																				1: {
-
-																																										infoPointIndex: 16 * 7 + 5,
-																																										position: [1.5, 1.5, 0],
-																																										radius: 2,
-																																										mass: 100000,
-																																										scale: [0.6, 0.6, 0.6],
-																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
-
-																																				},
-
-																																				2: {
-
-																																										infoPointIndex: 16 * 7 + 1,
-																																										position: [-1.5, 1.5, 0],
-																																										radius: 2,
-																																										mass: 100000,
-																																										scale: [0.6, 0.6, 0.6],
-																																										color: [255 / 255, 222 / 255, 40 / 255, 1]
-
-																																				}
-
-																														}
-
-																								},
-
-																								blackMatter: {
-
-																														elementType: 'BlackMatter',
-																														static: false,
-																														manualMode: false,
-																														transparent: true,
-																														individual: false,
-																														maxInstancesNum: 108,
-																														renderOrder: 3,
-																														drawInfos: true,
-																														mainInfoPointIndex: 3, // 0 - 8
-
-																														shaders: {
-
-																																				main: null,
-
-																																				normal: {
-
-																																										name: 'blackMatter',
-																																										blending: 'MultiplyBlending',
-																																										// blending: 'MultiplyBlending',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				scan: {
-
-																																										name: 'blackMatterScan',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				infos: {
-
-																																										name: 'blackMatterInfo',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				}
-
-																														},
-
-																														instances: {}
-
-																								}
-
-																		}
-
 												}
 
 						},
@@ -13379,8 +13367,8 @@ var levels = {
 												0: {
 
 																		chapter: 'electric',
-																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
-
+																		textIntro: '- E -\n\n1\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target by adding some attractors\n\nClick to start',
+																		playerDrag: 0.9855,
 																		elements: {
 
 																								fixedCharges: (_fixedCharges = {
@@ -13427,33 +13415,33 @@ var levels = {
 
 																								}), _defineProperty(_fixedCharges, 'instances', {
 
-																														0: {
+																														// 0: {
 
-																																				infoPointIndex: 16 * 7 + 2,
-																																				enabled: false,
-																																				fixedRadius: true,
-																																				position: [-2, 0, 0],
-																																				radius: 0,
-																																				targetRadius: 0.5,
-																																				sign: -1,
-																																				mass: 500000,
-																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+																														// 	infoPointIndex: 16 * 7 + 2,
+																														// 	enabled: false,
+																														// 	fixedRadius: true,
+																														//                       position: [ -2, 0, 0 ],
+																														//                       radius: 0,
+																														//                       targetRadius: 0.5,
+																														//                       sign: -1,
+																														//                       mass: 500000,
+																														//                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
 
-																														},
+																														//                   },
 
-																														1: {
+																														//                   1: {
 
-																																				infoPointIndex: 16 * 7 + 4,
-																																				enabled: false,
-																																				fixedRadius: true,
-																																				position: [2, 0, 0],
-																																				radius: 0,
-																																				targetRadius: 0.5,
-																																				sign: 1,
-																																				mass: 500000,
-																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+																														// 	infoPointIndex: 16 * 7 + 4,
+																														// 	enabled: false,
+																														// 	fixedRadius: true,
+																														//                       position: [ 2, 0, 0 ],
+																														//                       radius: 0,
+																														//                       targetRadius: 0.5,
+																														//                       sign: 1,
+																														//                       mass: 500000,
+																														//                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
 
-																														}
+																														//                   },
 
 																								}), _fixedCharges),
 
@@ -13561,7 +13549,7 @@ var levels = {
 												1: {
 
 																		chapter: 'electric',
-																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+																		textIntro: '- E -\n\n2\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target\n\nClick to start',
 
 																		elements: {
 
@@ -13715,7 +13703,7 @@ var levels = {
 												2: {
 
 																		chapter: 'electric',
-																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+																		textIntro: '- E -\n\n3\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
 
 																		elements: {
 
@@ -13897,7 +13885,7 @@ var levels = {
 												3: {
 
 																		chapter: 'electric',
-																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+																		textIntro: '- E -\n\n4\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
 
 																		elements: {
 
@@ -14087,7 +14075,7 @@ var levels = {
 												4: {
 
 																		chapter: 'electric',
-																		textIntro: 'E = q / r^2\n\n----------\n\nAvoid obstacle by attracting or repulsing the vehicle.\n\nClick and drag up or down to change the vehicle\'s trajectory.\n\nClick to start',
+																		textIntro: '- E -\n\n5\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
 
 																		elements: {
 
@@ -14290,7 +14278,7 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+																		textIntro: '- G & E -\n\n1\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
 
 																		elements: {
 
@@ -14427,7 +14415,7 @@ var levels = {
 												1: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+																		textIntro: '- G & E -\n\n2\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
 
 																		elements: {
 
@@ -14550,7 +14538,7 @@ var levels = {
 												2: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+																		textIntro: '- G & E -\n\n3\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
 
 																		elements: {
 
@@ -14749,7 +14737,219 @@ var levels = {
 												3: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: 'G || E\n\n----------\n\nChange the sign of the particles contained in the big circles to counterbalace their attractive force.\n\nClick and drag up or down.\n\nClick to start',
+																		textIntro: '- G & E -\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+
+																		elements: {
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 4,
+																														textAlign: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				0: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 4,
+																																										particles: [1, 3, 6, 7],
+																																										position: [2, -2, 0],
+																																										radius: 3.5,
+																																										mass: 10000,
+																																										charge: 15,
+																																										maxCharge: 30,
+																																										sign: -1,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				},
+
+																																				1: {
+
+																																										name: 'electricPlanet',
+																																										infoPointIndex: 16 * 7 + 2,
+																																										particles: [1, 3, 6, 7],
+																																										position: [-2, 2, 0],
+																																										radius: 3.5,
+																																										mass: 1000000,
+																																										charge: 25,
+																																										sign: -1,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				}
+
+																														}
+
+																								},
+
+																								charges: {
+
+																														elementType: 'ElectricPlanetParticle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 150,
+																														renderOrder: 3,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'electricCharge',
+																																										blending: 'MultiplyBlending',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'electricParticlePlanetScan',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'electricParticlePlanetInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
+																								},
+
+																								obstacles: {
+
+																														elementType: 'Obstacle',
+																														static: false,
+																														manualMode: false,
+																														transparent: true,
+																														individual: false,
+																														maxInstancesNum: 2,
+																														buildFromInstances: true,
+																														renderOrder: 2,
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'obstacle',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'obstacleScan',
+																																										transparent: true,
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'obstacleInfo',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_obstacle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {
+
+																																				1: {
+
+																																										position: [1, 1, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.4, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				},
+
+																																				2: {
+
+																																										position: [-1, -1, 0.0],
+																																										radius: 2,
+																																										mass: 100000,
+																																										scale: [1.4, 0.12, 0.1],
+																																										rotation: [0, 0, Math.PI * -0.25],
+																																										color: [0.7, 0.7, 0.7, 1]
+
+																																				}
+
+																														}
+
+																								}
+
+																		}
+
+												},
+
+												4: {
+
+																		chapter: 'gravity-electric',
+																		textIntro: '- G & E -\n\n5\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
 
 																		elements: {
 

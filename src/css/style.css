@@ -1,7 +1,7 @@
 
 @font-face {
     font-family: 'Campton';
-	src: url('../resources/fonts/campton.woff') format('woff');
+	src: url('../resources/fonts/GT-Walsheim-Pro-Regular.woff') format('woff');
 	font-weight: normal;
 	font-style: normal;
 }
@@ -143,8 +143,6 @@ html, body {
 	position: absolute;
 	left: 50%;
 	top: 50%;
-
-	border: solid;
 
 	text-align: center;
 

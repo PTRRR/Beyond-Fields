@@ -404,7 +404,7 @@ let loop = require ( 'raf-loop' );
 
 		let stats = new Stats();
 		stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-		document.body.appendChild( stats.dom );
+		// document.body.appendChild( stats.dom );
 
 		// Events
 
@@ -613,7 +613,7 @@ let loop = require ( 'raf-loop' );
 
 		// Create intro scene
 
-		let introScene = new IntroScene ( renderer );
+		let introScene = new IntroScene ( { renderer: renderer, soundManager: _soundManager } );
 		let mainBackgroundSound = null;
 		let mainPlayerSound = _soundManager.play ( 'Player_sound_0', { loop: -1, volume: 0 } );
 
@@ -631,7 +631,9 @@ let loop = require ( 'raf-loop' );
 
 						introScene.initIntro ( function () {
 
-							_soundManager.play ( 'Goal_sound_3', { volume: 0.2 } );
+							_soundManager.play ( 'Gong_sound_3', { volume: 0.2 } );
+							_soundManager.play ( 'Gong_sound_1', { volume: 0.2 } );
+							_soundManager.play ( 'Triangle_sound_1', { volume: 0.2 } );
 							_soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 5 ), { volume: 0.1 } );
 							mainBackgroundSound = _soundManager.play ( 'Back_sound_' + Math.floor ( Math.random () * 4 ), { loop: -1 } );
 
@@ -663,7 +665,7 @@ let loop = require ( 'raf-loop' );
 			} else {
 
 				introScene.update ();
-				mainPlayerSound.volume += ( 0.3 - mainPlayerSound.volume ) * 0.03;
+				mainPlayerSound.volume += ( 0.15 - mainPlayerSound.volume ) * 0.03;
 				if ( mainBackgroundSound ) mainBackgroundSound.volume += ( 1.0 - mainBackgroundSound.volume ) * 0.08;
 				
 			}

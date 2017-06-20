@@ -7,10 +7,10 @@ export class SoundManager {
 		var audioPath = "./resources/sounds/";
         var sounds = [
 
-            { id:"Back_sound_0", src:"Back_sound_0.mp3" },
-            { id:"Back_sound_1", src:"Back_sound_1.mp3" },
-            { id:"Back_sound_2", src:"Back_sound_2.mp3" },
-            { id:"Back_sound_3", src:"Back_sound_3.mp3" },
+            { id:"Back_sound_0", src:"Back_long_sound_0.mp3" },
+            { id:"Back_sound_1", src:"Back_long_sound_1.mp3" },
+            { id:"Back_sound_2", src:"Back_long_sound_2.mp3" },
+            { id:"Back_sound_3", src:"Back_long_sound_3.mp3" },
             { id:"Goal_sound_0", src:"Goal_sound_0.mp3" },
             { id:"Goal_sound_1", src:"Goal_sound_1.mp3" },
             { id:"Goal_sound_2", src:"Goal_sound_2.mp3" },
