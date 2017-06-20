@@ -69,6 +69,18 @@ export class SoundManager {
 
 	}
 
+    stop () {
+
+        createjs.Sound.stop ();
+
+    }
+
+    volume ( _volume ) {
+
+        createjs.Sound.volume = _volume;
+
+    }
+
 	onLoad ( _callback ) {
 
 		this.onLoadCallback = _callback;

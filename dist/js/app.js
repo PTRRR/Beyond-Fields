@@ -11906,7 +11906,7 @@ var IntroScene = exports.IntroScene = function () {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
-  value: true
+        value: true
 });
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -11914,58 +11914,70 @@ var _createClass = function () { function defineProperties(target, props) { for 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var SoundManager = exports.SoundManager = function () {
-  function SoundManager() {
-    _classCallCheck(this, SoundManager);
+        function SoundManager() {
+                _classCallCheck(this, SoundManager);
 
-    var instances = {};
+                var instances = {};
 
-    var audioPath = "./resources/sounds/";
-    var sounds = [{ id: "Back_sound_0", src: "Back_long_sound_0.mp3" }, { id: "Back_sound_1", src: "Back_long_sound_1.mp3" }, { id: "Back_sound_2", src: "Back_long_sound_2.mp3" }, { id: "Back_sound_3", src: "Back_long_sound_3.mp3" }, { id: "Goal_sound_0", src: "Goal_sound_0.mp3" }, { id: "Goal_sound_1", src: "Goal_sound_1.mp3" }, { id: "Goal_sound_2", src: "Goal_sound_2.mp3" }, { id: "Goal_sound_3", src: "Goal_sound_3.mp3" }, { id: "Hit_sound_0", src: "Hit_sound_0.mp3" }, { id: "Hit_sound_1", src: "Hit_sound_1.mp3" }, { id: "Hit_sound_2", src: "Hit_sound_2.mp3" }, { id: "Hit_sound_3", src: "Hit_sound_3.mp3" }, { id: "Hit_sound_4", src: "Hit_sound_4.mp3" }, { id: "Explosion_sound_0", src: "Explosion_sound_0.mp3" }, { id: "Explosion_sound_1", src: "Explosion_sound_1.mp3" }, { id: "Explosion_sound_2", src: "Explosion_sound_2.mp3" }, { id: "Gong_sound_0", src: "Gong_sound_0.mp3" }, { id: "Gong_sound_1", src: "Gong_sound_1.mp3" }, { id: "Gong_sound_2", src: "Gong_sound_2.mp3" }, { id: "Gong_sound_3", src: "Gong_sound_3.mp3" }, { id: "Triangle_sound_0", src: "Triangle_sound_0.mp3" }, { id: "Triangle_sound_1", src: "Triangle_sound_1.mp3" }, { id: "Player_sound_0", src: "Player_sound_0.mp3" }];
+                var audioPath = "./resources/sounds/";
+                var sounds = [{ id: "Back_sound_0", src: "Back_long_sound_0.mp3" }, { id: "Back_sound_1", src: "Back_long_sound_1.mp3" }, { id: "Back_sound_2", src: "Back_long_sound_2.mp3" }, { id: "Back_sound_3", src: "Back_long_sound_3.mp3" }, { id: "Goal_sound_0", src: "Goal_sound_0.mp3" }, { id: "Goal_sound_1", src: "Goal_sound_1.mp3" }, { id: "Goal_sound_2", src: "Goal_sound_2.mp3" }, { id: "Goal_sound_3", src: "Goal_sound_3.mp3" }, { id: "Hit_sound_0", src: "Hit_sound_0.mp3" }, { id: "Hit_sound_1", src: "Hit_sound_1.mp3" }, { id: "Hit_sound_2", src: "Hit_sound_2.mp3" }, { id: "Hit_sound_3", src: "Hit_sound_3.mp3" }, { id: "Hit_sound_4", src: "Hit_sound_4.mp3" }, { id: "Explosion_sound_0", src: "Explosion_sound_0.mp3" }, { id: "Explosion_sound_1", src: "Explosion_sound_1.mp3" }, { id: "Explosion_sound_2", src: "Explosion_sound_2.mp3" }, { id: "Gong_sound_0", src: "Gong_sound_0.mp3" }, { id: "Gong_sound_1", src: "Gong_sound_1.mp3" }, { id: "Gong_sound_2", src: "Gong_sound_2.mp3" }, { id: "Gong_sound_3", src: "Gong_sound_3.mp3" }, { id: "Triangle_sound_0", src: "Triangle_sound_0.mp3" }, { id: "Triangle_sound_1", src: "Triangle_sound_1.mp3" }, { id: "Player_sound_0", src: "Player_sound_0.mp3" }];
 
-    // if initializeDefaultPlugins returns false, we cannot play sound in this browser
-    if (!createjs.Sound.initializeDefaultPlugins()) {
-      return;
-    }
+                // if initializeDefaultPlugins returns false, we cannot play sound in this browser
+                if (!createjs.Sound.initializeDefaultPlugins()) {
+                        return;
+                }
 
-    createjs.Sound.alternateExtensions = ["mp3"];
-    createjs.Sound.addEventListener("fileload", handleLoad);
-    createjs.Sound.registerSounds(sounds, audioPath);
+                createjs.Sound.alternateExtensions = ["mp3"];
+                createjs.Sound.addEventListener("fileload", handleLoad);
+                createjs.Sound.registerSounds(sounds, audioPath);
 
-    var self = this;
-    var numSounds = Object.keys(sounds).length;
+                var self = this;
+                var numSounds = Object.keys(sounds).length;
 
-    function handleLoad(event) {
+                function handleLoad(event) {
 
-      instances[event.id] = event;
+                        instances[event.id] = event;
 
-      if (Object.keys(instances).length == numSounds) {
+                        if (Object.keys(instances).length == numSounds) {
 
-        if (self.onLoadCallback) self.onLoadCallback();
-      }
-    }
-  }
+                                if (self.onLoadCallback) self.onLoadCallback();
+                        }
+                }
+        }
 
-  _createClass(SoundManager, [{
-    key: "getInstance",
-    value: function getInstance(_id) {
+        _createClass(SoundManager, [{
+                key: "getInstance",
+                value: function getInstance(_id) {
 
-      return instances[_id];
-    }
-  }, {
-    key: "play",
-    value: function play(_id, _options) {
+                        return instances[_id];
+                }
+        }, {
+                key: "play",
+                value: function play(_id, _options) {
 
-      return createjs.Sound.play(_id, _options || {});
-    }
-  }, {
-    key: "onLoad",
-    value: function onLoad(_callback) {
+                        return createjs.Sound.play(_id, _options || {});
+                }
+        }, {
+                key: "stop",
+                value: function stop() {
 
-      this.onLoadCallback = _callback;
-    }
-  }]);
+                        createjs.Sound.stop();
+                }
+        }, {
+                key: "volume",
+                value: function volume(_volume) {
 
-  return SoundManager;
+                        createjs.Sound.volume = _volume;
+                }
+        }, {
+                key: "onLoad",
+                value: function onLoad(_callback) {
+
+                        this.onLoadCallback = _callback;
+                }
+        }]);
+
+        return SoundManager;
 }();
 
 },{}],73:[function(require,module,exports){
@@ -12588,6 +12600,7 @@ var loop = require('raf-loop');
 		soundManager.onLoad(function () {
 
 				init(this);
+				soundManager.volume(0.0);
 		});
 })();
 

@@ -705,6 +705,7 @@ let loop = require ( 'raf-loop' );
 	soundManager.onLoad ( function () {
 
 		init ( this );
+		soundManager.volume ( 0.0 );
 
 	} );
 
