@@ -91,6 +91,30 @@ export class GravityElectricLevel extends LevelCore {
 		this.indicatorScaleTarget = 0.0;
 		this.indicatorAlphaTarget = 0.0;
 
+		let totalCharges = this.gameElements.planets.instances;
+
+		for ( let i = 0; i < totalCharges.length; i ++ ) {
+
+			let isBoundToTouch = false;
+
+			for ( let touch in this.glWorldTouches ) {
+
+				if ( totalCharges[ i ].touchId == this.glWorldTouches[ touch ].id ) {
+
+					isBoundToTouch = true;
+
+				}
+
+			}
+
+			if ( !isBoundToTouch ) {
+
+				totalCharges[ i ].touchId = -1; // Nobody has -1 fingers I guess.
+
+			}
+
+		}
+
 		this.mouseDown = false;
 
 	} 
@@ -98,21 +122,26 @@ export class GravityElectricLevel extends LevelCore {
 	onDown ( _position ) {
 
 		super.onDown ( _position );
-		this.activePlanet = this.checkPlanets ( this.glMouseWorld );
 
-		if ( !this.activeScreen && this.activePlanet ) {
+		let planets = this.gameElements.planets.instances;
 
-			// this.indicatorObj.position.x = this.activePlanet.position[ 0 ];
-			// this.indicatorObj.position.y = this.activePlanet.position[ 1 ];
-			// this.indicatorObj.position.z = this.activePlanet.position[ 2 ];
+		if ( this.activeScreensBoundToTouch.length == 0 ) {
 
-			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.activePlanet.position );
-			let angle = Math.atan2 ( dir[ 1 ], dir[ 0 ] ) - Math.PI * 0.5;
-			let dist = vec3.length ( dir );
+			for ( let touch in this.glWorldTouches ) {
 
-			// this.indicatorAlphaTarget = 1.0;
-			// this.indicatorObj.rotation.z = angle;
-			// this.indicatorScaleTarget = dist;
+				for ( let i = 0; i < planets.length; i ++ ) {
+
+					let dist = vec3.length ( vec3.sub ( [ 0, 0, 0 ], planets[ i ].position, this.glWorldTouches[ touch ].position ) );
+
+					if ( dist < planets[ i ].scale[ 0 ] ) {
+
+						planets[ i ].touchId = this.glWorldTouches[ touch ].id;
+
+					}
+
+				}
+
+			}
 
 		}
 
@@ -137,21 +166,27 @@ export class GravityElectricLevel extends LevelCore {
 
 		super.onDrag ( _position );
 
-		if ( !this.activeScreen && this.activePlanet ) {
+		let planets = this.gameElements.planets.instances;
 
-			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.activePlanet.position );
-			let sign = Math.sign ( dir[ 1 ] );
-			let dist = vec3.length ( dir );
-			let maxDist = this.activePlanet.scale[ 0 ] * 1.2;
+		if ( this.activeScreensBoundToTouch.length == 0 ) {
 
-			this.activePlanet.sign = sign;
-			this.activePlanet.targetCharge = ( dist / maxDist ) * this.activePlanet.maxCharge;
+			for ( let touch in this.glWorldTouches ) {
 
-			let angle = Math.atan2 ( dir[ 1 ], dir[ 0 ] ) - Math.PI * 0.5;
+				for ( let i = 0; i < planets.length; i ++ ) {
 
-			// this.indicatorAlphaTarget = 1.0;
-			// this.indicatorObj.rotation.z = angle;
-			// this.indicatorScaleTarget = dist;
+					if ( planets[ i ].touchId == this.glWorldTouches[ touch ].id ) {
+
+						let maxDist = planets[ i ].scale[ 0 ] * 1.5;
+						let yDist = this.glWorldTouches[ touch ].position[ 1 ] - planets[ i ].position[ 1 ];
+						let percentDist = clamp ( yDist / maxDist, -1, 1 );
+
+						planets[ i ].targetCharge = planets[ i ].maxCharge * percentDist;
+
+					}
+
+				}
+
+			}
 
 		}
 

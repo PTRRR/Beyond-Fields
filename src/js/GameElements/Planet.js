@@ -32,7 +32,7 @@ export class Planet extends PhysicalElement {
 
 		for ( let i = 0; i < this.charges.length; i ++ ) {
 
-			if ( i <= maxIndex ) this.charges[ i ].charge = this.sign;
+			if ( i <= maxIndex ) this.charges[ i ].charge = Math.sign ( this.charge );
 			else this.charges[ i ].charge = 0;
 
 		}

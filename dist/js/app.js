@@ -5499,6 +5499,8 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 var _get = function get(object, property, receiver) { if (object === null) object = Function.prototype; var desc = Object.getOwnPropertyDescriptor(object, property); if (desc === undefined) { var parent = Object.getPrototypeOf(object); if (parent === null) { return undefined; } else { return get(parent, property, receiver); } } else if ("value" in desc) { return desc.value; } else { var getter = desc.get; if (getter === undefined) { return undefined; } return getter.call(receiver); } };
 
+var _utils = require("../utils");
+
 var _LevelCore2 = require("./LevelCore");
 
 var _shaderHelper = require("./shaderHelper");
@@ -5526,7 +5528,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 				_this.ready = false;
 				_this.createdInstance = null;
-				_this.currentInstance = null;
+				_this.activeChargesBoundToTouches = null;
 				_this.mouseOnDown = null;
 
 				// Build scan background
@@ -5554,6 +5556,11 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				_this.scanScene.add(_this.scanMesh);
 				_this.scanMaterial.extensions.derivatives = true;
 
+				// Multitouch
+
+				_this.createdInstances = [];
+				_this.downTouchIds = [];
+
 				_this.canUpdateTexts = true;
 				_this.won = false;
 
@@ -5573,93 +5580,118 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				}
 		}, {
 				key: "onUp",
-				value: function onUp(_position) {
+				value: function onUp(_positions) {
 
-						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onUp", this).call(this, _position);
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onUp", this).call(this, _positions);
 
-						this.currentInstance = null;
-						this.createdInstance = null;
+						this.downTouchIds = [];
+
+						var totalCharges = this.getTotalCharges();
+
+						for (var i = 0; i < totalCharges.length; i++) {
+
+								var isBoundToTouch = false;
+
+								for (var touch in this.glWorldTouches) {
+
+										if (totalCharges[i].touchId == this.glWorldTouches[touch].id) {
+
+												isBoundToTouch = true;
+										}
+								}
+
+								if (!isBoundToTouch) {
+
+										totalCharges[i].touchId = -1; // Nobody has -1 fingers I guess.
+								}
+						}
+
+						for (var _touch in this.glWorldTouches) {
+
+								this.downTouchIds.push(this.glWorldTouches[_touch].id);
+						}
 				}
 		}, {
 				key: "onDown",
-				value: function onDown(_position) {
+				value: function onDown(_positions) {
 
-						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDown", this).call(this, _position);
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDown", this).call(this, _positions);
 
-						if (!this.activeScreen) {
+						if (this.activeScreensBoundToTouch.length == 0) {
 
-								this.currentInstance = this.checkCharges(vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z));
+								// If no charges are touched
 
-								if (!this.currentInstance) {
+								var totalCharges = this.getTotalCharges();
 
-										this.createdInstance = this.addInstanceOf('charges', {
+								for (var touch in this.glWorldTouches) {
 
-												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
-												color: [0.0, 0.0, 0.0, 1.0],
-												rotation: [0, 0, Math.random() * Math.PI * 2],
-												mass: 15,
-												drag: 0.85,
-												enabled: true
+										if (!_utils.contains.call(this.downTouchIds, this.glWorldTouches[touch].id)) {
+												// check if that touch is already down.
 
-										});
+												var currentTouch = this.glWorldTouches[touch];
+
+												var hoverCharge = null;
+
+												for (var i = 0; i < totalCharges.length; i++) {
+
+														var dist = vec3.length(vec3.sub([0, 0, 0], currentTouch.position, totalCharges[i].position));
+														var offsetEdge = 0.2;
+
+														if (dist < totalCharges[i].scale[0] + offsetEdge) {
+
+																hoverCharge = totalCharges[i];
+																hoverCharge.touchId = this.glWorldTouches[touch].id;
+
+																if (dist < totalCharges[i].scale[0] * 0.5) {
+
+																		hoverCharge.touchType = 'center';
+																} else {
+
+																		hoverCharge.touchType = 'edge';
+																}
+
+																break;
+														}
+												}
+
+												if (!hoverCharge) {
+
+														this.addInstanceOf('charges', {
+
+																position: this.glWorldTouches[touch].position,
+																color: [0.0, 0.0, 0.0, 1.0],
+																rotation: [0, 0, Math.random() * Math.PI * 2],
+																mass: 15,
+																drag: 0.85,
+																enabled: true,
+																touchId: this.glWorldTouches[touch].id,
+																touchType: 'edge'
+
+														});
+												}
+
+												this.downTouchIds.push(this.glWorldTouches[touch].id);
+										}
 								}
 						}
-
-						this.mouseOnDown = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
 				}
 		}, {
 				key: "onClick",
-				value: function onClick(_position) {
+				value: function onClick(_positions) {
 
-						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onClick", this).call(this, _position);
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onClick", this).call(this, _positions);
 				}
 		}, {
 				key: "onMove",
-				value: function onMove(_position) {
+				value: function onMove(_positions) {
 
-						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onMove", this).call(this, _position);
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onMove", this).call(this, _positions);
 				}
 		}, {
 				key: "onDrag",
-				value: function onDrag(_position) {
+				value: function onDrag(_positions) {
 
-						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDrag", this).call(this, _position);
-
-						var mouse = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
-
-						if (this.createdInstance) {
-
-								var dist = vec3.length(vec3.sub(vec3.create(), this.createdInstance.position, mouse));
-								var yDist = mouse[1] - this.createdInstance.position[1];
-								this.createdInstance.sign = Math.sign(yDist);
-								this.createdInstance.targetRadius = dist;
-						} else if (this.currentInstance && this.currentInstance.element.enabled) {
-
-								var dir = null;
-								var _dist = null;
-								var _yDist = null;
-
-								switch (this.currentInstance.type) {
-
-										case 'center':
-
-												// this.currentInstance.element.targetPosition = mouse;
-
-												// this.currentInstance.element.targetRadius = 0;
-
-												break;
-
-										case 'edge':
-
-												_dist = vec3.length(vec3.sub(vec3.create(), this.currentInstance.element.position, mouse));
-												_yDist = mouse[1] - this.currentInstance.element.position[1];
-												this.currentInstance.element.sign = Math.sign(_yDist);
-												this.currentInstance.element.targetRadius = _dist;
-
-												break;
-
-								}
-						}
+						_get(ElectricLevel.prototype.__proto__ || Object.getPrototypeOf(ElectricLevel.prototype), "onDrag", this).call(this, _positions);
 				}
 		}, {
 				key: "onResize",
@@ -5776,17 +5808,34 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						// Update current charge
 
-						if (this.currentInstance && this.currentInstance.type == 'center') {
+						var totalCharges = this.getTotalCharges();
 
-								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.currentInstance.element.position);
-								this.currentInstance.element.applyForce(dir);
+						for (var touch in this.glWorldTouches) {
+
+								for (var _i4 = 0; _i4 < totalCharges.length; _i4++) {
+
+										if (totalCharges[_i4].touchId == this.glWorldTouches[touch].id && totalCharges[_i4].enabled) {
+
+												var _force = vec3.sub([0, 0, 0], this.glWorldTouches[touch].position, totalCharges[_i4].position);
+												var yDist = Math.sign(this.glWorldTouches[touch].position[1] - totalCharges[_i4].position[1]);
+
+												if (totalCharges[_i4].touchType == 'center') {
+
+														totalCharges[_i4].applyForce(vec3.scale(_force, _force, 0.8));
+												} else if (totalCharges[_i4].touchType == 'edge') {
+
+														totalCharges[_i4].targetRadius = vec3.length(_force);
+														totalCharges[_i4].sign = yDist;
+												}
+										}
+								}
 						}
 
 						var charges = this.gameElements.charges.instances;
 
-						for (var _i4 = 0; _i4 < charges.length; _i4++) {
+						for (var _i5 = 0; _i5 < charges.length; _i5++) {
 
-								var _charge = charges[_i4];
+								var _charge = charges[_i5];
 
 								if (this.checkEdges(_charge.position, 0.2)) {
 
@@ -5801,47 +5850,47 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								chargesUniform.push(_charge.position[1]);
 								chargesUniform.push(Math.abs(_charge.charge / _charge.maxCharge) * _charge.sign);
 
-								var _dist2 = vec3.length(vec3.sub(vec3.create(), _charge.position, player.position));
+								var _dist = vec3.length(vec3.sub(vec3.create(), _charge.position, player.position));
 
-								if (_dist2 < _charge.radius) {
+								if (_dist < _charge.radius) {
 
 										if (!this.levelCompleted) this.resetPlayer();
 								} else {
 
-										var _force = this.computeElectricForce(_charge, player);
-										vec3.add(forceResult, forceResult, _force);
+										var _force2 = this.computeElectricForce(_charge, player);
+										vec3.add(forceResult, forceResult, _force2);
 								}
 
 								// Check overlapping charges.
 
 								for (var j = 0; j < charges.length; j++) {
 
-										if (j != _i4) {
+										if (j != _i5) {
 
-												var _dir = vec3.sub(vec3.create(), _charge.position, charges[j].position);
-												var _dist3 = vec3.length(_dir);
+												var dir = vec3.sub(vec3.create(), _charge.position, charges[j].position);
+												var _dist2 = vec3.length(dir);
 												var minDist = _charge.scale[0] + charges[j].scale[0];
 												var offset = -0.15;
 
-												if (_dist3 < minDist + offset) {
+												if (_dist2 < minDist + offset) {
 
-														vec3.scale(_dir, _dir, Math.pow(minDist - _dist3, 3) * 5);
-														_charge.applyForce(_dir);
+														vec3.scale(dir, dir, Math.pow(minDist - _dist2, 3) * 5);
+														_charge.applyForce(dir);
 												}
 										}
 								}
 
 								for (var _j = 0; _j < fixedCharges.length; _j++) {
 
-										var _dir2 = vec3.sub(vec3.create(), _charge.position, fixedCharges[_j].position);
-										var _dist4 = vec3.length(_dir2);
+										var _dir = vec3.sub(vec3.create(), _charge.position, fixedCharges[_j].position);
+										var _dist3 = vec3.length(_dir);
 										var _minDist = _charge.scale[0] + fixedCharges[_j].scale[0];
 										var _offset = -0.07;
 
-										if (_dist4 < _minDist + _offset) {
+										if (_dist3 < _minDist + _offset) {
 
-												vec3.scale(_dir2, _dir2, Math.pow(_minDist - _dist4, 2) * 5);
-												_charge.applyForce(_dir2);
+												vec3.scale(_dir, _dir, Math.pow(_minDist - _dist3, 2) * 5);
+												_charge.applyForce(_dir);
 										}
 								}
 						}
@@ -5862,37 +5911,37 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 								var particle = playerParticles[_j2];
 
-								var _dir3 = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist5 = vec3.length(_dir3);
+								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
+								var _dist4 = vec3.length(_dir2);
 
-								vec3.normalize(_dir3, _dir3);
-								vec3.scale(_dir3, _dir3, 1 / Math.pow(_dist5 + 1.0, 2) * 2);
+								vec3.normalize(_dir2, _dir2);
+								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist4 + 1.0, 2) * 2);
 
-								particle.applyForce(_dir3);
+								particle.applyForce(_dir2);
 
-								for (var _i5 = 0; _i5 < charges.length; _i5++) {
+								for (var _i6 = 0; _i6 < charges.length; _i6++) {
 
-										var _charge2 = charges[_i5];
+										var _charge2 = charges[_i6];
 
-										var _dir4 = vec3.sub(vec3.create(), _charge2.position, particle.position);
+										var _dir3 = vec3.sub(vec3.create(), _charge2.position, particle.position);
 										var _minDist2 = _charge2.scale[0] + particle.scale[0];
-										var _dist6 = vec3.length(_dir4);
+										var _dist5 = vec3.length(_dir3);
 
-										if (_dist6 < _minDist2) {
+										if (_dist5 < _minDist2) {
 
-												vec3.scale(_dir4, _dir4, -(_minDist2 - _dist6) * 100);
-												particle.applyForce(_dir4);
+												vec3.scale(_dir3, _dir3, -(_minDist2 - _dist5) * 100);
+												particle.applyForce(_dir3);
 										} else {
 
-												var _force2 = this.computeElectricForce(_charge2, particle);
-												particle.applyForce(vec3.scale(_force2, _force2, 0.5));
+												var _force3 = this.computeElectricForce(_charge2, particle);
+												particle.applyForce(vec3.scale(_force3, _force3, 0.5));
 										}
 								}
 						}
 
 						// Update FX particles
 
-						for (var _i6 = 0; _i6 < 2; _i6++) {
+						for (var _i7 = 0; _i7 < 2; _i7++) {
 
 								var instance = this.addInstanceOf('playerParticles', {
 
@@ -5995,10 +6044,10 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								var _totalForce = 0;
 								var _totalMass = 0;
 
-								for (var _i7 = 0; _i7 < _instances.length; _i7++) {
+								for (var _i8 = 0; _i8 < _instances.length; _i8++) {
 
-										_totalForce += vec3.length(this.computeElectricForce(_instances[_i7], player));
-										_totalMass += _instances[_i7].mass;
+										_totalForce += vec3.length(this.computeElectricForce(_instances[_i8], player));
+										_totalMass += _instances[_i8].mass;
 								}
 
 								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
@@ -6042,8 +6091,39 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						}
 				}
 		}, {
+				key: "getBoundChargesToTouches",
+				value: function getBoundChargesToTouches(_worldTouches) {
+
+						var boundChargesToTouches = [];
+
+						var totalCharges = [];
+						var charges = this.gameElements.charges.instances;
+						var fixedCharges = this.gameElements.fixedCharges.instances;
+						totalCharges = totalCharges.concat(charges);
+						totalCharges = totalCharges.concat(fixedCharges);
+
+						for (var j = 0; j < _worldTouches; j++) {
+
+								var currentGlTouch = _worldTouches[j];
+
+								for (var i = 0; i < totalCharges.length; i++) {
+
+										var currentCharge = totalCharges[i];
+										var dist = vec3.length(vec3.sub([0, 0, 0], currentCharge.position, currentGlTouch));
+										var edgeOffset = 0.3;
+
+										if (dist < currentCharge.scale[0] + edgeOffset) {
+
+												boundChargesToTouches.push({ charge: currentCharge, touchId: j });
+										}
+								}
+						}
+
+						return boundChargesToTouches;
+				}
+		}, {
 				key: "checkCharges",
-				value: function checkCharges(_position) {
+				value: function checkCharges(_positions) {
 
 						var totalCharges = [];
 						var charges = this.gameElements.charges.instances;
@@ -6055,7 +6135,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						for (var i = 0; i < totalCharges.length; i++) {
 
 								var rangeCenter = totalCharges[i].radius * 0.5;
-								var distToCenter = vec3.length(vec3.sub(vec3.create(), totalCharges[i].position, _position));
+								var distToCenter = vec3.length(vec3.sub(vec3.create(), totalCharges[i].position, _positions));
 
 								var rangeEdge = 0.2;
 								var distToEdge = Math.abs(distToCenter - totalCharges[i].radius);
@@ -6084,6 +6164,18 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 						}
 
 						return null;
+				}
+		}, {
+				key: "getTotalCharges",
+				value: function getTotalCharges() {
+
+						var totalCharges = [];
+						var charges = this.gameElements.charges.instances;
+						var fixedCharges = this.gameElements.fixedCharges.instances;
+						totalCharges = totalCharges.concat(charges);
+						totalCharges = totalCharges.concat(fixedCharges);
+
+						return totalCharges;
 				}
 		}, {
 				key: "computeElectricForce",
@@ -6124,7 +6216,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 		return ElectricLevel;
 }(_LevelCore2.LevelCore);
 
-},{"./LevelCore":61,"./shaderHelper":69}],56:[function(require,module,exports){
+},{"../utils":76,"./LevelCore":61,"./shaderHelper":69}],56:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -6570,6 +6662,26 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 						this.indicatorScaleTarget = 0.0;
 						this.indicatorAlphaTarget = 0.0;
 
+						var totalCharges = this.gameElements.planets.instances;
+
+						for (var i = 0; i < totalCharges.length; i++) {
+
+								var isBoundToTouch = false;
+
+								for (var touch in this.glWorldTouches) {
+
+										if (totalCharges[i].touchId == this.glWorldTouches[touch].id) {
+
+												isBoundToTouch = true;
+										}
+								}
+
+								if (!isBoundToTouch) {
+
+										totalCharges[i].touchId = -1; // Nobody has -1 fingers I guess.
+								}
+						}
+
 						this.mouseDown = false;
 				}
 		}, {
@@ -6577,21 +6689,23 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				value: function onDown(_position) {
 
 						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onDown', this).call(this, _position);
-						this.activePlanet = this.checkPlanets(this.glMouseWorld);
 
-						if (!this.activeScreen && this.activePlanet) {
+						var planets = this.gameElements.planets.instances;
 
-								// this.indicatorObj.position.x = this.activePlanet.position[ 0 ];
-								// this.indicatorObj.position.y = this.activePlanet.position[ 1 ];
-								// this.indicatorObj.position.z = this.activePlanet.position[ 2 ];
+						if (this.activeScreensBoundToTouch.length == 0) {
 
-								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.activePlanet.position);
-								var angle = Math.atan2(dir[1], dir[0]) - Math.PI * 0.5;
-								var dist = vec3.length(dir);
+								for (var touch in this.glWorldTouches) {
 
-								// this.indicatorAlphaTarget = 1.0;
-								// this.indicatorObj.rotation.z = angle;
-								// this.indicatorScaleTarget = dist;
+										for (var i = 0; i < planets.length; i++) {
+
+												var dist = vec3.length(vec3.sub([0, 0, 0], planets[i].position, this.glWorldTouches[touch].position));
+
+												if (dist < planets[i].scale[0]) {
+
+														planets[i].touchId = this.glWorldTouches[touch].id;
+												}
+										}
+								}
 						}
 
 						this.mouseDown = true;
@@ -6614,21 +6728,24 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'onDrag', this).call(this, _position);
 
-						if (!this.activeScreen && this.activePlanet) {
+						var planets = this.gameElements.planets.instances;
 
-								var dir = vec3.sub(vec3.create(), this.glMouseWorld, this.activePlanet.position);
-								var sign = Math.sign(dir[1]);
-								var dist = vec3.length(dir);
-								var maxDist = this.activePlanet.scale[0] * 1.2;
+						if (this.activeScreensBoundToTouch.length == 0) {
 
-								this.activePlanet.sign = sign;
-								this.activePlanet.targetCharge = dist / maxDist * this.activePlanet.maxCharge;
+								for (var touch in this.glWorldTouches) {
 
-								var angle = Math.atan2(dir[1], dir[0]) - Math.PI * 0.5;
+										for (var i = 0; i < planets.length; i++) {
 
-								// this.indicatorAlphaTarget = 1.0;
-								// this.indicatorObj.rotation.z = angle;
-								// this.indicatorScaleTarget = dist;
+												if (planets[i].touchId == this.glWorldTouches[touch].id) {
+
+														var maxDist = planets[i].scale[0] * 1.5;
+														var yDist = this.glWorldTouches[touch].position[1] - planets[i].position[1];
+														var percentDist = (0, _utils.clamp)(yDist / maxDist, -1, 1);
+
+														planets[i].targetCharge = planets[i].maxCharge * percentDist;
+												}
+										}
+								}
 						}
 				}
 		}, {
@@ -7169,28 +7286,31 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						_get(GravityLevel.prototype.__proto__ || Object.getPrototypeOf(GravityLevel.prototype), "onDrag", this).call(this, _position);
 
-						if (!this.activeScreen && this.canDraw) {
+						if (this.activeScreensBoundToTouch.length == 0 && this.canDraw) {
 
-								var r = rc();
-								var s = Math.random() * 0.3 + 0.2;
+								for (var touch in this.glWorldTouches) {
 
-								// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
+										var r = rc();
+										var s = Math.random() * 0.3 + 0.2;
 
-								if (this.gameElements.blackMatter.instances.length < 108) {
+										// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
 
-										this.addInstanceOf('blackMatter', {
+										if (this.gameElements.blackMatter.instances.length < 108) {
 
-												position: [this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z],
-												scale: [s, s, s],
-												color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
-												rotation: [0, 0, Math.random() * Math.PI * 2],
-												mass: 20000,
-												drag: 0.95,
-												lifeSpan: Math.random() * 4000 + 6000,
-												canDye: true,
-												targetLinePosition: [-2.0, 2.0, 0.0]
+												this.addInstanceOf('blackMatter', {
 
-										});
+														position: this.glWorldTouches[touch].position,
+														scale: [s, s, s],
+														color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
+														rotation: [0, 0, Math.random() * Math.PI * 2],
+														mass: 20000,
+														drag: 0.95,
+														lifeSpan: Math.random() * 4000 + 6000,
+														canDye: true,
+														targetLinePosition: [-2.0, 2.0, 0.0]
+
+												});
+										}
 								}
 						}
 
@@ -7616,12 +7736,19 @@ var LevelCore = exports.LevelCore = function () {
 				};
 				this.soundManager = _options.soundManager;
 
-				this.mouseDown = false;
 				this.glMouse = vec3.create();
 				this.glMouseWorld = vec3.create();
 				this.mouse = new THREE.Vector2();
 				this.mouseWorld = new THREE.Vector3();
 				this.raycaster = new THREE.Raycaster();
+
+				// Multitouch update
+
+				this.touchDown = false;
+				this.touches = {};
+				this.worldTouches = {};
+				this.glTouches = {};
+				this.glWorldTouches = {};
 
 				// Level elements
 
@@ -7634,7 +7761,7 @@ var LevelCore = exports.LevelCore = function () {
 				this.genericQuad = this.getQuad([0, 0, 0], [0, 0, 0], [1, 1, 1]);
 				this.quadGeometry = new THREE.PlaneGeometry(1, 1);
 				this.screensScene = new THREE.Scene();
-				this.activeScreen = null;
+				this.activeScreensBoundToTouch = null;
 				this.screenMaterial = new THREE.ShaderMaterial({
 
 						vertexShader: _shaderHelper.shaderHelper.screen.vertex,
@@ -7762,50 +7889,65 @@ var LevelCore = exports.LevelCore = function () {
 
 		_createClass(LevelCore, [{
 				key: 'onMove',
-				value: function onMove(_position) {
+				value: function onMove(_positions) {
 
-						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
-						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
-
-						this.glMouse = vec2.clone(_position);
-
-						this.updateMouseWorld(this.mouse);
+						this.updateTouches(_positions);
 				}
 		}, {
 				key: 'onClick',
-				value: function onClick(_position) {
+				value: function onClick(_positions) {
 
-						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
-						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
-
-						this.glMouse = vec2.clone(_position);
-
-						this.updateMouseWorld(this.mouse);
+						this.updateTouches(_positions);
 				}
 		}, {
 				key: 'onDrag',
-				value: function onDrag(_position) {
+				value: function onDrag(_positions) {
 
-						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
-						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+						this.updateTouches(_positions);
 
-						this.glMouse = vec2.clone(_position);
+						// console.log(this.worldTouches);
 
-						this.updateMouseWorld(this.mouse);
+						// Update screens position according to touches.
 
-						if (this.activeScreen == this.scanScreen) {
+						if (this.activeScreensBoundToTouch.length > 0) {
 
-								this.scanScreenTargetPosition.x = this.mouseWorld.x + this.getWorldRight();
-						} else if (this.activeScreen == this.infoScreen) {
+								for (var i = 0; i < this.activeScreensBoundToTouch.length; i++) {
 
-								this.infoScreenTargetPosition.x = this.mouseWorld.x - this.getWorldRight();
+										// console.log(this.activeScreensBoundToTouch[ i ].touchId);
+										if (this.activeScreensBoundToTouch[i].screen == this.scanScreen) {
+
+												// Brute force
+
+												try {
+
+														this.scanScreenTargetPosition.x = this.worldTouches[this.activeScreensBoundToTouch[i].touchId].position.x + this.getWorldRight();
+												} catch (e) {
+
+														console.log('Brute force error: ' + e);
+												}
+										}
+
+										if (this.activeScreensBoundToTouch[i].screen == this.infoScreen) {
+
+												// Brute force
+
+												try {
+
+														this.infoScreenTargetPosition.x = this.worldTouches[this.activeScreensBoundToTouch[i].touchId].position.x - this.getWorldRight();
+												} catch (e) {
+
+														console.log('Brute force error: ' + e);
+												}
+										}
+								}
 						}
 				}
 		}, {
 				key: 'onDown',
-				value: function onDown(_position) {
+				value: function onDown(_positions) {
 
-						this.mouseDown = true;
+						this.touchDown = true;
+						this.updateTouches(_positions);
 
 						if (!this.levelStarted) {
 
@@ -7816,25 +7958,17 @@ var LevelCore = exports.LevelCore = function () {
 								this.removeTextIntro();
 						}
 
-						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
-						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
+						// Check if the player has touched a screen button.
 
-						this.glMouse = vec2.clone(_position);
-						this.updateMouseWorld(this.mouse);
-						this.activeScreen = this.checkButtons();
+						this.activeScreensBoundToTouch = this.checkButtons();
 				}
 		}, {
 				key: 'onUp',
-				value: function onUp(_position) {
+				value: function onUp(_positions) {
 
-						this.mouse.x = _position[0] * this.renderer.getPixelRatio();
-						this.mouse.y = _position[1] * this.renderer.getPixelRatio();
-						this.glMouse = vec2.clone(_position);
-
-						this.updateMouseWorld(this.mouse);
-
-						this.activeScreen = null;
-						this.mouseDown = false;
+						this.touchDown = false;
+						this.updateTouches(_positions);
+						this.activeScreensBoundToTouch = [];
 				}
 		}, {
 				key: 'onResize',
@@ -7843,6 +7977,7 @@ var LevelCore = exports.LevelCore = function () {
 						this.mainCamera.aspect = window.innerWidth / window.innerHeight;
 						this.mainCamera.updateProjectionMatrix();
 
+						this.touchDown = false;
 						this.renderer.setSize(window.innerWidth, window.innerHeight);
 
 						this.scanScreen.material.uniforms.screenDimentions.value = [this.getWidth(), this.getHeight()];
@@ -9205,11 +9340,35 @@ var LevelCore = exports.LevelCore = function () {
 						return false;
 				}
 		}, {
-				key: 'updateMouseWorld',
-				value: function updateMouseWorld(_mouse) {
+				key: 'updateTouches',
+				value: function updateTouches(_positions) {
 
-						this.mouseWorld = this.get3DPointOnBasePlane(_mouse);
-						this.glMouseWorld = vec3.fromValues(this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z);
+						_positions.sort(function (a, b) {
+
+								return a.id - b.id;
+						});
+
+						this.touches = {};
+						this.worldTouches = {};
+						this.glTouches = {};
+						this.glWorldTouches = {};
+
+						for (var i = 0; i < _positions.length; i++) {
+
+								this.touches[_positions[i].id] = { id: _positions[i].id, position: new THREE.Vector2(_positions[i].x * this.renderer.getPixelRatio(), _positions[i].y * this.renderer.getPixelRatio()) };
+								this.glTouches[_positions[i].id] = { id: _positions[i].id, position: [_positions[i].x * this.renderer.getPixelRatio(), _positions[i].y * this.renderer.getPixelRatio()] };
+
+								var worldTouch = this.getWorldTouch(this.touches[_positions[i].id].position);
+								this.worldTouches[_positions[i].id] = { id: _positions[i].id, position: new THREE.Vector3(worldTouch[0], worldTouch[1], worldTouch[2]) };
+								this.glWorldTouches[_positions[i].id] = { id: _positions[i].id, position: worldTouch };
+						}
+				}
+		}, {
+				key: 'getWorldTouch',
+				value: function getWorldTouch(_touch) {
+
+						var touchWorld = this.get3DPointOnBasePlane(_touch);
+						return [touchWorld.x, touchWorld.y, touchWorld.z];
 				}
 		}, {
 				key: 'get3DPointOnBasePlane',
@@ -9243,37 +9402,46 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'checkButtons',
 				value: function checkButtons() {
 
-						var distToScanButton = this.mouseWorld.distanceTo(this.scanScreenButton.position);
-						var onScan = false;
+						var screensBoundToTouch = [];
 
-						if (distToScanButton < this.scanScreenButton.scale.x * 1.0) {
+						for (var touch in this.worldTouches) {
 
-								onScan = true;
+								var currentTouch = this.worldTouches[touch];
+
+								var distToScanButton = currentTouch.position.distanceTo(this.scanScreenButton.position);
+								var onScan = false;
+
+								if (distToScanButton < this.scanScreenButton.scale.x * 1.0) {
+
+										onScan = true;
+								}
+
+								var distToInfoButton = currentTouch.position.distanceTo(this.infoScreenButton.position);
+								var onInfo = false;
+
+								if (distToInfoButton < this.infoScreenButton.scale.x * 1.0) {
+
+										onInfo = true;
+								}
+
+								// Check where the screens are to make an intuitive interaction when they are overlapping.
+
+								if (onScan && onInfo && !this.scanScreenOpened) {
+
+										if (onInfo) screensBoundToTouch.push({ screen: this.infoScreen, touchId: currentTouch.id });
+								} else if (onScan && onInfo && this.scanScreenOpened) {
+
+										if (onScan) screensBoundToTouch.push({ screen: this.scanScreen, touchId: currentTouch.id });
+								} else if (onScan && !onInfo) {
+
+										if (onScan) screensBoundToTouch.push({ screen: this.scanScreen, touchId: currentTouch.id });
+								} else if (!onScan && onInfo) {
+
+										if (onInfo) screensBoundToTouch.push({ screen: this.infoScreen, touchId: currentTouch.id });
+								}
 						}
 
-						var distToInfoButton = this.mouseWorld.distanceTo(this.infoScreenButton.position);
-						var onInfo = false;
-
-						if (distToInfoButton < this.infoScreenButton.scale.x * 1.0) {
-
-								onInfo = true;
-						}
-
-						// Check where the screens are to make an intuitive interaction when they are overlapping.
-
-						if (this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x != 0.0) {
-
-								if (onScan) return this.scanScreen;
-								if (onInfo) return this.infoScreen;
-						} else if (this.scanScreenTargetPosition.x == 0.0 && this.infoScreenTargetPosition.x != 0.0) {
-
-								if (onScan) return this.scanScreen;
-								if (onScan) return this.infoScreen;
-						} else if (this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x == 0.0) {
-
-								if (onInfo) return this.infoScreen;
-								if (onScan) return this.scanScreen;
-						}
+						return screensBoundToTouch;
 				}
 		}, {
 				key: 'addLoadingObject',
@@ -9340,9 +9508,9 @@ var LevelCore = exports.LevelCore = function () {
 						this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight();
 						this.infoScreenButton.position.y = this.infoScreen.position.y;
 
-						if (!this.mouseDown) {
+						// Check screens limits. 
 
-								// Check screens limits.
+						if (!this.touchDown) {
 
 								if (this.scanScreenButton.position.x > this.getWorldRight() * 0.7) {
 
@@ -9954,7 +10122,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 
 						for (var i = 0; i < this.charges.length; i++) {
 
-								if (i <= maxIndex) this.charges[i].charge = this.sign;else this.charges[i].charge = 0;
+								if (i <= maxIndex) this.charges[i].charge = Math.sign(this.charge);else this.charges[i].charge = 0;
 						}
 				}
 		}]);
@@ -10540,47 +10708,47 @@ var GameManager = exports.GameManager = function () {
 		}
 	}, {
 		key: "onMove",
-		value: function onMove(_position) {
+		value: function onMove(_positions) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.onMove(_position);
+				this.currentLevel.onMove(_positions);
 			}
 		}
 	}, {
 		key: "onDrag",
-		value: function onDrag(_position) {
+		value: function onDrag(_positions) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.onDrag(_position);
+				this.currentLevel.onDrag(_positions);
 			}
 		}
 	}, {
 		key: "onClick",
-		value: function onClick(_position) {
+		value: function onClick(_positions) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.onClick(_position);
+				this.currentLevel.onClick(_positions);
 			}
 		}
 	}, {
 		key: "onDown",
-		value: function onDown(_position) {
+		value: function onDown(_positions) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.onDown(_position);
+				this.currentLevel.onDown(_positions);
 			}
 		}
 	}, {
 		key: "onUp",
-		value: function onUp(_position) {
+		value: function onUp(_positions) {
 
 			if (this.currentLevel) {
 
-				this.currentLevel.onUp(_position);
+				this.currentLevel.onUp(_positions);
 			}
 		}
 	}, {
@@ -11035,8 +11203,8 @@ var IntroScene = exports.IntroScene = function () {
 						this.run = true;
 						this.intro = true;
 						this.player.position = [0, this.getWorldTop() + 0.2, 0];
-						this.player.acceleration = [0.06, -0.06, 0];
-						// this.player.acceleration = [ 0, -0.06, 0 ];
+						// this.player.acceleration = [ 0.06, -0.06, 0 ];
+						this.player.acceleration = [0, -0.06, 0];
 						this.player.mass = 400;
 						this.player.drag = 0.985;
 						this.arrivalScaleTarget = 1.0;
@@ -12338,15 +12506,18 @@ var loop = require('raf-loop');
 				// Events
 
 				var down = false;
-				var lastPos = vec2.create();
 
 				// Cross mouse & touch
 
+				function createMouseTouch(_event) {
+
+						return [{ id: 0, x: _event.clientX, y: _event.clientY }];
+				}
+
 				(0, _utils.addEvent)(rendererElement, 'click', function (event) {
 
-						var pos = vec2.fromValues(event.clientX, event.clientY);
-						gameManager.onClick(vec2.fromValues(event.clientX, event.clientY));
-						lastPos = pos;
+						var mouseTouch = createMouseTouch(event);
+						gameManager.onClick(mouseTouch);
 				});
 
 				(0, _utils.addEvent)(window, 'dbclick', function (event) {
@@ -12360,36 +12531,42 @@ var loop = require('raf-loop');
 
 						down = true;
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
-
-						var pos = vec2.fromValues(event.clientX, event.clientY);
-						gameManager.onDown(vec2.fromValues(event.clientX, event.clientY));
-						lastPos = pos;
+						var mouseTouch = createMouseTouch(event);
+						gameManager.onDown(mouseTouch);
 				});
 
 				(0, _utils.addEvent)(rendererElement, 'mouseup', function (event) {
 
 						down = false;
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
-
-						gameManager.onUp(lastPos);
+						gameManager.onUp([]);
 				});
 
 				(0, _utils.addEvent)(rendererElement, 'mousemove', function (event) {
 
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
-
-						var pos = vec2.fromValues(event.clientX, event.clientY);
-						gameManager.onMove(vec2.fromValues(event.clientX, event.clientY));
+						var mouseTouch = createMouseTouch(event);
+						gameManager.onMove(mouseTouch);
 
 						if (down) {
 
-								gameManager.onDrag(vec2.fromValues(event.clientX, event.clientY));
+								gameManager.onDrag(mouseTouch);
 						}
-
-						lastPos = pos;
 				});
 
 				// Touch
+
+				function getTouches(_event) {
+
+						var touches = [];
+
+						for (var _i2 = 0; _i2 < _event.touches.length; _i2++) {
+
+								touches.push({ x: _event.touches[_i2].clientX, y: _event.touches[_i2].clientY, id: _event.touches[_i2].identifier });
+						}
+
+						return touches;
+				}
 
 				(0, _utils.addEvent)(rendererElement, 'touchstart', function (event) {
 
@@ -12397,38 +12574,33 @@ var loop = require('raf-loop');
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
 
 						var pos = vec2.fromValues(event.touches[0].clientX, event.touches[0].clientY);
-						gameManager.onDown(pos);
-						lastPos = pos;
+						var touches = getTouches(event);
+						gameManager.onDown(touches);
 				});
 
 				(0, _utils.addEvent)(rendererElement, 'touchend', function (event) {
 
-						down = false;
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
-
-						gameManager.onUp(lastPos);
-				});
-
-				(0, _utils.addEvent)(window, 'touchmove', function (event) {
-
-						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+						var touches = getTouches(event);
+						if (touches.length == 0) down = false;
+						gameManager.onUp(touches);
 				});
 
 				(0, _utils.addEvent)(rendererElement, 'touchmove', function (event) {
 
 						event.preventDefault ? event.preventDefault() : event.returnValue = false;
 						var pos = vec2.fromValues(event.touches[0].clientX, event.touches[0].clientY);
-						gameManager.onMove(pos);
-
-						if (down) {
-
-								gameManager.onDrag(pos);
-						}
-
-						lastPos = pos;
+						var touches = getTouches(event);
+						gameManager.onMove(touches);
+						gameManager.onDrag(touches);
 				});
 
 				// Window events
+
+				(0, _utils.addEvent)(window, 'touchmove', function (event) {
+
+						event.preventDefault ? event.preventDefault() : event.returnValue = false;
+				});
 
 				(0, _utils.addEvent)(window, 'resize', function () {
 

@@ -320,8 +320,8 @@ export class IntroScene {
 		this.run = true;
 		this.intro = true;
 		this.player.position = [ 0, this.getWorldTop () + 0.2, 0 ];
-		this.player.acceleration = [ 0.06, -0.06, 0 ];
-		// this.player.acceleration = [ 0, -0.06, 0 ];
+		// this.player.acceleration = [ 0.06, -0.06, 0 ];
+		this.player.acceleration = [ 0, -0.06, 0 ];
 		this.player.mass = 400;
 		this.player.drag = 0.985;
 		this.arrivalScaleTarget = 1.0;

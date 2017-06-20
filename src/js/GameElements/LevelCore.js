@@ -46,12 +46,19 @@ export class LevelCore {
 		this.onWinCallback = function () { console.log( 'you won' ) };
 		this.soundManager = _options.soundManager;
 
-		this.mouseDown = false;
 		this.glMouse = vec3.create ();
 		this.glMouseWorld = vec3.create ();
 		this.mouse = new THREE.Vector2 ();
 		this.mouseWorld = new THREE.Vector3 ();
 		this.raycaster = new THREE.Raycaster ();
+
+		// Multitouch update
+
+		this.touchDown = false;
+		this.touches = {};
+		this.worldTouches = {};
+		this.glTouches = {};
+		this.glWorldTouches = {};
 
 		// Level elements
 
@@ -64,7 +71,7 @@ export class LevelCore {
 		this.genericQuad = this.getQuad ( [ 0, 0, 0 ], [ 0, 0, 0 ], [ 1, 1, 1 ] );
 		this.quadGeometry = new THREE.PlaneGeometry ( 1, 1 ); 
 		this.screensScene = new THREE.Scene ();
-		this.activeScreen = null;
+		this.activeScreensBoundToTouch = null;
 		this.screenMaterial = new THREE.ShaderMaterial ( {
 
 			vertexShader: shaderHelper.screen.vertex,
@@ -192,52 +199,74 @@ export class LevelCore {
 		
 	}
 
-	onMove ( _position ) {
+	onMove ( _positions ) {
 
-		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
-		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
-
-		this.glMouse = vec2.clone ( _position );
-
-		this.updateMouseWorld ( this.mouse );
+		this.updateTouches ( _positions );
 
 	}
 
-	onClick ( _position ) {
+	onClick ( _positions ) {
 
-		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
-		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
-
-		this.glMouse = vec2.clone ( _position );
-
-		this.updateMouseWorld ( this.mouse );
+		this.updateTouches ( _positions );
 
 	}
 
-	onDrag ( _position ) {
+	onDrag ( _positions ) {
 
-		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
-		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
+		this.updateTouches ( _positions );
 
-		this.glMouse = vec2.clone ( _position );
+		// console.log(this.worldTouches);
 
-		this.updateMouseWorld ( this.mouse );
+		// Update screens position according to touches.
 
-		if ( this.activeScreen == this.scanScreen ) {
+		if ( this.activeScreensBoundToTouch.length > 0 ) {
 
-			this.scanScreenTargetPosition.x = this.mouseWorld.x + this.getWorldRight ();
+			for ( let i = 0; i < this.activeScreensBoundToTouch.length; i ++ ) {
 
-		} else if ( this.activeScreen == this.infoScreen ) {
 
-			this.infoScreenTargetPosition.x = this.mouseWorld.x - this.getWorldRight ();
+				// console.log(this.activeScreensBoundToTouch[ i ].touchId);
+				if ( this.activeScreensBoundToTouch[ i ].screen == this.scanScreen ) {
+
+					// Brute force
+
+					try {
+
+						this.scanScreenTargetPosition.x = this.worldTouches[ this.activeScreensBoundToTouch[ i ].touchId ].position.x + this.getWorldRight ();
+
+					} catch ( e ) {
+
+						console.log('Brute force error: ' + e);
+						
+					}
+
+				} 
+
+				if ( this.activeScreensBoundToTouch[ i ].screen == this.infoScreen ) {
+
+					// Brute force
+
+					try {
+
+						this.infoScreenTargetPosition.x = this.worldTouches[ this.activeScreensBoundToTouch[ i ].touchId ].position.x - this.getWorldRight ();
+						
+					} catch ( e ) {
+
+						console.log('Brute force error: ' + e);
+
+					}
+
+				}
+
+			}
 
 		}	
 
 	}
 
-	onDown ( _position ) {
+	onDown ( _positions ) {
 
-		this.mouseDown = true;
+		this.touchDown = true;
+		this.updateTouches ( _positions );
 
 		if ( !this.levelStarted ) {
 
@@ -249,25 +278,17 @@ export class LevelCore {
 
 		}
 
-		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
-		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
+		// Check if the player has touched a screen button.
 
-		this.glMouse = vec2.clone ( _position );
-		this.updateMouseWorld ( this.mouse );
-		this.activeScreen = this.checkButtons ();
+		this.activeScreensBoundToTouch = this.checkButtons ();
 
 	}
 
-	onUp ( _position ) {
+	onUp ( _positions ) {
 
-		this.mouse.x = _position[ 0 ] * this.renderer.getPixelRatio ();
-		this.mouse.y = _position[ 1 ] * this.renderer.getPixelRatio ();
-		this.glMouse = vec2.clone ( _position );
-
-		this.updateMouseWorld ( this.mouse );
-
-		this.activeScreen = null;
-		this.mouseDown = false;
+		this.touchDown = false;
+		this.updateTouches ( _positions );
+		this.activeScreensBoundToTouch = [];
 
 	}
 
@@ -276,6 +297,7 @@ export class LevelCore {
 		this.mainCamera.aspect = window.innerWidth / window.innerHeight;
 	    this.mainCamera.updateProjectionMatrix();
 
+		this.touchDown = false;
 	    this.renderer.setSize( window.innerWidth, window.innerHeight );
 
 	    this.scanScreen.material.uniforms.screenDimentions.value = [ this.getWidth(), this.getHeight() ];
@@ -1723,10 +1745,36 @@ export class LevelCore {
 
 	}
 
-	updateMouseWorld ( _mouse ) {
+	updateTouches ( _positions ) {
 
-		this.mouseWorld = this.get3DPointOnBasePlane ( _mouse );
-		this.glMouseWorld = vec3.fromValues ( this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z );
+		_positions.sort ( function ( a, b ) {
+
+			return a.id - b.id;
+
+		} );
+
+		this.touches = {};
+		this.worldTouches = {};
+		this.glTouches = {};
+		this.glWorldTouches = {};
+
+		for ( let i = 0; i < _positions.length; i ++ ) {
+
+			this.touches[ _positions[ i ].id ] = { id: _positions[ i ].id, position: new THREE.Vector2 ( _positions[ i ].x * this.renderer.getPixelRatio (), _positions[ i ].y * this.renderer.getPixelRatio () ) };
+			this.glTouches[ _positions[ i ].id ] = { id: _positions[ i ].id, position: [ _positions[ i ].x * this.renderer.getPixelRatio (), _positions[ i ].y * this.renderer.getPixelRatio () ] };
+
+			let worldTouch = this.getWorldTouch ( this.touches[ _positions[ i ].id ].position );
+			this.worldTouches[ _positions[ i ].id ] = { id: _positions[ i ].id, position: new THREE.Vector3 ( worldTouch[ 0 ], worldTouch[ 1 ], worldTouch[ 2 ] ) };
+			this.glWorldTouches[ _positions[ i ].id ] = { id: _positions[ i ].id, position: worldTouch };
+
+		}
+
+	}
+
+	getWorldTouch ( _touch ) {
+
+		let touchWorld = this.get3DPointOnBasePlane ( _touch );
+		return [ touchWorld.x, touchWorld.y, touchWorld.z ];
 
 	}
 
@@ -1758,42 +1806,53 @@ export class LevelCore {
 
 	checkButtons () {
 
-		let distToScanButton = this.mouseWorld.distanceTo ( this.scanScreenButton.position );
-		let onScan = false;
+		let screensBoundToTouch = [];
 
-		if ( distToScanButton < this.scanScreenButton.scale.x * 1.0 ) {
+		for ( let touch in this.worldTouches ) {
 
-			onScan = true;
+			let currentTouch = this.worldTouches[ touch ];
+
+			let distToScanButton = currentTouch.position.distanceTo ( this.scanScreenButton.position );
+			let onScan = false;
+
+			if ( distToScanButton < this.scanScreenButton.scale.x * 1.0 ) {
+
+				onScan = true;
+
+			}
+
+			let distToInfoButton = currentTouch.position.distanceTo ( this.infoScreenButton.position );
+			let onInfo = false;
+
+			if ( distToInfoButton < this.infoScreenButton.scale.x * 1.0 ) {
+
+				onInfo = true;
+
+			}
+
+			// Check where the screens are to make an intuitive interaction when they are overlapping.
+
+			if ( onScan && onInfo && !this.scanScreenOpened ) {
+
+				if ( onInfo ) screensBoundToTouch.push ( { screen: this.infoScreen, touchId: currentTouch.id } );  
+
+			} else if ( onScan && onInfo && this.scanScreenOpened ) {
+
+				if ( onScan ) screensBoundToTouch.push ( { screen: this.scanScreen, touchId: currentTouch.id } );				
+
+			} else if ( onScan && !onInfo ) {
+
+				if ( onScan ) screensBoundToTouch.push ( { screen: this.scanScreen, touchId: currentTouch.id } );
+
+			} else if ( !onScan && onInfo ) {
+
+				if ( onInfo ) screensBoundToTouch.push ( { screen: this.infoScreen, touchId: currentTouch.id } );  
+
+			}
 
 		}
 
-		let distToInfoButton = this.mouseWorld.distanceTo ( this.infoScreenButton.position );
-		let onInfo = false;
-
-		if ( distToInfoButton < this.infoScreenButton.scale.x * 1.0 ) {
-
-			onInfo = true;
-
-		}
-
-		// Check where the screens are to make an intuitive interaction when they are overlapping.
-
-		if ( this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x != 0.0 ) {
-
-			if ( onScan ) return this.scanScreen;
-			if ( onInfo ) return this.infoScreen;  
-
-		} else if ( this.scanScreenTargetPosition.x == 0.0 && this.infoScreenTargetPosition.x != 0.0 ) {
-
-			if ( onScan ) return this.scanScreen;
-			if ( onScan ) return this.infoScreen;
-
-		} else if ( this.scanScreenTargetPosition.x != 0.0 && this.infoScreenTargetPosition.x == 0.0 ) {
-
-			if ( onInfo ) return this.infoScreen;
-			if ( onScan ) return this.scanScreen;
-
-		}
+		return screensBoundToTouch;
 
 	}
 
@@ -1868,15 +1927,16 @@ export class LevelCore {
 		this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight ();
 		this.infoScreenButton.position.y = this.infoScreen.position.y;
 
-		if ( !this.mouseDown ) {
 
-			// Check screens limits.
+		// Check screens limits. 
+
+		if ( !this.touchDown ) {
 
 			if ( this.scanScreenButton.position.x > this.getWorldRight () * 0.7 ) {
 
 				this.scanScreenTargetPosition.x = this.getWorldRight () * 2.0;
 
-			} 
+			}
 
 			if ( this.scanScreenButton.position.x < this.getWorldLeft () * 0.7 ) {
 

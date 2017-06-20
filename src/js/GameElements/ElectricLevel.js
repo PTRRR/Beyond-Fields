@@ -1,3 +1,4 @@
+import { contains } from "../utils";
 import { LevelCore } from "./LevelCore";
 import { shaderHelper } from "./shaderHelper";
 
@@ -18,7 +19,7 @@ export class ElectricLevel extends LevelCore {
 
 		this.ready = false;
 		this.createdInstance = null;
-		this.currentInstance = null;
+		this.activeChargesBoundToTouches = null;
 		this.mouseOnDown = null;
 
 		// Build scan background
@@ -47,6 +48,11 @@ export class ElectricLevel extends LevelCore {
 		this.scanScene.add ( this.scanMesh );
 		this.scanMaterial.extensions.derivatives = true;
 
+		// Multitouch
+
+		this.createdInstances = [];
+		this.downTouchIds = [];
+
 		this.canUpdateTexts = true;
 		this.won = false;
 
@@ -64,97 +70,130 @@ export class ElectricLevel extends LevelCore {
 
 	}
 
-	onUp ( _position ) {
+	onUp ( _positions ) {
 
-		super.onUp ( _position );
+		super.onUp ( _positions );
 
-		this.currentInstance = null;
-		this.createdInstance = null;
+		this.downTouchIds = [];
 
-	} 
+		let totalCharges = this.getTotalCharges ();
 
-	onDown ( _position ) {
+		for ( let i = 0; i < totalCharges.length; i ++ ) {
 
-		super.onDown ( _position );
+			let isBoundToTouch = false;
 
-		if ( !this.activeScreen ) {
+			for ( let touch in this.glWorldTouches ) {
 
-			this.currentInstance = this.checkCharges ( vec3.fromValues ( this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z ) );
+				if ( totalCharges[ i ].touchId == this.glWorldTouches[ touch ].id ) {
 
-			if ( !this.currentInstance ) {
+					isBoundToTouch = true;
 
-				this.createdInstance = this.addInstanceOf ( 'charges', {
+				}
 
-					position: [ this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z ],
-					color: [ 0.0, 0.0, 0.0, 1.0 ],
-					rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-					mass: 15,
-					drag: 0.85,
-					enabled: true,
+			}
 
-				} );
+			if ( !isBoundToTouch ) {
+
+				totalCharges[ i ].touchId = -1; // Nobody has -1 fingers I guess.
 
 			}
 
 		}
 
-		this.mouseOnDown = vec3.fromValues ( this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z );
+		for ( let touch in this.glWorldTouches ) {
 
-	}
+			this.downTouchIds.push ( this.glWorldTouches[ touch ].id );
 
-	onClick ( _position ) {
-
-		super.onClick ( _position );
-
-	}
-
-	onMove ( _position ) {
-
-		super.onMove ( _position );
+		}
 
 	} 
 
-	onDrag ( _position ) {
+	onDown ( _positions ) {
 
-		super.onDrag ( _position );
+		super.onDown ( _positions );
 
-		let mouse = vec3.fromValues ( this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z );
+		if ( this.activeScreensBoundToTouch.length == 0 ) {
 
-		if ( this.createdInstance ) {
+			// If no charges are touched
 
-			let dist = vec3.length ( vec3.sub ( vec3.create(), this.createdInstance.position, mouse ) );
-			let yDist = mouse[ 1 ] - this.createdInstance.position[ 1 ];
-			this.createdInstance.sign = Math.sign ( yDist );
-			this.createdInstance.targetRadius = dist;
+			let totalCharges = this.getTotalCharges ();
 
-		} else if ( this.currentInstance && this.currentInstance.element.enabled ) {
+			for ( let touch in this.glWorldTouches ) {
 
-			let dir = null;
-			let dist = null;
-			let yDist = null;
+				if ( !contains.call ( this.downTouchIds, this.glWorldTouches[ touch ].id ) ) { // check if that touch is already down.
 
-			switch ( this.currentInstance.type ) {
+					let currentTouch = this.glWorldTouches[ touch ];
 
-				case 'center':
+					let hoverCharge = null;
 
-					// this.currentInstance.element.targetPosition = mouse;
-					
-					// this.currentInstance.element.targetRadius = 0;
+					for ( let i = 0; i < totalCharges.length; i ++ ) {
 
-				break;
+						let dist = vec3.length ( vec3.sub ( [ 0, 0, 0 ], currentTouch.position, totalCharges[ i ].position ) );
+						let offsetEdge = 0.2;
 
-				case 'edge':
+						if ( dist < totalCharges[ i ].scale[ 0 ] + offsetEdge ) {
 
-					dist = vec3.length ( vec3.sub ( vec3.create(), this.currentInstance.element.position, mouse ) );
-					yDist = mouse[ 1 ] - this.currentInstance.element.position[ 1 ];
-					this.currentInstance.element.sign = Math.sign ( yDist );
-					this.currentInstance.element.targetRadius = dist;
+							hoverCharge = totalCharges[ i ];
+							hoverCharge.touchId = this.glWorldTouches[ touch ].id;
 
-				break;
+							if ( dist < totalCharges[ i ].scale[ 0 ] * 0.5 ) {
 
-			} 
+								hoverCharge.touchType = 'center';
+
+							} else {
+
+								hoverCharge.touchType = 'edge';
+
+							}
+
+							break;
+
+						}
+
+					}
+
+					if ( !hoverCharge ) {
+
+						this.addInstanceOf ( 'charges', {
+
+							position: this.glWorldTouches[ touch ].position,
+							color: [ 0.0, 0.0, 0.0, 1.0 ],
+							rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+							mass: 15,
+							drag: 0.85,
+							enabled: true,
+							touchId: this.glWorldTouches[ touch ].id,
+							touchType: 'edge',
+
+						} );
+
+					}
+
+					this.downTouchIds.push ( this.glWorldTouches[ touch ].id );
+
+				}
+
+			}
 
 		}
+
+	}
+
+	onClick ( _positions ) {
+
+		super.onClick ( _positions );
+
+	}
+
+	onMove ( _positions ) {
+
+		super.onMove ( _positions );
+
+	} 
+
+	onDrag ( _positions ) {
+
+		super.onDrag ( _positions );
 
 	}
 
@@ -283,10 +322,31 @@ export class ElectricLevel extends LevelCore {
 
 		// Update current charge
 
-		if ( this.currentInstance && this.currentInstance.type == 'center' ) {
+		let totalCharges = this.getTotalCharges ();
 
-			let dir = vec3.sub ( vec3.create (), this.glMouseWorld, this.currentInstance.element.position );
-			this.currentInstance.element.applyForce ( dir );
+		for ( let touch in this.glWorldTouches ) {
+
+			for ( let i = 0; i < totalCharges.length; i ++ ) {
+
+				if ( totalCharges[ i ].touchId == this.glWorldTouches[ touch ].id && totalCharges[ i ].enabled ) {
+					
+					let force = vec3.sub ( [ 0, 0, 0 ], this.glWorldTouches[ touch ].position, totalCharges[ i ].position );
+					let yDist = Math.sign ( this.glWorldTouches[ touch ].position[ 1 ] - totalCharges[ i ].position[ 1 ] );
+
+					if ( totalCharges[ i ].touchType == 'center' ) {
+
+						totalCharges[ i ].applyForce ( vec3.scale ( force, force, 0.8 ) );
+
+					} else if ( totalCharges[ i ].touchType == 'edge' ) {
+
+						totalCharges[ i ].targetRadius = vec3.length ( force );
+						totalCharges[ i ].sign = yDist;
+
+					}
+
+				}
+
+			}
 
 		}
 
@@ -584,7 +644,41 @@ export class ElectricLevel extends LevelCore {
 
 	}
 
-	checkCharges ( _position ) {
+	getBoundChargesToTouches ( _worldTouches ) {
+
+		let boundChargesToTouches = [];
+
+		let totalCharges = [];
+		let charges = this.gameElements.charges.instances;
+		let fixedCharges = this.gameElements.fixedCharges.instances;
+		totalCharges = totalCharges.concat ( charges );
+		totalCharges = totalCharges.concat ( fixedCharges );
+
+		for ( let j = 0; j < _worldTouches; j ++ ) {
+
+			let currentGlTouch = _worldTouches[ j ];
+
+			for ( let i = 0; i < totalCharges.length; i ++ ) {
+
+				let currentCharge = totalCharges[ i ];
+				let dist = vec3.length ( vec3.sub ( [ 0, 0, 0 ], currentCharge.position, currentGlTouch ) );
+				let edgeOffset = 0.3;
+
+				if ( dist < currentCharge.scale[ 0 ] + edgeOffset ) {
+
+					boundChargesToTouches.push ( { charge: currentCharge, touchId: j } );
+
+				}
+
+			}
+
+		}
+
+		return boundChargesToTouches;
+
+	}
+
+	checkCharges ( _positions ) {
 
 		let totalCharges = [];
 		let charges = this.gameElements.charges.instances;
@@ -596,7 +690,7 @@ export class ElectricLevel extends LevelCore {
 		for ( let i = 0; i < totalCharges.length; i ++ ) {
 
 			let rangeCenter = totalCharges[ i ].radius * 0.5;
-			let distToCenter = vec3.length ( vec3.sub ( vec3.create(), totalCharges[ i ].position, _position ) );
+			let distToCenter = vec3.length ( vec3.sub ( vec3.create(), totalCharges[ i ].position, _positions ) );
 
 			let rangeEdge = 0.2;
 			let distToEdge = Math.abs ( distToCenter - totalCharges[ i ].radius );
@@ -628,6 +722,18 @@ export class ElectricLevel extends LevelCore {
 		}
 
 		return null;
+
+	}
+
+	getTotalCharges () {
+
+		let totalCharges = [];
+		let charges = this.gameElements.charges.instances;
+		let fixedCharges = this.gameElements.fixedCharges.instances;
+		totalCharges = totalCharges.concat ( charges );
+		totalCharges = totalCharges.concat ( fixedCharges );
+
+		return totalCharges;
 
 	}
 

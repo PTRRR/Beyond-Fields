@@ -409,21 +409,25 @@ let loop = require ( 'raf-loop' );
 		// Events
 
 		let down = false;
-		let lastPos = vec2.create();
 
 		// Cross mouse & touch
 
+		function createMouseTouch ( _event ) {
+
+			return [ { id: 0, x: _event.clientX, y: _event.clientY } ];
+
+		}
+
 		addEvent ( rendererElement, 'click', function ( event ) {
 
-			let pos = vec2.fromValues ( event.clientX, event.clientY );
-			gameManager.onClick ( vec2.fromValues ( event.clientX, event.clientY ) );
-			lastPos = pos;
+			let mouseTouch = createMouseTouch ( event );
+			gameManager.onClick ( mouseTouch );
 
 		} );
 
 		addEvent ( window, 'dbclick', function ( event ) {
 
-			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+			event.preventDefault ? event.preventDefault() : ( event.returnValue = false );
 
 		} );
 
@@ -432,41 +436,49 @@ let loop = require ( 'raf-loop' );
 		addEvent ( rendererElement, 'mousedown', function ( event ) {
 
 			down = true;
-			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
-
-			let pos = vec2.fromValues ( event.clientX, event.clientY );
-			gameManager.onDown ( vec2.fromValues ( event.clientX, event.clientY ) );
-			lastPos = pos;			
+			event.preventDefault ? event.preventDefault() : ( event.returnValue = false );
+			let mouseTouch = createMouseTouch ( event );
+			gameManager.onDown ( mouseTouch );		
 
 		} );
 
 		addEvent ( rendererElement, 'mouseup', function ( event ) {
 
-			down = false
-			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
-
-			gameManager.onUp ( lastPos );			
+			down = false;
+			event.preventDefault ? event.preventDefault() : ( event.returnValue = false );
+			gameManager.onUp ( [] );			
 
 		} );
 
 		addEvent ( rendererElement, 'mousemove', function ( event ) {
 
-			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
-
-			let pos = vec2.fromValues ( event.clientX, event.clientY );
-			gameManager.onMove ( vec2.fromValues ( event.clientX, event.clientY ) );
+			event.preventDefault ? event.preventDefault() : ( event.returnValue = false );
+			let mouseTouch = createMouseTouch ( event );
+			gameManager.onMove ( mouseTouch );
 
 			if ( down ) {
 
-				gameManager.onDrag ( vec2.fromValues ( event.clientX, event.clientY ) );
+				gameManager.onDrag ( mouseTouch );
 
 			}
-
-			lastPos = pos;
 
 		} );
 
 		// Touch
+
+		function getTouches ( _event ) {
+
+			let touches = [];
+
+			for ( let i = 0; i < _event.touches.length; i ++ ) {
+
+				touches.push ( { x: _event.touches[ i ].clientX, y: _event.touches[ i ].clientY, id: _event.touches[ i ].identifier } );
+
+			}
+
+			return touches;
+
+		}
 
 		addEvent ( rendererElement, 'touchstart', function ( event ) {
 
@@ -474,23 +486,17 @@ let loop = require ( 'raf-loop' );
 			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
 
 			let pos = vec2.fromValues ( event.touches[ 0 ].clientX, event.touches[ 0 ].clientY );
-			gameManager.onDown ( pos );
-			lastPos = pos;
+			let touches = getTouches ( event );
+			gameManager.onDown ( touches );
 
 		} );
 
 		addEvent ( rendererElement, 'touchend', function ( event ) {
 
-			down = false;
 			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
-
-			gameManager.onUp ( lastPos );
-
-		} );
-
-		addEvent ( window, 'touchmove', function ( event ) {
-
-			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
+			let touches = getTouches ( event );
+			if ( touches.length == 0 ) down = false;
+			gameManager.onUp ( touches );
 
 		} );
 
@@ -498,19 +504,19 @@ let loop = require ( 'raf-loop' );
 
 			event.preventDefault ? event.preventDefault() : (event.returnValue = false);
 			let pos = vec2.fromValues ( event.touches[ 0 ].clientX, event.touches[ 0 ].clientY );
-			gameManager.onMove ( pos );
-
-			if ( down ) {
-
-				gameManager.onDrag ( pos );
-
-			}
-
-			lastPos = pos;
+			let touches = getTouches ( event );
+			gameManager.onMove ( touches );
+			gameManager.onDrag ( touches );
 
 		} );
 
 		// Window events
+
+		addEvent ( window, 'touchmove', function ( event ) {
+
+			event.preventDefault ? event.preventDefault() : ( event.returnValue = false );
+
+		} );
 
 		addEvent ( window, 'resize', function () {
 

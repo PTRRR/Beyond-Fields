@@ -103,28 +103,33 @@ export class GravityLevel extends LevelCore {
 
 		super.onDrag ( _position );
 
-		if ( !this.activeScreen && this.canDraw ) {
 
-			let r = rc();
-			let s = Math.random () * 0.3 + 0.2;
+		if ( this.activeScreensBoundToTouch.length == 0 && this.canDraw ) {
 
-			// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
+			for ( let touch in this.glWorldTouches ) {
 
-			if ( this.gameElements.blackMatter.instances.length < 108 ) {
+				let r = rc();
+				let s = Math.random () * 0.3 + 0.2;
 
-				this.addInstanceOf ( 'blackMatter', {
+				// On the iPad Air the max number of vectors we can pass to a vertex shader is 108.
 
-					position: [ this.mouseWorld.x, this.mouseWorld.y, this.mouseWorld.z ],
-					scale: [ s, s, s ],
-					color: [ 0.8 + r, 0.8 + r, 0.8 + r, 1.0 ],
-					rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-					mass: 20000,
-					drag: 0.95,
-					lifeSpan: Math.random () * 4000 + 6000,
-					canDye: true,
-					targetLinePosition: [ -2.0, 2.0, 0.0 ],
+				if ( this.gameElements.blackMatter.instances.length < 108 ) {
 
-				} );
+					this.addInstanceOf ( 'blackMatter', {
+
+						position: this.glWorldTouches[ touch ].position,
+						scale: [ s, s, s ],
+						color: [ 0.8 + r, 0.8 + r, 0.8 + r, 1.0 ],
+						rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+						mass: 20000,
+						drag: 0.95,
+						lifeSpan: Math.random () * 4000 + 6000,
+						canDye: true,
+						targetLinePosition: [ -2.0, 2.0, 0.0 ],
+
+					} );
+
+				}
 
 			}
 

@@ -26,51 +26,51 @@ export class GameManager {
 
 	}
 
-	onMove ( _position ) {
+	onMove ( _positions ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.onMove ( _position );
+			this.currentLevel.onMove ( _positions );
 
 		}		
 
 	}
 
-	onDrag ( _position ) {
+	onDrag ( _positions ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.onDrag ( _position );
+			this.currentLevel.onDrag ( _positions );
 
 		}
 
 	}
 
-	onClick ( _position ) {
+	onClick ( _positions ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.onClick ( _position );
+			this.currentLevel.onClick ( _positions );
 
 		}
 
 	}
 
-	onDown ( _position ) {
+	onDown ( _positions ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.onDown ( _position );
+			this.currentLevel.onDown ( _positions );
 
 		}
 
 	}
 
-	onUp ( _position ) {
+	onUp ( _positions ) {
 
 		if ( this.currentLevel ) {
 
-			this.currentLevel.onUp ( _position );
+			this.currentLevel.onUp ( _positions );
 
 		}
 
