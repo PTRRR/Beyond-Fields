@@ -8,12 +8,13 @@ export class PhysicalElement extends ElementCore {
 
 		_options = _options || {};
 
-		this.position = _options.position ? [ _options.position[ 0 ], _options.position[ 1 ], _options.position[ 2 ] ] : [ 0, 0, 0 ];
-		this.rotation = _options.rotation ? [ _options.rotation[ 0 ], _options.rotation[ 1 ], _options.rotation[ 2 ] ] : [ 0, 0, 0 ];
-		this.scale = _options.scale ? [ _options.scale[ 0 ], _options.scale[ 1 ], _options.scale[ 2 ] ] : [ 0, 0, 0 ];
+		this.position = _options.position || [ 0, 0, 0 ];
+		this.rotation = _options.rotation || [ 0, 0, 0 ];
+		this.scale = _options.scale || [ 0, 0, 0 ];
 
-		this.velocity = _options.velocity ? [ _options.velocity[ 0 ], _options.velocity[ 1 ], _options.velocity[ 2 ] ] : [ 0, 0, 0 ];
-		this.acceleration = _options.acceleration ? [ _options.acceleration[ 0 ], _options.acceleration[ 1 ], _options.acceleration[ 2 ] ] : [ 0, 0, 0 ];
+		this.velocity = _options.velocity || [ 0, 0, 0 ];
+		this.acceleration = _options.acceleration || [ 0, 0, 0 ];
+		this.accelerationCache = this.acceleration;
 
 		this.mass = _options.mass || 2.0;
 		this.drag = _options.drag || 0.7;
@@ -23,8 +24,7 @@ export class PhysicalElement extends ElementCore {
 
 	applyForce ( _force ) {
 
-		let newForce = this.divScal ( _force, this.mass );
-		this.acceleration = this.add ( this.acceleration, newForce );
+		this.acceleration = this.add ( this.acceleration, _force );
 
 	}
 
@@ -36,7 +36,9 @@ export class PhysicalElement extends ElementCore {
 
 		if ( !this.enabled ) return;
 
-		// this.acceleration = this.mulScal ( this.acceleration, _deltaTime );
+		// if ( !this.acceleration[ 0 ] && !this.acceleration[ 1 ] && !this.acceleration[ 2 ] ) console.log( this );
+		this.accelerationCache = [ this.acceleration[ 0 ], this.acceleration[ 1 ], this.acceleration[ 2 ] ];
+		this.acceleration = this.mulScal ( this.acceleration, 1.0 / this.mass );
 		this.velocity = this.add ( this.velocity, this.acceleration );
 		this.velocity = this.mulScal ( this.velocity, _deltaTime * 0.063 );
 		this.velocity = this.mulScal ( this.velocity, this.drag );

@@ -1,6 +1,7 @@
-import { Float32Concat } from '../utils';
+import { Float32Concat, contains } from '../utils';
 import { shaderHelper } from './shaderHelper';
 import { library } from './library';
+import { PhysicalElement } from './PhysicalElement';
 
 // Import some npm libs
 
@@ -110,7 +111,7 @@ export class LevelCore {
 		this.screensScene.add ( this.scanScreenButton );
 
 		this.infoScene = new THREE.Scene ();
-		this.infoScene.background = new THREE.Color ( 0x808080 );
+		this.infoScene.background = new THREE.Color ( 0x9E9E9E );
 		this.infoSceneRenderTarget = new THREE.WebGLRenderTarget ( this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false } );
 
 		this.infoScreenTargetPosition = new THREE.Vector3 ( 0, 0, 0 );
@@ -357,7 +358,7 @@ export class LevelCore {
 
 					this.textBackgroundMaterial = new THREE.MeshBasicMaterial ( {
 
-						color: 'rgb( 128, 128, 128 )',
+						color: this.infoScene.background,
 						opacity: 0.9,
 						transparent: true,
 
@@ -404,7 +405,7 @@ export class LevelCore {
 					this.textsGeometry = bmfontGeometry ( {
 
 						font: font,
-						align: 'center',
+						align: 'left',
 
 					} );
 
@@ -425,7 +426,27 @@ export class LevelCore {
 					// this.texts.scale.set ( 0.0025, 0.0025, 0.0025 );
 					this.infoScene.add ( this.texts );
 
+					this.infoLegendGeometry = bmfontGeometry ( {
+
+						font: font,
+						align: 'left',
+
+					} );
+
+					this.fontSizeMultiplier = 0.0024;
+					let legend = this.levelFile.legend || '0: Attractors number\n1: Mass average [kg]\n2: Average force on player [N]';
+					this.infoLegendGeometry.update ( legend );
+					this.infoLegendGeometry.computeBoundingSphere ();
+					this.infoLegend = new THREE.Mesh ( this.infoLegendGeometry, this.textsMaterial );
+					this.infoLegend.position.x -= this.infoLegendGeometry.boundingSphere.center.x * 0.0025;
+					this.infoLegend.rotation.x = Math.PI;
+					this.infoLegend.scale.set ( this.fontSizeMultiplier, this.fontSizeMultiplier, this.fontSizeMultiplier );
+					this.infoScene.add ( this.infoLegend );
+
 					this.render ();
+
+					let offset = 0.3;
+					this.infoLegend.position.set ( this.getWorldLeft () + offset, this.getWorldBottom () + offset, 0 );
 
 				}.bind ( this ) );
 
@@ -498,38 +519,6 @@ export class LevelCore {
 
 		}
 
-		this.addElement ( 'playerParticles', {
-
-			elementType: 'Particle',
-			static: false,
-			individual: false,
-			manualMode: false,
-			renderingOrder: 10,
-			maxInstancesNum: 200,
-
-			shaders: {
-
-				main: null,
-
-				normal: {
-
-					name: 'playerParticles',
-					transparent: true,
-					blending: 'MultiplyBlending',
-					textureUrl: './resources/textures/generic_circle_sdf.png',
-					uniforms: {},
-
-				},
-
-				scan: null,
-				infos: null,
-
-			},
-
-			instances: {}
-
-		} );
-
 		this.addElement ( 'player', {
 
 			elementType: 'Player',
@@ -591,6 +580,28 @@ export class LevelCore {
 
 		} );
 
+		// Player particles
+
+		this.enableParticles = false;
+		this.nParticles = 200;
+		this.particles = [];
+
+		this.particlesMaterial = new THREE.ShaderMaterial ( {
+
+			vertexShader: shaderHelper.introParticles.vertex,
+			fragmentShader: shaderHelper.introParticles.fragment,
+			transparent: true,
+
+		} );
+
+		this.particlesGeometry = new THREE.BufferGeometry ();
+		this.particlesGeometry.addAttribute ( 'position', new THREE.BufferAttribute ( new Float32Array ( this.nParticles * 3 ), 3 ) );
+
+		this.particlesPoints = new THREE.Points ( this.particlesGeometry, this.particlesMaterial );
+		this.particlesPoints.renderOrder = 10000;
+
+		this.mainScene.add ( this.particlesPoints );
+
 		// Build a base grid to draw infos.
 
 		this.baseGridX = 7;
@@ -608,10 +619,40 @@ export class LevelCore {
 		// this.infoScene.add ( gridDebug );
 		this.baseGrid = gridGeometry.attributes.position.array;
 
+		let arrowHeadTextureLoader = new THREE.TextureLoader().load ( './resources/textures/Arrow_Head_sdf.png', function ( texture ) {
+
+			this.infoArrow = new THREE.Object3D ();
+			this.arrowHeadMaterial = new THREE.MeshBasicMaterial ( {
+
+				map: texture,
+				color: 'rgb(0, 0, 0)',
+				transparent: true,
+
+			} );
+
+			this.arrowLineMaterial = new THREE.ShaderMaterial( {
+
+				vertexShader: shaderHelper.arrowLine.vertex,
+				fragmentShader: shaderHelper.arrowLine.fragment,
+				transparent: true,
+
+			} );
+
+			this.arrowHead = new THREE.Mesh ( this.quadGeometry, this.arrowHeadMaterial );
+			this.arrowHead.scale.set ( 0.1, 0.1, 0.1 );
+			this.arrowLine = new THREE.Mesh ( this.quadGeometry, this.arrowLineMaterial );
+			this.arrowLine.scale.set ( 0.01, 1.0, 1.0 );
+			this.infoArrow.add ( this.arrowHead );
+			this.infoArrow.add ( this.arrowLine );
+			this.infoScene.add ( this.infoArrow );
+
+		}.bind ( this ) );
+
 		// Add lines
 
 		this.onLoad ( function () {
 
+			this.updateTextPoints ();
 			let linesData = this.getLinesData ();
 
 			this.linesGeometry = new THREE.BufferGeometry ();
@@ -1285,6 +1326,108 @@ export class LevelCore {
 
 	}
 
+	updateTextPoints () {
+
+		let nPos = 5;
+		this.offsetTop = this.offsetTop || 1.4;
+		let offsetSides = 0.8;
+		this.offsetBottom = this.offsetBottom || 1.5;
+
+		let topLine = [];
+		let bottomLine = [];
+		let width = this.getWorldRight () * 2;
+		let step = ( width - 2 * offsetSides ) * ( 1.0 / ( nPos - 1 ) );
+
+		for ( let i = 0; i < nPos; i ++ ) {
+
+			topLine.push ( [ i * step - ( width - 2 * offsetSides ) * 0.5 - 0.3, this.getWorldTop () - this.offsetTop ] );
+			bottomLine.push ( [ i * step - ( width - 2 * offsetSides ) * 0.5 - 0.3, this.getWorldBottom () + this.offsetBottom ] );
+
+		}
+
+		for ( let element in this.gameElements ) {
+
+			if ( this.gameElements[ element ].drawInfos ) { // Check if we have to draw info related to this object
+				
+				let instances = this.gameElements[ element ].instances;
+				let maxInstancesNum = this.gameElements[ element ].maxInstancesNum || 0;
+
+				// Create or overide an object to store where the text should be located
+
+				this.gameElements[ element ].textPoints = {};
+
+				for ( let i = 0; i < nPos; i ++ ) {
+
+					// Check wich of the two lines of points must be uset to display the inormations.
+
+					let line = [];
+					this.gameElements[ element ].lineInfo = this.gameElements[ element ].lineInfo || 'top'; // Set default value if not specified;
+
+					if ( this.gameElements[ element ].lineInfo == 'top' ) {
+
+						line = topLine;
+						this.gameElements[ element ].textPoints[ i ] = { point: line[ i ], instances: [] };
+
+					} else if ( this.gameElements[ element ].lineInfo == 'bottom' ) {
+
+						line = bottomLine;
+						this.gameElements[ element ].textPoints[ i ] = { point: line[ i ], instances: [] };
+						
+					}
+
+					// Check where a certain instance's information must be displayed.
+					// Get the lines informations out of the positions retrieved here. 
+
+					for ( let j = 0; j < instances.length; j ++ ) {
+
+						let instance = instances[ j ];
+
+						if ( typeof instance.manualPointIndex == 'number' ) { // Check if a fixed point is defined.
+
+							// Add this instance only when the actual textPoint is defined.
+
+							if ( i == instance.manualPointIndex ) {
+
+								this.gameElements[ element ].textPoints[ i ].instances.push ( instances[ j ] );
+
+							}
+
+						} else {
+
+							// Here we first check the extreme points in order to always have a text point.
+							// Then we check the nearest point in the line array.
+
+							if ( i == 0 && instance.position[ 0 ] <= line[ i ][ 0 ] ) {
+
+								this.gameElements[ element ].textPoints[ i ].instances.push ( instances[ j ] );
+								
+							} else if ( i == line.length - 1 && instance.position[ 0 ] >= line[ i ][ 0 ] ) {
+
+								this.gameElements[ element ].textPoints[ i ].instances.push ( instances[ j ] );
+
+							} else {
+
+								let xDist = Math.abs ( instance.position[ 0 ] - line[ i ][ 0 ] );
+								if ( xDist <= step * 0.5 ) {
+
+									this.gameElements[ element ].textPoints[ i ].instances.push ( instances[ j ] );
+
+								}
+
+							} 
+
+						}
+							
+					}
+
+				}
+
+			}
+
+		}
+
+	}
+
 	getLinesData () {
 
 		let linesIndices = [];
@@ -1293,139 +1436,95 @@ export class LevelCore {
 		let linesMiters = [];
 		let linesOpacities = [];
 
+		// As we update in two different ways the arrays - with instance and without - we declare a function not to repeat ourself.
+
+		let self = this;
+
+		function updateArrays ( _iPoint, _tPoint, _cPoint, _opacity ) {
+
+			let linePoints = self.quadratic ( _iPoint, _cPoint, _tPoint, 0 );
+			let lineGeometry = self.generateLine ( linePoints );
+
+			for ( let j = 0; j < lineGeometry.index.length; j ++ ) {
+
+				linesIndices.push ( lineGeometry.index[ j ] + linesPositions.length / 3 );
+
+			}
+
+			for ( let j = 0; j < lineGeometry.position.length; j ++ ) {
+
+				linesPositions.push ( lineGeometry.position[ j ] );
+
+			}
+
+			for ( let j = 0; j < lineGeometry.lineNormal.length; j ++ ) {
+
+				linesNormals.push ( lineGeometry.lineNormal[ j ] );
+
+			}
+
+			for ( let j = 0; j < lineGeometry.lineMiter.length; j ++ ) {
+
+				linesMiters.push ( lineGeometry.lineMiter[ j ] );
+				linesOpacities.push ( _opacity );
+
+			}
+
+		}
+
+		// Pass throw all elements and check if they need to display infos.
+
 		for ( let element in this.gameElements ) {
 
-			if ( this.gameElements[ element ].drawInfos ) {
-				
-				let maxInstancesNum = this.gameElements[ element ].maxInstancesNum || 0;
+			if ( this.gameElements[ element ].drawInfos && this.gameElements[ element ].textPoints ) {
 
-				let mainInfoPointIndex = undefined;
+				// As we work with some fixed size buffers we'll pass trougth all max num instances.
 
-				if ( this.gameElements[ element ].mainInfoPointIndex !== undefined ) {
-
-					mainInfoPointIndex = this.gameElements[ element ].mainInfoPointIndex;
-
-				}
-
-				// Create or overide an object to store where the text should be located
-
-				this.gameElements[ element ].textPoints = {};
-				let pointObjectIndex = 0;
-
+				let maxInstancesNum = this.gameElements[ element ].maxInstancesNum;
 				let instances = this.gameElements[ element ].instances;
-
+				let textPoints = this.gameElements[ element ].textPoints;
+			
 				for ( let i = 0; i < maxInstancesNum; i ++ ) {
-
-					let lPoints = null;
-					let opacity = 0;
 
 					if ( i < instances.length ) {
 
-						let infoPointIndex = instances[ i ].infoPointIndex;
+						let instance = instances[ i ];
 
-						let iPos2 = [ instances[ i ].position[ 0 ], instances[ i ].position[ 1 ] ]; // Object position
-						let tPos2 = [ 0, 0 ];
+						// Check in which text point object the actual instance has been stored.
 
-						if ( mainInfoPointIndex !== undefined && infoPointIndex === undefined ) {
+						for ( let p in textPoints ) {
 
-							let numPerPoint = Math.floor ( this.baseGridX / instances.length );
-							let attachedInstances = [];
+							if ( contains.call ( textPoints[ p ].instances, instance ) ) {
 
-							for ( let j = 0; j < this.baseGridX; j ++ ) {
+								let iPoint = [ instance.position[ 0 ], instance.position[ 1 ] ];
+								let tPoint = textPoints[ p ].point;
 
-								
-								// let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
-								let fI = j;
+								// Reset the iPoint to the edge of the element - not the middle.
+								// Offset if slightly as the circles are not perfectly round.
 
-								if ( fI == 0 ) fI = 1;
+								let dir = vec2.sub ( [ 0, 0 ], tPoint, iPoint );
+								vec2.normalize ( dir, dir );
+								iPoint[ 0 ] += ( dir[ 0 ] * instance.scale[ 0 ] ) * 0.97;
+								iPoint[ 1 ] += ( dir[ 1 ] * instance.scale[ 1 ] ) * 0.97;
 
-								let index = fI * 3 + ( this.baseGridX ) * 3 * mainInfoPointIndex;
-								let point = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
+								let cPoint = [ tPoint[ 0 ] + ( iPoint[ 0 ] - tPoint[ 0 ] ) * 0.8, tPoint[ 1 ] ];
 
-								let dY = Math.abs ( iPos2[ 1 ] - point[ 1 ] );
-								let dX = Math.abs ( iPos2[ 0 ] - point[ 0 ] );
+								updateArrays ( iPoint, tPoint, cPoint, instance.lifePercent * 0.4 );
 
-								// if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
-
-								// 	tPos2 = point;
-								// 	if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
-								// 	this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
-								// 	break;
-									
-								// }
-
-								if ( dX < this.getWorldRight () / ( this.baseGridX - 1.0 ) ) {
-
-									tPos2 = point;
-									if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
-									this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
-									break;
-
-								}
+								break;
 
 							}
 
-
-						} else if ( infoPointIndex !== undefined ){
-
-							let index = infoPointIndex * 3;
-							tPos2 = [ this.baseGrid[ index + 0 ], this.baseGrid[ index + 1 ] ];
-
-							if ( !this.gameElements[ element ].textPoints[ i ] ) this.gameElements[ element ].textPoints[ index ] = { point: tPos2, instances: [] };
-							this.gameElements[ element ].textPoints[ index ].instances.push ( instances[ i ] );
-
-						} else {
-
-							tPos2 = [ this.baseGrid[ 0 * 3 + 0 ], this.baseGrid[ 0 * 3 + 1 ] ];
-							if ( !this.gameElements[ element ].textPoints[ i ] ) this.gameElements[ element ].textPoints[ index ] = { point: tPos2, instances: [] };
-							this.gameElements[ element ].textPoints[ 0 ].instances.push ( instances[ 0 ] );
-
 						}
-
-						let dir = [ ( iPos2[ 0 ] - tPos2[ 0 ] ) * 0.5, ( iPos2[ 1 ] - tPos2[ 1 ] ) * 0.5 ];
-
-						let cPos2 = [ tPos2[ 0 ] + dir[ 0 ], tPos2[ 1 ] ];
-						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
-						opacity = instances[ i ].color[ 3 ] * instances[ i ].lifeStartMultiplier;
 
 					} else {
 
-						let iPos2 = [ 30, 30 ];
-						let tPos2 = [ 10, 10 ];
-						let cPos2 = [ 0, 0 ];
-						lPoints = this.quadratic ( iPos2, cPos2, tPos2, 0 );
-
-					}
-
-					let lGeom = this.generateLine ( lPoints );
-
-					for ( let j = 0; j < lGeom.index.length; j ++ ) {
-
-						linesIndices.push ( lGeom.index[ j ] + linesPositions.length / 3 );
-
-					}
-
-					for ( let j = 0; j < lGeom.position.length; j ++ ) {
-
-						linesPositions.push ( lGeom.position[ j ] );
-
-					}
-
-					for ( let j = 0; j < lGeom.lineNormal.length; j ++ ) {
-
-						linesNormals.push ( lGeom.lineNormal[ j ] );
-
-					}
-
-					for ( let j = 0; j < lGeom.lineMiter.length; j ++ ) {
-
-						linesMiters.push ( lGeom.lineMiter[ j ] );
-						linesOpacities.push ( opacity );
+						updateArrays ( [ 0, 0, 0 ], [ 0, 0, 0 ], [ 0, 0, 0 ], 0 );
 
 					}
 
 				} 
-
+				
 			}
 
 		}
@@ -1856,6 +1955,117 @@ export class LevelCore {
 
 	}
 
+	emitParticles ( _num, _mag ) {
+
+		if ( !this.gameElements.player ) return;
+		let player = this.gameElements.player.instances[ 0 ];
+
+		if ( _num > 2 ) {
+
+			this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
+			this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 4 ), { volume: 0.2 } );
+			this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
+
+		}
+
+		// Add particles
+
+		if ( this.particles.length < this.nParticles ) {
+
+			for ( let i = 0; i < ( _num || 2 ); i ++ ) {
+
+				this.particles.push ( new PhysicalElement ( {
+
+					position: player.position,
+					scale: [ Math.random () * 10 * this.renderer.getPixelRatio () + 1.0, 0, 0 ],
+					acceleration: [ ( Math.random () - 0.5 ) * ( _mag || 20 ), ( Math.random () - 0.5 ) * ( _mag || 20 ), 0 ],
+					velocity: vec3.scale ( vec3.create (), player.velocity, 0.2 ),
+					canDye: true,
+					lifeSpan: 1000 * Math.random (),
+					mass: 700 * Math.random () + 700,
+					enabled: true,
+					drag: 0.99,
+
+				} ) );
+
+			}
+
+		}
+
+	}
+
+	updateParticles () {
+
+		if ( !this.gameElements.player ) return;
+		let player = this.gameElements.player.instances[ 0 ];
+
+		// Update the particles & the geometry used to render them.
+
+		for ( let i = this.nParticles - 4; i >= 0 ; i -- ) {
+
+			let bufferIndex = i * 3;
+
+			if ( i < this.particles.length ) {
+
+				let force = vec3.sub ( [ 0, 0, 0 ], player.position, this.particles[ i ].position );
+				let dist = vec3.length ( force );
+				vec3.normalize ( force, force );
+				let mag = ( 1.0 / Math.pow ( dist + 1.0, 2.0 ) ) * 1.0;
+
+				this.particles[ i ].applyForce ( vec3.scale ( force, force, mag ) );
+				this.particles[ i ].update ();
+
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 0 ] = this.particles[ i ].position[ 0 ];
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 1 ] = this.particles[ i ].position[ 1 ];
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 2 ] = this.particles[ i ].scale[ 0 ] * this.particles[ i ].lifePercent;
+
+				if ( this.particles[ i ].isDead () ) {
+
+					this.particles.splice ( i, 1 );
+
+				}
+
+			} else {
+
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 0 ] = 0;
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 1 ] = 0;
+				this.particlesGeometry.attributes.position.array [ bufferIndex + 2 ] = 0;
+
+			}
+
+		}
+
+		this.particlesGeometry.attributes.position.needsUpdate = true;
+
+	}
+
+	updateInfoArrow () {
+
+		if ( !this.infoArrow ) return;
+
+		let player = this.gameElements.player.instances[ 0 ];
+		let acceleration = player.accelerationCache;
+		// console.log(acceleration);
+		let length = vec3.length ( acceleration ) / player.mass;
+		let rotation = Math.atan2 ( acceleration[ 1 ], acceleration[ 0 ] );
+
+		length = Math.min ( Math.max ( length, 0.0000001 ), 100 );
+
+		// console.log(length);
+
+		if ( length > 0.005 ) length = 0.0000000001;
+
+		let scaleM = 500.5;
+
+		this.arrowHead.scale.set ( 0.1, 0.1, 0.1 );
+		this.arrowHead.position.y = length * scaleM;
+		this.arrowLine.scale.y = length * scaleM;
+		this.arrowLine.position.y = length * scaleM * 0.5;
+		this.infoArrow.position.set ( player.position[ 0 ], player.position[ 1 ], 0 );
+		this.infoArrow.rotation.z = rotation - Math.PI * 0.5;
+
+	}
+
 	addLoadingObject () {
 
 		this.loadObjects ++;
@@ -1926,7 +2136,6 @@ export class LevelCore {
 		this.infoScreen.position.y += ( this.infoScreenTargetPosition.y - this.infoScreen.position.y ) * 0.2;
 		this.infoScreenButton.position.x = this.infoScreen.position.x + this.getWorldRight ();
 		this.infoScreenButton.position.y = this.infoScreen.position.y;
-
 
 		// Check screens limits. 
 
@@ -2083,6 +2292,15 @@ export class LevelCore {
 
 		}
 
+		// Update arrow
+
+		this.updateInfoArrow ();
+
+		// Particles player
+
+		this.emitParticles ();
+		if ( this.particles.length > 0 ) this.updateParticles ();
+
 		// Update end circle
 
 		let aPos = this.gameElements.arrival.instances[ 0 ].position;
@@ -2121,6 +2339,7 @@ export class LevelCore {
 
 		if ( this.infoScreenClosed ) return;
 
+		this.updateTextPoints (); // This stores in the elements some text positions.
 		let linesData = this.getLinesData ();
 
 		this.linesGeometry.index.array = new Uint32Array ( linesData.index );

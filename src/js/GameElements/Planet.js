@@ -11,7 +11,7 @@ export class Planet extends PhysicalElement {
 		this.maxCharge = _options.maxCharge || 50;
 		this.minCharge =  _options.minCharge || -this.maxCharge;
 		this.charge = _options.charge || 0;
-		this.targetCharge = this.charge;
+		this.targetCharge = _options.targetCharge || this.charge;
 
 		this.charges = [];
 		this.maxMass = this.mass;

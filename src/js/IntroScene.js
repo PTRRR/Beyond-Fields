@@ -598,7 +598,7 @@ export class IntroScene {
 
 					if ( dist < minDist ) {
 
-						this.emitParticles ( 50, 0.1 );
+						this.emitParticles ( 50, 120 );
 						this.player.position = this.getRandomEdgePosition ();
 						this.player.velocity = [ ( Math.random () - 0.5 ) * 0.3, ( Math.random () - 0.5 ) * 0.3, 0 ];
 
@@ -768,7 +768,7 @@ export class IntroScene {
 
 			if ( dist < minDist ) {
 
-				this.emitParticles ( 50, 0.1 );
+				this.emitParticles ( 50, 120 );
 				this.player.position = this.getRandomEdgePosition ();
 				this.player.velocity = [ ( Math.random () - 0.5 ) * 0.3, ( Math.random () - 0.5 ) * 0.3, 0 ];
 
@@ -995,7 +995,7 @@ export class IntroScene {
 
 				if ( dist < minDist - 0.1 ) {
 
-					this.emitParticles ( 50, 0.1 );
+					this.emitParticles ( 50, 120 );
 					this.player.position = this.getRandomEdgePosition ();
 
 				}
@@ -1216,7 +1216,7 @@ export class IntroScene {
 
 					position: this.player.position,
 					scale: [ Math.random () * 10 * this.renderer.getPixelRatio () + 1.0, 0, 0 ],
-					acceleration: [ ( Math.random () - 0.5 ) * ( _mag || 0.02 ), ( Math.random () - 0.5 ) * ( _mag || 0.02 ), 0 ],
+					acceleration: [ ( Math.random () - 0.5 ) * ( _mag || 20 ), ( Math.random () - 0.5 ) * ( _mag || 20 ), 0 ],
 					velocity: vec3.scale ( vec3.create (), this.player.velocity, 0.2 ),
 					canDye: true,
 					lifeSpan: 1000 * Math.random (),

@@ -4691,9 +4691,9 @@ module.exports = function createSDFShader (opt) {
       'void main() {',
       '  vec4 texColor = texture2D(map, vUv);',
       '  float alpha = aastep(texColor.a);',
-      '  gl_FragColor = vec4 ( 0.5, 0.5, 0.5, 1.0 ); ',
-      '  gl_FragColor.rgb *= 1.0 - alpha;',
-      '  gl_FragColor.a *= opacity;',
+      '  gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 ); ',
+      // '  gl_FragColor.rgb *= 1.0 - alpha;',
+      '  gl_FragColor.a *= opacity * alpha;',
       alphaTest === 0
         ? ''
         : '  if (gl_FragColor.a < ' + alphaTest + ') discard;',
@@ -5456,11 +5456,9 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 
 				_this.targetScale = vec3.clone(_this.scale);
 				_this.scale = vec3.create();
-				_this.applyForce([(Math.random() - 0.5) * 300, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 300]);
 
 				_this.maxMass = _this.mass;
 				_this.targetMass = _this.maxMass;
-				_this.mass = 0;
 
 				_this.enabled = true;
 
@@ -5473,14 +5471,14 @@ var BlackMatter = exports.BlackMatter = function (_PhysicalElement) {
 
 						_get(BlackMatter.prototype.__proto__ || Object.getPrototypeOf(BlackMatter.prototype), "update", this).call(this);
 
-						this.scale[0] += (this.targetScale[0] - this.scale[0]) * 0.07;
-						this.scale[1] += (this.targetScale[1] - this.scale[1]) * 0.07;
-						this.scale[2] += (this.targetScale[2] - this.scale[2]) * 0.07;
+						this.scale[0] += (this.targetScale[0] * this.lifePercent - this.scale[0]) * 0.07;
+						this.scale[1] += (this.targetScale[1] * this.lifePercent - this.scale[1]) * 0.07;
+						this.scale[2] += (this.targetScale[2] * this.lifePercent - this.scale[2]) * 0.07;
 
 						this.mass = this.scale[0] / this.targetScale[0] * this.targetMass;
 						this.targetMass = this.maxMass * this.lifePercent;
 
-						this.color[3] = this.lifePercent;
+						// this.color[ 3 ] = this.lifePercent;
 				}
 		}]);
 
@@ -5903,62 +5901,6 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						if (!this.levelCompleted) player.applyForce(forceResult);
 
-						// Update the particles emitted by the player.
-
-						var playerParticles = this.gameElements.playerParticles.instances;
-
-						for (var _j2 = 0; _j2 < playerParticles.length; _j2++) {
-
-								var particle = playerParticles[_j2];
-
-								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist4 = vec3.length(_dir2);
-
-								vec3.normalize(_dir2, _dir2);
-								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist4 + 1.0, 2) * 2);
-
-								particle.applyForce(_dir2);
-
-								for (var _i6 = 0; _i6 < charges.length; _i6++) {
-
-										var _charge2 = charges[_i6];
-
-										var _dir3 = vec3.sub(vec3.create(), _charge2.position, particle.position);
-										var _minDist2 = _charge2.scale[0] + particle.scale[0];
-										var _dist5 = vec3.length(_dir3);
-
-										if (_dist5 < _minDist2) {
-
-												vec3.scale(_dir3, _dir3, -(_minDist2 - _dist5) * 100);
-												particle.applyForce(_dir3);
-										} else {
-
-												var _force3 = this.computeElectricForce(_charge2, particle);
-												particle.applyForce(vec3.scale(_force3, _force3, 0.5));
-										}
-								}
-						}
-
-						// Update FX particles
-
-						for (var _i7 = 0; _i7 < 2; _i7++) {
-
-								var instance = this.addInstanceOf('playerParticles', {
-
-										enabled: Math.random() > 0.05 ? true : false,
-										position: vec3.clone(player.position),
-										canDye: true,
-										lifeSpan: Math.random() * 1000 + 1000,
-										drag: 0.95,
-										mass: Math.random() * 100 + 200,
-										initialRadius: Math.random() * 0.06 + 0.03,
-										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
-
-								});
-
-								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
-						}
-
 						// Update texts
 
 						if (!this.infoScreenOpened) return;
@@ -5970,7 +5912,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								setTimeout(function () {
 
 										this.canUpdateTexts = true;
-								}.bind(this), 5);
+								}.bind(this), 100);
 						}
 				}
 		}, {
@@ -5979,100 +5921,66 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 
 						if (!this.textsGeometry) return;
 
-						var player = this.gameElements.player.instances[0];
-						var points = this.gameElements.charges.textPoints;
-
 						var indices = [];
 						var positions = [];
 						var uvs = [];
 
-						var modelMatrix = mat4.create();
+						var player = this.gameElements.player.instances[0];
 
-						var fixedChargesPoints = this.gameElements.fixedCharges.textPoints;
+						var mv = mat4.create();
 
-						for (var pp in fixedChargesPoints) {
+						for (var element in this.gameElements) {
 
-								var point = fixedChargesPoints[pp].point;
-								var instances = fixedChargesPoints[pp].instances;
+								if (this.gameElements[element].textPoints) {
 
-								var totalForce = 0;
-								var totalMass = 0;
-								var hack = false;
+										for (var p in this.gameElements[element].textPoints) {
 
-								for (var i = 0; i < instances.length; i++) {
+												var point = this.gameElements[element].textPoints[p].point;
+												var instances = this.gameElements[element].textPoints[p].instances;
 
-										totalForce += vec3.length(this.computeElectricForce(instances[i], player));
-										totalMass += instances[i].mass;
+												if (instances.length > 0) {
 
-										if (instances[i].hack) hack = true;
-								}
+														var totalCharge = 0;
+														var totalForce = 0;
 
-								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+														for (var i = 0; i < instances.length; i++) {
 
-								mat4.identity(modelMatrix);
-								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
-								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+																totalCharge += instances[i].charge;
+																totalForce += vec3.length(this.computeElectricForce(instances[i], player));
+														}
 
-								if (!hack) {
+														var textData = this.textsGeometry.getTextData('0: ' + instances.length + '\n1: ' + Math.floor(totalCharge * 100000) / 100000 + ' [C]\n2: ' + Math.floor(totalForce * 10000) / 100000 + ' [N]');
 
-										for (var j = 0; j < textData.indices.length; j++) {
+														var offsetX = 0.2;
+														var offsetY = 0;
 
-												indices.push(textData.indices[j] + positions.length / 2);
+														if (this.gameElements[element].lineInfo == 'top') offsetY = -0.1;
+														if (this.gameElements[element].lineInfo == 'bottom') offsetY = 0.5;
+
+														mat4.identity(mv);
+														mat4.translate(mv, mv, [point[0] - offsetX, -point[1] + offsetY, 0]);
+														mat4.scale(mv, mv, vec3.fromValues(this.fontSizeMultiplier, this.fontSizeMultiplier, this.fontSizeMultiplier));
+
+														for (var j = 0; j < textData.indices.length; j++) {
+
+																indices.push(textData.indices[j] + positions.length / 2);
+														}
+
+														for (var _j2 = 0; _j2 < textData.positions.length; _j2 += 2) {
+
+																var v = [textData.positions[_j2 + 0], textData.positions[_j2 + 1], 0];
+																vec3.transformMat4(v, v, mv);
+
+																positions.push(v[0]);
+																positions.push(v[1]);
+														}
+
+														for (var _j3 = 0; _j3 < textData.uvs.length; _j3++) {
+
+																uvs.push(textData.uvs[_j3]);
+														}
+												}
 										}
-
-										for (var _j3 = 0; _j3 < textData.positions.length; _j3 += 2) {
-
-												var v = [textData.positions[_j3 + 0], textData.positions[_j3 + 1], 0];
-												vec3.transformMat4(v, v, modelMatrix);
-
-												positions.push(v[0]);
-												positions.push(v[1]);
-										}
-
-										for (var _j4 = 0; _j4 < textData.uvs.length; _j4++) {
-
-												uvs.push(textData.uvs[_j4]);
-										}
-								}
-						}
-
-						for (var p in points) {
-
-								var _point = points[p].point;
-								var _instances = points[p].instances;
-
-								var _totalForce = 0;
-								var _totalMass = 0;
-
-								for (var _i8 = 0; _i8 < _instances.length; _i8++) {
-
-										_totalForce += vec3.length(this.computeElectricForce(_instances[_i8], player));
-										_totalMass += _instances[_i8].mass;
-								}
-
-								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
-
-								mat4.identity(modelMatrix);
-								mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
-								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
-
-								for (var _j5 = 0; _j5 < _textData.indices.length; _j5++) {
-
-										indices.push(_textData.indices[_j5] + positions.length / 2);
-								}
-
-								for (var _j6 = 0; _j6 < _textData.positions.length; _j6 += 2) {
-
-										var _v = [_textData.positions[_j6 + 0], _textData.positions[_j6 + 1], 0];
-										vec3.transformMat4(_v, _v, modelMatrix);
-
-										positions.push(_v[0]);
-										positions.push(_v[1]);
-								}
-
-								for (var _j7 = 0; _j7 < _textData.uvs.length; _j7++) {
-
-										uvs.push(_textData.uvs[_j7]);
 								}
 						}
 
@@ -6083,11 +5991,11 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 								this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
 						} else {
 
-								var _textData2 = this.textsGeometry.getTextData('');
+								var _textData = this.textsGeometry.getTextData('');
 
-								this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
-								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
-								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
+								this.dynamicBuffer.index(this.textsGeometry, _textData.indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData.positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData.uvs, 2);
 						}
 				}
 		}, {
@@ -6195,6 +6103,7 @@ var ElectricLevel = exports.ElectricLevel = function (_LevelCore) {
 				value: function resetPlayer() {
 
 						this.explosionSound();
+						this.emitParticles(50, 120);
 						this.gameElements.player.instances[0].color[3] = 0;
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldTop() + 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
@@ -6538,6 +6447,7 @@ var ElementCore = exports.ElementCore = function () {
 				key: 'lifePercent',
 				get: function get() {
 
+						if (!this.canDye) return 1;
 						return this.lifeLeft / this.lifeSpan;
 				}
 		}]);
@@ -6738,11 +6648,12 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 												if (planets[i].touchId == this.glWorldTouches[touch].id) {
 
-														var maxDist = planets[i].scale[0] * 1.5;
+														var maxDist = planets[i].scale[0] * 1.2;
 														var yDist = this.glWorldTouches[touch].position[1] - planets[i].position[1];
-														var percentDist = (0, _utils.clamp)(yDist / maxDist, -1, 1);
 
-														planets[i].targetCharge = planets[i].maxCharge * percentDist;
+														var sign = Math.sign(yDist);
+
+														planets[i].targetCharge = planets[i].maxCharge * sign * (0, _utils.clamp)(Math.abs(yDist / maxDist), 0, 1);
 												}
 										}
 								}
@@ -6761,11 +6672,11 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 										this.ready = true;
 										this.gameElements.player.instances[0].mass = 1000000;
 										this.gameElements.player.instances[0].enabled = true;
+										// this.gameElements.player.instances[ 0 ].charge = -1;
 										this.resetPlayer();
-										// this.start = this.getInstanceByName ( 'goals', 'bottom' );
-										// this.arrival = this.getInstanceByName ( 'goals', 'top' );
 										this.arrivedInGame = false;
 										this.buildCharges();
+										this.offsetBottom = 1.8;
 								} else {
 
 										return;
@@ -6780,16 +6691,10 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						_get(GravityElectricLevel.prototype.__proto__ || Object.getPrototypeOf(GravityElectricLevel.prototype), 'update', this).call(this);
 
-						// this.indicatorObj.scale.y += ( this.indicatorScaleTarget - this.indicatorObj.scale.y ) * 0.2;
-						// this.indicatorObj.rotation.z += ( this.indicatorAngleTarget - this.indicatorObj.rotation.z ) * 0.2;
-						// this.indicatorMaterial.uniforms.alpha.value += ( this.indicatorAlphaTarget - this.indicatorMaterial.uniforms.alpha.value ) * 0.1;
-
 						// main player
 
 						var player = this.gameElements.player.instances[0];
 						if (this.checkEdges(player.position, 0.2) && !this.levelCompleted) this.resetPlayer();
-						// if ( this.isInBox ( this.arrival, player.position ) ) this.onWinCallback ();
-						// if ( this.isInBox ( this.start, player.position ) ) this.arrivedInGame = true;
 
 						// Compute the physics behind.
 						// Here we take two different équations to compute the forces.
@@ -6806,7 +6711,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 								chargesUniform.push(planets[i].position[0]);
 								chargesUniform.push(planets[i].position[1]);
-								chargesUniform.push(Math.abs(planets[i].charge / planets[i].maxCharge) * planets[i].sign);
+								chargesUniform.push(planets[i].charge / planets[i].maxCharge);
 
 								massesUniforms.push(planets[i].position[0]);
 								massesUniforms.push(planets[i].position[1]);
@@ -6832,9 +6737,9 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 								for (var j = 0; j < charges.length; j++) {
 
-										if (this.mouseDown) {
+										for (var touch in this.glWorldTouches) {
 
-												var dir = vec3.sub(vec3.create(), charges[j].position, this.glMouseWorld);
+												var dir = vec3.sub(vec3.create(), charges[j].position, this.glWorldTouches[touch].position);
 												var _dist = vec3.length(dir);
 												var maxDist = 2.0;
 												vec3.normalize(dir, dir);
@@ -6889,23 +6794,6 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						if (!this.levelCompleted) player.applyForce(resultForce);
 
-						// Update particles emitted by the player.
-
-						var playerParticles = this.gameElements.playerParticles.instances;
-
-						for (var _j = 0; _j < playerParticles.length; _j++) {
-
-								var particle = playerParticles[_j];
-
-								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist3 = vec3.length(_dir2);
-
-								vec3.normalize(_dir2, _dir2);
-								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist3 + 1.0, 2) * 2);
-
-								particle.applyForce(_dir2);
-						}
-
 						// Obstacles
 
 						if (this.gameElements.obstacles) {
@@ -6924,27 +6812,6 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 								}
 						}
 
-						// Update FX particles
-
-						// for ( let i = 0; i < 2; i ++ ) {
-
-						// 	let instance = this.addInstanceOf ( 'playerParticles', {
-
-						// 		enabled: Math.random () > 0.05 ? true : false,
-						// 		position: vec3.clone ( player.position ),
-						// 		canDye: true,
-						// 		lifeSpan: Math.random () * 1000 + 1000,
-						// 		drag: 0.95,
-						// 		mass: Math.random () * 100 + 200,
-						// 		initialRadius: Math.random () * 0.06 + 0.03,
-						// 		velocity: vec3.scale ( vec3.create (), vec3.clone ( player.velocity ), 0.1 ),
-
-						// 	} );
-
-						// 	instance.applyForce ( vec3.fromValues ( ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30, ( Math.random () - 0.5 ) * 30 ) );
-
-						// }
-
 						if (!this.infoScreenOpened) return;
 
 						if (this.canUpdateTexts) {
@@ -6954,7 +6821,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 								setTimeout(function () {
 
 										this.canUpdateTexts = true;
-								}.bind(this), 5);
+								}.bind(this), 100);
 						}
 				}
 		}, {
@@ -6963,54 +6830,68 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 
 						if (!this.textsGeometry) return;
 
-						var player = this.gameElements.player.instances[0];
-						var points = this.gameElements.planets.textPoints;
-
 						var indices = [];
 						var positions = [];
 						var uvs = [];
 
-						var modelMatrix = mat4.create();
+						var player = this.gameElements.player.instances[0];
 
-						var planetPoints = this.gameElements.planets.textPoints;
+						var mv = mat4.create();
 
-						for (var pp in planetPoints) {
+						for (var element in this.gameElements) {
 
-								var point = planetPoints[pp].point;
-								var instances = planetPoints[pp].instances;
+								if (this.gameElements[element].textPoints) {
 
-								var totalForce = 0;
-								var totalMass = 0;
+										for (var p in this.gameElements[element].textPoints) {
 
-								for (var i = 0; i < instances.length; i++) {
+												var point = this.gameElements[element].textPoints[p].point;
+												var instances = this.gameElements[element].textPoints[p].instances;
 
-										totalForce += vec3.length(this.computeGravityForce(instances[i], player));
-										totalMass += instances[i].mass;
-								}
+												if (instances.length > 0) {
 
-								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+														var totalCharge = 0;
+														var totalMasses = 0;
+														var totalForce = 0;
 
-								mat4.identity(modelMatrix);
-								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
-								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+														for (var i = 0; i < instances.length; i++) {
 
-								for (var j = 0; j < textData.indices.length; j++) {
+																totalCharge += instances[i].charge;
+																totalMasses += instances[i].mass;
+																totalForce += vec3.length(this.computeElectricForce(instances[i], player)) + vec3.length(this.computeGravityForce(instances[i], player));
+														}
 
-										indices.push(textData.indices[j] + positions.length / 2);
-								}
+														var textData = this.textsGeometry.getTextData('0: ' + instances.length + '\n1: ' + Math.floor(totalCharge * 100000) / 100000 + '[C]\n2: ' + Math.floor(totalMasses) + ' [kg]\n3: ' + Math.floor(totalForce * 10000) / 100000 + ' [N]');
 
-								for (var _j2 = 0; _j2 < textData.positions.length; _j2 += 2) {
+														var offsetX = 0.2;
+														var offsetY = 0;
 
-										var v = [textData.positions[_j2 + 0], textData.positions[_j2 + 1], 0];
-										vec3.transformMat4(v, v, modelMatrix);
+														if (this.gameElements[element].lineInfo == 'top') offsetY = -0.1;
+														if (this.gameElements[element].lineInfo == 'bottom') offsetY = 0.7;
 
-										positions.push(v[0]);
-										positions.push(v[1]);
-								}
+														mat4.identity(mv);
+														mat4.translate(mv, mv, [point[0] - offsetX, -point[1] + offsetY, 0]);
+														mat4.scale(mv, mv, vec3.fromValues(this.fontSizeMultiplier, this.fontSizeMultiplier, this.fontSizeMultiplier));
 
-								for (var _j3 = 0; _j3 < textData.uvs.length; _j3++) {
+														for (var j = 0; j < textData.indices.length; j++) {
 
-										uvs.push(textData.uvs[_j3]);
+																indices.push(textData.indices[j] + positions.length / 2);
+														}
+
+														for (var _j = 0; _j < textData.positions.length; _j += 2) {
+
+																var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+																vec3.transformMat4(v, v, mv);
+
+																positions.push(v[0]);
+																positions.push(v[1]);
+														}
+
+														for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+
+																uvs.push(textData.uvs[_j2]);
+														}
+												}
+										}
 								}
 						}
 
@@ -7137,6 +7018,7 @@ var GravityElectricLevel = exports.GravityElectricLevel = function (_LevelCore) 
 				value: function resetPlayer() {
 
 						this.explosionSound();
+						this.emitParticles(50, 120);
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom() - 0.1, 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
 						this.gameElements.player.instances[0].applyForce([0, 10000, 0]);
@@ -7303,11 +7185,11 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 														scale: [s, s, s],
 														color: [0.8 + r, 0.8 + r, 0.8 + r, 1.0],
 														rotation: [0, 0, Math.random() * Math.PI * 2],
-														mass: 20000,
+														mass: 30000,
 														drag: 0.95,
 														lifeSpan: Math.random() * 4000 + 6000,
 														canDye: true,
-														targetLinePosition: [-2.0, 2.0, 0.0]
+														acceleration: [Math.random() - 0.5, Math.random() - 0.5, 0]
 
 												});
 										}
@@ -7418,7 +7300,6 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						// Planets & particles
 
-						var playerParticles = this.gameElements.playerParticles.instances;
 						var planetsInstances = this.gameElements.planets.instances;
 
 						for (var _i = 0; _i < planetsInstances.length; _i++) {
@@ -7439,38 +7320,6 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 										if (!this.levelCompleted) this.resetPlayer();
 								}
-
-								// for ( let j = 0; j < playerParticles.length; j ++ ) {
-
-								// 	let particle = playerParticles[ j ];
-
-								// 	let dirToPlanet = vec3.sub ( vec3.create (), planet.position, particle.position );
-								// 	let distToPlanet = vec3.length ( dirToPlanet );
-								// 	let minDistToPlanet = planet.scale[ 0 ] + particle.scale[ 0 ] - 0.01;
-								// 	let force = null;
-
-								// 	if ( distToPlanet < minDistToPlanet ) {
-
-								// 		let mag = ( minDistToPlanet - distToPlanet ) * 50;
-								// 		vec3.normalize ( distToPlanet, distToPlanet );
-								// 		force = vec3.scale ( dirToPlanet, dirToPlanet, -mag );
-
-								// 	} else {
-
-								// 		force = this.computeGravityAttraction ( planet, particle );
-
-								// 		if ( vec3.length ( force ) > 1 ) {
-
-								// 			vec3.normalize ( force, force );
-								// 			vec3.scale ( force, force, 1 );
-
-								// 		}
-
-								// 	}
-
-								// 	particle.applyForce ( force );
-
-								// }
 						}
 
 						// Update the grid in the scan scene.
@@ -7481,40 +7330,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								this.gridMaterial.uniforms.masses.value = massesUniforms;
 						}
 
-						for (var j = 0; j < playerParticles.length; j++) {
-
-								var particle = playerParticles[j];
-
-								var _dir2 = vec3.sub(vec3.create(), player.position, particle.position);
-								var _dist2 = vec3.length(_dir2);
-
-								vec3.normalize(_dir2, _dir2);
-								vec3.scale(_dir2, _dir2, 1 / Math.pow(_dist2 + 1.0, 2) * 2);
-
-								particle.applyForce(_dir2);
-						}
-
 						player.applyForce(forceResult);
-
-						// Update FX particles
-
-						for (var _i2 = 0; _i2 < 1; _i2++) {
-
-								var instance = this.addInstanceOf('playerParticles', {
-
-										enabled: Math.random() > 0.05 ? true : false,
-										position: vec3.clone(player.position),
-										canDye: true,
-										lifeSpan: Math.random() * 1000 + 1000,
-										drag: 0.95,
-										mass: Math.random() * 100 + 200,
-										initialRadius: Math.random() * 0.06 + 0.03,
-										velocity: vec3.scale(vec3.create(), vec3.clone(player.velocity), 0.1)
-
-								});
-
-								instance.applyForce(vec3.fromValues((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30));
-						}
 
 						if (!this.infoScreenOpened) return;
 
@@ -7527,7 +7343,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								setTimeout(function () {
 
 										this.canUpdateTexts = true;
-								}.bind(this), 5);
+								}.bind(this), 100);
 						}
 				}
 		}, {
@@ -7536,94 +7352,66 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 
 						if (!this.textsGeometry) return;
 
-						var player = this.gameElements.player.instances[0];
-						var points = this.gameElements.blackMatter.textPoints;
-
 						var indices = [];
 						var positions = [];
 						var uvs = [];
 
-						var modelMatrix = mat4.create();
+						var player = this.gameElements.player.instances[0];
 
-						var planetPoints = this.gameElements.planets.textPoints;
+						var mv = mat4.create();
 
-						for (var pp in planetPoints) {
+						for (var element in this.gameElements) {
 
-								var point = planetPoints[pp].point;
-								var instances = planetPoints[pp].instances;
+								if (this.gameElements[element].textPoints) {
 
-								var totalForce = 0;
-								var totalMass = 0;
+										for (var p in this.gameElements[element].textPoints) {
 
-								for (var i = 0; i < instances.length; i++) {
+												var point = this.gameElements[element].textPoints[p].point;
+												var instances = this.gameElements[element].textPoints[p].instances;
 
-										totalForce += vec3.length(this.computeGravityAttraction(instances[i], player));
-										totalMass += instances[i].mass;
-								}
+												if (instances.length > 0) {
 
-								var textData = this.textsGeometry.getTextData(totalMass + ' kg\n' + Math.floor(totalForce * 100) / 100 + ' N');
+														var totalMass = 0;
+														var totalForce = 0;
 
-								mat4.identity(modelMatrix);
-								mat4.translate(modelMatrix, modelMatrix, [point[0] - textData.width * 0.0025 * 0.5, -point[1] + 0.1 + textData.height * 0.0025, 0]);
-								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
+														for (var i = 0; i < instances.length; i++) {
 
-								for (var j = 0; j < textData.indices.length; j++) {
+																totalMass += instances[i].mass;
+																totalForce += vec3.length(this.computeGravityAttraction(instances[i], player));
+														}
 
-										indices.push(textData.indices[j] + positions.length / 2);
-								}
+														var textData = this.textsGeometry.getTextData('0: ' + instances.length + '\n1: ' + Math.floor(totalMass) + ' [kg]\n2: ' + Math.floor(totalForce * 100000) / 10 + ' [N]');
 
-								for (var _j = 0; _j < textData.positions.length; _j += 2) {
+														var offsetX = 0.2;
+														var offsetY = 0;
 
-										var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
-										vec3.transformMat4(v, v, modelMatrix);
+														if (this.gameElements[element].lineInfo == 'top') offsetY = -0.1;
+														if (this.gameElements[element].lineInfo == 'bottom') offsetY = 0.5;
 
-										positions.push(v[0]);
-										positions.push(v[1]);
-								}
+														mat4.identity(mv);
+														mat4.translate(mv, mv, [point[0] - offsetX, -point[1] + offsetY, 0]);
+														mat4.scale(mv, mv, vec3.fromValues(this.fontSizeMultiplier, this.fontSizeMultiplier, this.fontSizeMultiplier));
 
-								for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
+														for (var j = 0; j < textData.indices.length; j++) {
 
-										uvs.push(textData.uvs[_j2]);
-								}
-						}
+																indices.push(textData.indices[j] + positions.length / 2);
+														}
 
-						for (var p in points) {
+														for (var _j = 0; _j < textData.positions.length; _j += 2) {
 
-								var _point = points[p].point;
-								var _instances = points[p].instances;
+																var v = [textData.positions[_j + 0], textData.positions[_j + 1], 0];
+																vec3.transformMat4(v, v, mv);
 
-								var _totalForce = 0;
-								var _totalMass = 0;
+																positions.push(v[0]);
+																positions.push(v[1]);
+														}
 
-								for (var _i3 = 0; _i3 < _instances.length; _i3++) {
+														for (var _j2 = 0; _j2 < textData.uvs.length; _j2++) {
 
-										_totalForce += vec3.length(this.computeGravityAttraction(_instances[_i3], player));
-										_totalMass += _instances[_i3].mass;
-								}
-
-								var _textData = this.textsGeometry.getTextData(Math.floor(_totalMass) + ' kg\n' + Math.floor(_totalForce * 100) / 100 + ' N');
-
-								mat4.identity(modelMatrix);
-								mat4.translate(modelMatrix, modelMatrix, [_point[0] - _textData.width * 0.0025 * 0.5, -_point[1] - 0.1, 0]);
-								mat4.scale(modelMatrix, modelMatrix, vec3.fromValues(0.0025, 0.0025, 0.0025));
-
-								for (var _j3 = 0; _j3 < _textData.indices.length; _j3++) {
-
-										indices.push(_textData.indices[_j3] + positions.length / 2);
-								}
-
-								for (var _j4 = 0; _j4 < _textData.positions.length; _j4 += 2) {
-
-										var _v = [_textData.positions[_j4 + 0], _textData.positions[_j4 + 1], 0];
-										vec3.transformMat4(_v, _v, modelMatrix);
-
-										positions.push(_v[0]);
-										positions.push(_v[1]);
-								}
-
-								for (var _j5 = 0; _j5 < _textData.uvs.length; _j5++) {
-
-										uvs.push(_textData.uvs[_j5]);
+																uvs.push(textData.uvs[_j2]);
+														}
+												}
+										}
 								}
 						}
 
@@ -7634,11 +7422,11 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 								this.dynamicBuffer.attr(this.textsGeometry, 'uv', uvs, 2);
 						} else {
 
-								var _textData2 = this.textsGeometry.getTextData('');
+								var _textData = this.textsGeometry.getTextData('');
 
-								this.dynamicBuffer.index(this.textsGeometry, _textData2.indices, 1);
-								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData2.positions, 2);
-								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData2.uvs, 2);
+								this.dynamicBuffer.index(this.textsGeometry, _textData.indices, 1);
+								this.dynamicBuffer.attr(this.textsGeometry, 'position', _textData.positions, 2);
+								this.dynamicBuffer.attr(this.textsGeometry, 'uv', _textData.uvs, 2);
 						}
 				}
 		}, {
@@ -7659,6 +7447,7 @@ var GravityLevel = exports.GravityLevel = function (_LevelCore) {
 				value: function resetPlayer() {
 
 						this.explosionSound();
+						this.emitParticles(50, 120);
 						this.gameElements.player.instances[0].position = vec3.fromValues(0, this.getWorldBottom(), 0);
 						this.gameElements.player.instances[0].velocity = vec3.create();
 						this.gameElements.player.instances[0].applyForce([0, 1000, 0]);
@@ -7689,6 +7478,8 @@ var _utils = require('../utils');
 var _shaderHelper = require('./shaderHelper');
 
 var _library = require('./library');
+
+var _PhysicalElement = require('./PhysicalElement');
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
@@ -7799,7 +7590,7 @@ var LevelCore = exports.LevelCore = function () {
 				this.screensScene.add(this.scanScreenButton);
 
 				this.infoScene = new THREE.Scene();
-				this.infoScene.background = new THREE.Color(0x808080);
+				this.infoScene.background = new THREE.Color(0x9E9E9E);
 				this.infoSceneRenderTarget = new THREE.WebGLRenderTarget(this.getWidth(), this.getHeight(), { depthBuffer: false, stencilBuffer: false });
 
 				this.infoScreenTargetPosition = new THREE.Vector3(0, 0, 0);
@@ -8036,7 +7827,7 @@ var LevelCore = exports.LevelCore = function () {
 
 												this.textBackgroundMaterial = new THREE.MeshBasicMaterial({
 
-														color: 'rgb( 128, 128, 128 )',
+														color: this.infoScene.background,
 														opacity: 0.9,
 														transparent: true
 
@@ -8083,7 +7874,7 @@ var LevelCore = exports.LevelCore = function () {
 												this.textsGeometry = bmfontGeometry({
 
 														font: font,
-														align: 'center'
+														align: 'left'
 
 												});
 
@@ -8104,7 +7895,27 @@ var LevelCore = exports.LevelCore = function () {
 												// this.texts.scale.set ( 0.0025, 0.0025, 0.0025 );
 												this.infoScene.add(this.texts);
 
+												this.infoLegendGeometry = bmfontGeometry({
+
+														font: font,
+														align: 'left'
+
+												});
+
+												this.fontSizeMultiplier = 0.0024;
+												var legend = this.levelFile.legend || '0: Attractors number\n1: Mass average [kg]\n2: Average force on player [N]';
+												this.infoLegendGeometry.update(legend);
+												this.infoLegendGeometry.computeBoundingSphere();
+												this.infoLegend = new THREE.Mesh(this.infoLegendGeometry, this.textsMaterial);
+												this.infoLegend.position.x -= this.infoLegendGeometry.boundingSphere.center.x * 0.0025;
+												this.infoLegend.rotation.x = Math.PI;
+												this.infoLegend.scale.set(this.fontSizeMultiplier, this.fontSizeMultiplier, this.fontSizeMultiplier);
+												this.infoScene.add(this.infoLegend);
+
 												this.render();
+
+												var offset = 0.3;
+												this.infoLegend.position.set(this.getWorldLeft() + offset, this.getWorldBottom() + offset, 0);
 										}.bind(this));
 								}
 						}.bind(this));
@@ -8172,38 +7983,6 @@ var LevelCore = exports.LevelCore = function () {
 								}
 						}
 
-						this.addElement('playerParticles', {
-
-								elementType: 'Particle',
-								static: false,
-								individual: false,
-								manualMode: false,
-								renderingOrder: 10,
-								maxInstancesNum: 200,
-
-								shaders: {
-
-										main: null,
-
-										normal: {
-
-												name: 'playerParticles',
-												transparent: true,
-												blending: 'MultiplyBlending',
-												textureUrl: './resources/textures/generic_circle_sdf.png',
-												uniforms: {}
-
-										},
-
-										scan: null,
-										infos: null
-
-								},
-
-								instances: {}
-
-						});
-
 						this.addElement('player', {
 
 								elementType: 'Player',
@@ -8265,6 +8044,28 @@ var LevelCore = exports.LevelCore = function () {
 
 						});
 
+						// Player particles
+
+						this.enableParticles = false;
+						this.nParticles = 200;
+						this.particles = [];
+
+						this.particlesMaterial = new THREE.ShaderMaterial({
+
+								vertexShader: _shaderHelper.shaderHelper.introParticles.vertex,
+								fragmentShader: _shaderHelper.shaderHelper.introParticles.fragment,
+								transparent: true
+
+						});
+
+						this.particlesGeometry = new THREE.BufferGeometry();
+						this.particlesGeometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(this.nParticles * 3), 3));
+
+						this.particlesPoints = new THREE.Points(this.particlesGeometry, this.particlesMaterial);
+						this.particlesPoints.renderOrder = 10000;
+
+						this.mainScene.add(this.particlesPoints);
+
 						// Build a base grid to draw infos.
 
 						this.baseGridX = 7;
@@ -8282,10 +8083,39 @@ var LevelCore = exports.LevelCore = function () {
 						// this.infoScene.add ( gridDebug );
 						this.baseGrid = gridGeometry.attributes.position.array;
 
+						var arrowHeadTextureLoader = new THREE.TextureLoader().load('./resources/textures/Arrow_Head_sdf.png', function (texture) {
+
+								this.infoArrow = new THREE.Object3D();
+								this.arrowHeadMaterial = new THREE.MeshBasicMaterial({
+
+										map: texture,
+										color: 'rgb(0, 0, 0)',
+										transparent: true
+
+								});
+
+								this.arrowLineMaterial = new THREE.ShaderMaterial({
+
+										vertexShader: _shaderHelper.shaderHelper.arrowLine.vertex,
+										fragmentShader: _shaderHelper.shaderHelper.arrowLine.fragment,
+										transparent: true
+
+								});
+
+								this.arrowHead = new THREE.Mesh(this.quadGeometry, this.arrowHeadMaterial);
+								this.arrowHead.scale.set(0.1, 0.1, 0.1);
+								this.arrowLine = new THREE.Mesh(this.quadGeometry, this.arrowLineMaterial);
+								this.arrowLine.scale.set(0.01, 1.0, 1.0);
+								this.infoArrow.add(this.arrowHead);
+								this.infoArrow.add(this.arrowLine);
+								this.infoScene.add(this.infoArrow);
+						}.bind(this));
+
 						// Add lines
 
 						this.onLoad(function () {
 
+								this.updateTextPoints();
 								var linesData = this.getLinesData();
 
 								this.linesGeometry = new THREE.BufferGeometry();
@@ -8907,6 +8737,96 @@ var LevelCore = exports.LevelCore = function () {
 						};
 				}
 		}, {
+				key: 'updateTextPoints',
+				value: function updateTextPoints() {
+
+						var nPos = 5;
+						this.offsetTop = this.offsetTop || 1.4;
+						var offsetSides = 0.8;
+						this.offsetBottom = this.offsetBottom || 1.5;
+
+						var topLine = [];
+						var bottomLine = [];
+						var width = this.getWorldRight() * 2;
+						var step = (width - 2 * offsetSides) * (1.0 / (nPos - 1));
+
+						for (var i = 0; i < nPos; i++) {
+
+								topLine.push([i * step - (width - 2 * offsetSides) * 0.5 - 0.3, this.getWorldTop() - this.offsetTop]);
+								bottomLine.push([i * step - (width - 2 * offsetSides) * 0.5 - 0.3, this.getWorldBottom() + this.offsetBottom]);
+						}
+
+						for (var element in this.gameElements) {
+
+								if (this.gameElements[element].drawInfos) {
+										// Check if we have to draw info related to this object
+
+										var instances = this.gameElements[element].instances;
+										var maxInstancesNum = this.gameElements[element].maxInstancesNum || 0;
+
+										// Create or overide an object to store where the text should be located
+
+										this.gameElements[element].textPoints = {};
+
+										for (var _i5 = 0; _i5 < nPos; _i5++) {
+
+												// Check wich of the two lines of points must be uset to display the inormations.
+
+												var _line = [];
+												this.gameElements[element].lineInfo = this.gameElements[element].lineInfo || 'top'; // Set default value if not specified;
+
+												if (this.gameElements[element].lineInfo == 'top') {
+
+														_line = topLine;
+														this.gameElements[element].textPoints[_i5] = { point: _line[_i5], instances: [] };
+												} else if (this.gameElements[element].lineInfo == 'bottom') {
+
+														_line = bottomLine;
+														this.gameElements[element].textPoints[_i5] = { point: _line[_i5], instances: [] };
+												}
+
+												// Check where a certain instance's information must be displayed.
+												// Get the lines informations out of the positions retrieved here. 
+
+												for (var j = 0; j < instances.length; j++) {
+
+														var instance = instances[j];
+
+														if (typeof instance.manualPointIndex == 'number') {
+																// Check if a fixed point is defined.
+
+																// Add this instance only when the actual textPoint is defined.
+
+																if (_i5 == instance.manualPointIndex) {
+
+																		this.gameElements[element].textPoints[_i5].instances.push(instances[j]);
+																}
+														} else {
+
+																// Here we first check the extreme points in order to always have a text point.
+																// Then we check the nearest point in the line array.
+
+																if (_i5 == 0 && instance.position[0] <= _line[_i5][0]) {
+
+																		this.gameElements[element].textPoints[_i5].instances.push(instances[j]);
+																} else if (_i5 == _line.length - 1 && instance.position[0] >= _line[_i5][0]) {
+
+																		this.gameElements[element].textPoints[_i5].instances.push(instances[j]);
+																} else {
+
+																		var xDist = Math.abs(instance.position[0] - _line[_i5][0]);
+																		if (xDist <= step * 0.5) {
+
+																				this.gameElements[element].textPoints[_i5].instances.push(instances[j]);
+																		}
+																}
+														}
+												}
+										}
+								}
+						}
+				}
+		}, {
 				key: 'getLinesData',
 				value: function getLinesData() {
 
@@ -8916,121 +8836,82 @@ var LevelCore = exports.LevelCore = function () {
 						var linesMiters = [];
 						var linesOpacities = [];
 
+						// As we update in two different ways the arrays - with instance and without - we declare a function not to repeat ourself.
+
+						var self = this;
+
+						function updateArrays(_iPoint, _tPoint, _cPoint, _opacity) {
+
+								var linePoints = self.quadratic(_iPoint, _cPoint, _tPoint, 0);
+								var lineGeometry = self.generateLine(linePoints);
+
+								for (var j = 0; j < lineGeometry.index.length; j++) {
+
+										linesIndices.push(lineGeometry.index[j] + linesPositions.length / 3);
+								}
+
+								for (var _j7 = 0; _j7 < lineGeometry.position.length; _j7++) {
+
+										linesPositions.push(lineGeometry.position[_j7]);
+								}
+
+								for (var _j8 = 0; _j8 < lineGeometry.lineNormal.length; _j8++) {
+
+										linesNormals.push(lineGeometry.lineNormal[_j8]);
+								}
+
+								for (var _j9 = 0; _j9 < lineGeometry.lineMiter.length; _j9++) {
+
+										linesMiters.push(lineGeometry.lineMiter[_j9]);
+										linesOpacities.push(_opacity);
+								}
+						}
+
+						// Pass throw all elements and check if they need to display infos.
+
 						for (var element in this.gameElements) {
 
-								if (this.gameElements[element].drawInfos) {
+								if (this.gameElements[element].drawInfos && this.gameElements[element].textPoints) {
 
-										var maxInstancesNum = this.gameElements[element].maxInstancesNum || 0;
+										// As we work with some fixed size buffers we'll pass trougth all max num instances.
 
-										var mainInfoPointIndex = undefined;
-
-										if (this.gameElements[element].mainInfoPointIndex !== undefined) {
-
-												mainInfoPointIndex = this.gameElements[element].mainInfoPointIndex;
-										}
-
-										// Create or overide an object to store where the text should be located
-
-										this.gameElements[element].textPoints = {};
-										var pointObjectIndex = 0;
-
+										var maxInstancesNum = this.gameElements[element].maxInstancesNum;
 										var instances = this.gameElements[element].instances;
+										var textPoints = this.gameElements[element].textPoints;
 
 										for (var i = 0; i < maxInstancesNum; i++) {
 
-												var lPoints = null;
-												var opacity = 0;
-
 												if (i < instances.length) {
 
-														var infoPointIndex = instances[i].infoPointIndex;
+														var instance = instances[i];
 
-														var iPos2 = [instances[i].position[0], instances[i].position[1]]; // Object position
-														var tPos2 = [0, 0];
+														// Check in which text point object the actual instance has been stored.
 
-														if (mainInfoPointIndex !== undefined && infoPointIndex === undefined) {
+														for (var p in textPoints) {
 
-																var numPerPoint = Math.floor(this.baseGridX / instances.length);
-																var attachedInstances = [];
+																if (_utils.contains.call(textPoints[p].instances, instance)) {
 
-																for (var j = 0; j < this.baseGridX; j++) {
+																		var iPoint = [instance.position[0], instance.position[1]];
+																		var tPoint = textPoints[p].point;
 
-																		// let index = j * 3 * this.baseGridX + mainInfoPointIndex * 3;
-																		var fI = j;
+																		// Reset the iPoint to the edge of the element - not the middle.
+																		// Offset if slightly as the circles are not perfectly round.
 
-																		if (fI == 0) fI = 1;
+																		var dir = vec2.sub([0, 0], tPoint, iPoint);
+																		vec2.normalize(dir, dir);
+																		iPoint[0] += dir[0] * instance.scale[0] * 0.97;
+																		iPoint[1] += dir[1] * instance.scale[1] * 0.97;
 
-																		var _index = fI * 3 + this.baseGridX * 3 * mainInfoPointIndex;
-																		var point = [this.baseGrid[_index + 0], this.baseGrid[_index + 1]];
+																		var cPoint = [tPoint[0] + (iPoint[0] - tPoint[0]) * 0.8, tPoint[1]];
 
-																		var dY = Math.abs(iPos2[1] - point[1]);
-																		var dX = Math.abs(iPos2[0] - point[0]);
+																		updateArrays(iPoint, tPoint, cPoint, instance.lifePercent * 0.4);
 
-																		// if ( dY < this.getWorldTop () / ( this.baseGridY - 1.0 ) ) {
-
-																		// 	tPos2 = point;
-																		// 	if ( !this.gameElements[ element ].textPoints[ j ] ) this.gameElements[ element ].textPoints[ j ] = { point: point, instances: [] };
-																		// 	this.gameElements[ element ].textPoints[ j ].instances.push ( instances[ i ] );
-																		// 	break;
-
-																		// }
-
-																		if (dX < this.getWorldRight() / (this.baseGridX - 1.0)) {
-
-																				tPos2 = point;
-																				if (!this.gameElements[element].textPoints[j]) this.gameElements[element].textPoints[j] = { point: point, instances: [] };
-																				this.gameElements[element].textPoints[j].instances.push(instances[i]);
-																				break;
-																		}
+																		break;
 																}
-														} else if (infoPointIndex !== undefined) {
-
-																var _index2 = infoPointIndex * 3;
-																tPos2 = [this.baseGrid[_index2 + 0], this.baseGrid[_index2 + 1]];
-
-																if (!this.gameElements[element].textPoints[i]) this.gameElements[element].textPoints[_index2] = { point: tPos2, instances: [] };
-																this.gameElements[element].textPoints[_index2].instances.push(instances[i]);
-														} else {
-
-																tPos2 = [this.baseGrid[0 * 3 + 0], this.baseGrid[0 * 3 + 1]];
-																if (!this.gameElements[element].textPoints[i]) this.gameElements[element].textPoints[index] = { point: tPos2, instances: [] };
-																this.gameElements[element].textPoints[0].instances.push(instances[0]);
 														}
-
-														var dir = [(iPos2[0] - tPos2[0]) * 0.5, (iPos2[1] - tPos2[1]) * 0.5];
-
-														var cPos2 = [tPos2[0] + dir[0], tPos2[1]];
-														lPoints = this.quadratic(iPos2, cPos2, tPos2, 0);
-														opacity = instances[i].color[3] * instances[i].lifeStartMultiplier;
 												} else {
 
-														var _iPos = [30, 30];
-														var _tPos = [10, 10];
-														var _cPos = [0, 0];
-														lPoints = this.quadratic(_iPos, _cPos, _tPos, 0);
-												}
-
-												var lGeom = this.generateLine(lPoints);
-
-												for (var _j7 = 0; _j7 < lGeom.index.length; _j7++) {
-
-														linesIndices.push(lGeom.index[_j7] + linesPositions.length / 3);
-												}
-
-												for (var _j8 = 0; _j8 < lGeom.position.length; _j8++) {
-
-														linesPositions.push(lGeom.position[_j8]);
-												}
-
-												for (var _j9 = 0; _j9 < lGeom.lineNormal.length; _j9++) {
-
-														linesNormals.push(lGeom.lineNormal[_j9]);
-												}
-
-												for (var _j10 = 0; _j10 < lGeom.lineMiter.length; _j10++) {
-
-														linesMiters.push(lGeom.lineMiter[_j10]);
-														linesOpacities.push(opacity);
+														updateArrays([0, 0, 0], [0, 0, 0], [0, 0, 0], 0);
 												}
 										}
 								}
@@ -9444,6 +9325,110 @@ var LevelCore = exports.LevelCore = function () {
 						return screensBoundToTouch;
 				}
 		}, {
+				key: 'emitParticles',
+				value: function emitParticles(_num, _mag) {
+
+						if (!this.gameElements.player) return;
+						var player = this.gameElements.player.instances[0];
+
+						if (_num > 2) {
+
+								this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
+								this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 4), { volume: 0.2 });
+								this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
+						}
+
+						// Add particles
+
+						if (this.particles.length < this.nParticles) {
+
+								for (var i = 0; i < (_num || 2); i++) {
+
+										this.particles.push(new _PhysicalElement.PhysicalElement({
+
+												position: player.position,
+												scale: [Math.random() * 10 * this.renderer.getPixelRatio() + 1.0, 0, 0],
+												acceleration: [(Math.random() - 0.5) * (_mag || 20), (Math.random() - 0.5) * (_mag || 20), 0],
+												velocity: vec3.scale(vec3.create(), player.velocity, 0.2),
+												canDye: true,
+												lifeSpan: 1000 * Math.random(),
+												mass: 700 * Math.random() + 700,
+												enabled: true,
+												drag: 0.99
+
+										}));
+								}
+						}
+				}
+		}, {
+				key: 'updateParticles',
+				value: function updateParticles() {
+
+						if (!this.gameElements.player) return;
+						var player = this.gameElements.player.instances[0];
+
+						// Update the particles & the geometry used to render them.
+
+						for (var i = this.nParticles - 4; i >= 0; i--) {
+
+								var bufferIndex = i * 3;
+
+								if (i < this.particles.length) {
+
+										var force = vec3.sub([0, 0, 0], player.position, this.particles[i].position);
+										var dist = vec3.length(force);
+										vec3.normalize(force, force);
+										var mag = 1.0 / Math.pow(dist + 1.0, 2.0) * 1.0;
+
+										this.particles[i].applyForce(vec3.scale(force, force, mag));
+										this.particles[i].update();
+
+										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = this.particles[i].position[0];
+										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = this.particles[i].position[1];
+										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = this.particles[i].scale[0] * this.particles[i].lifePercent;
+
+										if (this.particles[i].isDead()) {
+
+												this.particles.splice(i, 1);
+										}
+								} else {
+
+										this.particlesGeometry.attributes.position.array[bufferIndex + 0] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 1] = 0;
+										this.particlesGeometry.attributes.position.array[bufferIndex + 2] = 0;
+								}
+						}
+
+						this.particlesGeometry.attributes.position.needsUpdate = true;
+				}
+		}, {
+				key: 'updateInfoArrow',
+				value: function updateInfoArrow() {
+
+						if (!this.infoArrow) return;
+
+						var player = this.gameElements.player.instances[0];
+						var acceleration = player.accelerationCache;
+						// console.log(acceleration);
+						var length = vec3.length(acceleration) / player.mass;
+						var rotation = Math.atan2(acceleration[1], acceleration[0]);
+
+						length = Math.min(Math.max(length, 0.0000001), 100);
+
+						// console.log(length);
+
+						if (length > 0.005) length = 0.0000000001;
+
+						var scaleM = 500.5;
+
+						this.arrowHead.scale.set(0.1, 0.1, 0.1);
+						this.arrowHead.position.y = length * scaleM;
+						this.arrowLine.scale.y = length * scaleM;
+						this.arrowLine.position.y = length * scaleM * 0.5;
+						this.infoArrow.position.set(player.position[0], player.position[1], 0);
+						this.infoArrow.rotation.z = rotation - Math.PI * 0.5;
+				}
+		}, {
 				key: 'addLoadingObject',
 				value: function addLoadingObject() {
 
@@ -9571,56 +9556,56 @@ var LevelCore = exports.LevelCore = function () {
 
 												var geometry = element.mainGeometry;
 
-												for (var _i5 = maxInstancesNum; _i5 >= 0; _i5--) {
+												for (var _i6 = maxInstancesNum; _i6 >= 0; _i6--) {
 
-														if (_i5 < _instances4.length) {
+														if (_i6 < _instances4.length) {
 
-																if (!_instances4[_i5].isDead()) {
+																if (!_instances4[_i6].isDead()) {
 
-																		_instances4[_i5].update(_deltaTime);
+																		_instances4[_i6].update(_deltaTime);
 
-																		for (var _j11 = 0; _j11 < 4; _j11++) {
+																		for (var _j10 = 0; _j10 < 4; _j10++) {
 
-																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 0] = _instances4[_i5].position[0];
-																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 1] = _instances4[_i5].position[1];
+																				geometry.attributes.transform.array[_i6 * 16 + _j10 * 4 + 0] = _instances4[_i6].position[0];
+																				geometry.attributes.transform.array[_i6 * 16 + _j10 * 4 + 1] = _instances4[_i6].position[1];
 
-																				geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 3] = _instances4[_i5].rotation[2];
+																				geometry.attributes.transform.array[_i6 * 16 + _j10 * 4 + 3] = _instances4[_i6].rotation[2];
 
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 0] = _instances4[_i5].color[0];
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 1] = _instances4[_i5].color[1];
-																				geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].color[2];
+																				geometry.attributes.rgbaColor.array[_i6 * 16 + _j10 * 4 + 0] = _instances4[_i6].color[0];
+																				geometry.attributes.rgbaColor.array[_i6 * 16 + _j10 * 4 + 1] = _instances4[_i6].color[1];
+																				geometry.attributes.rgbaColor.array[_i6 * 16 + _j10 * 4 + 2] = _instances4[_i6].color[2];
 
 																				// Hack pass the sign along with the scale & color alpha
 
-																				if (_instances4[_i5].name == 'gravityChargeParticle') {
+																				if (_instances4[_i6].name == 'gravityChargeParticle') {
 
 																						// console.log(instances[ i ].charge);
-																						var s = Math.sign(_instances4[_i5].charge);
+																						var s = Math.sign(_instances4[_i6].charge);
 																						if (s == 0) s = 1;
-																						geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].scale[0] * s;
+																						geometry.attributes.transform.array[_i6 * 16 + _j10 * 4 + 2] = _instances4[_i6].scale[0] * s;
 																				} else {
 
-																						geometry.attributes.transform.array[_i5 * 16 + _j11 * 4 + 2] = _instances4[_i5].scale[0];
-																						geometry.attributes.rgbaColor.array[_i5 * 16 + _j11 * 4 + 3] = _instances4[_i5].color[3];
+																						geometry.attributes.transform.array[_i6 * 16 + _j10 * 4 + 2] = _instances4[_i6].scale[0];
+																						geometry.attributes.rgbaColor.array[_i6 * 16 + _j10 * 4 + 3] = _instances4[_i6].color[3];
 																				}
 																		}
 																} else {
 
-																		_instances4.splice(_i5, 1);
+																		_instances4.splice(_i6, 1);
 																}
 														} else {
 
-																for (var _j12 = 0; _j12 < 4; _j12++) {
+																for (var _j11 = 0; _j11 < 4; _j11++) {
 
-																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 0] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 1] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 2] = 0;
-																		geometry.attributes.transform.array[_i5 * 16 + _j12 * 4 + 3] = 0;
+																		geometry.attributes.transform.array[_i6 * 16 + _j11 * 4 + 0] = 0;
+																		geometry.attributes.transform.array[_i6 * 16 + _j11 * 4 + 1] = 0;
+																		geometry.attributes.transform.array[_i6 * 16 + _j11 * 4 + 2] = 0;
+																		geometry.attributes.transform.array[_i6 * 16 + _j11 * 4 + 3] = 0;
 
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 0] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 1] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 2] = 0;
-																		geometry.attributes.rgbaColor.array[_i5 * 16 + _j12 * 4 + 3] = 0;
+																		geometry.attributes.rgbaColor.array[_i6 * 16 + _j11 * 4 + 0] = 0;
+																		geometry.attributes.rgbaColor.array[_i6 * 16 + _j11 * 4 + 1] = 0;
+																		geometry.attributes.rgbaColor.array[_i6 * 16 + _j11 * 4 + 2] = 0;
+																		geometry.attributes.rgbaColor.array[_i6 * 16 + _j11 * 4 + 3] = 0;
 																}
 														}
 												}
@@ -9632,12 +9617,21 @@ var LevelCore = exports.LevelCore = function () {
 
 										var _instances5 = this.gameElements[elementName].instances;
 
-										for (var _i6 = 0; _i6 < _instances5.length; _i6++) {
+										for (var _i7 = 0; _i7 < _instances5.length; _i7++) {
 
-												_instances5[_i6].update(_deltaTime);
+												_instances5[_i7].update(_deltaTime);
 										}
 								}
 						}
+
+						// Update arrow
+
+						this.updateInfoArrow();
+
+						// Particles player
+
+						this.emitParticles();
+						if (this.particles.length > 0) this.updateParticles();
 
 						// Update end circle
 
@@ -9676,6 +9670,7 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (this.infoScreenClosed) return;
 
+						this.updateTextPoints(); // This stores in the elements some text positions.
 						var linesData = this.getLinesData();
 
 						this.linesGeometry.index.array = new Uint32Array(linesData.index);
@@ -9856,7 +9851,7 @@ var LevelCore = exports.LevelCore = function () {
 		return LevelCore;
 }();
 
-},{"../utils":76,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
+},{"../utils":76,"./PhysicalElement":64,"./library":68,"./shaderHelper":69,"adaptive-bezier-curve":2,"adaptive-quadratic-curve":4,"load-bmfont":25,"polyline-normals":35,"three-bmfont-text":41,"three-bmfont-text/shaders/msdf":44,"three-bmfont-text/shaders/sdf":45,"three-buffer-vertex-data":46,"three-line-2d":47,"three-line-2d/shaders/basic":48}],62:[function(require,module,exports){
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -9965,12 +9960,13 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 
 		_options = _options || {};
 
-		_this.position = _options.position ? [_options.position[0], _options.position[1], _options.position[2]] : [0, 0, 0];
-		_this.rotation = _options.rotation ? [_options.rotation[0], _options.rotation[1], _options.rotation[2]] : [0, 0, 0];
-		_this.scale = _options.scale ? [_options.scale[0], _options.scale[1], _options.scale[2]] : [0, 0, 0];
+		_this.position = _options.position || [0, 0, 0];
+		_this.rotation = _options.rotation || [0, 0, 0];
+		_this.scale = _options.scale || [0, 0, 0];
 
-		_this.velocity = _options.velocity ? [_options.velocity[0], _options.velocity[1], _options.velocity[2]] : [0, 0, 0];
-		_this.acceleration = _options.acceleration ? [_options.acceleration[0], _options.acceleration[1], _options.acceleration[2]] : [0, 0, 0];
+		_this.velocity = _options.velocity || [0, 0, 0];
+		_this.acceleration = _options.acceleration || [0, 0, 0];
+		_this.accelerationCache = _this.acceleration;
 
 		_this.mass = _options.mass || 2.0;
 		_this.drag = _options.drag || 0.7;
@@ -9983,8 +9979,7 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 		key: "applyForce",
 		value: function applyForce(_force) {
 
-			var newForce = this.divScal(_force, this.mass);
-			this.acceleration = this.add(this.acceleration, newForce);
+			this.acceleration = this.add(this.acceleration, _force);
 		}
 	}, {
 		key: "update",
@@ -9996,7 +9991,9 @@ var PhysicalElement = exports.PhysicalElement = function (_ElementCore) {
 
 			if (!this.enabled) return;
 
-			// this.acceleration = this.mulScal ( this.acceleration, _deltaTime );
+			// if ( !this.acceleration[ 0 ] && !this.acceleration[ 1 ] && !this.acceleration[ 2 ] ) console.log( this );
+			this.accelerationCache = [this.acceleration[0], this.acceleration[1], this.acceleration[2]];
+			this.acceleration = this.mulScal(this.acceleration, 1.0 / this.mass);
 			this.velocity = this.add(this.velocity, this.acceleration);
 			this.velocity = this.mulScal(this.velocity, _deltaTime * 0.063);
 			this.velocity = this.mulScal(this.velocity, this.drag);
@@ -10098,7 +10095,7 @@ var Planet = exports.Planet = function (_PhysicalElement) {
 				_this.maxCharge = _options.maxCharge || 50;
 				_this.minCharge = _options.minCharge || -_this.maxCharge;
 				_this.charge = _options.charge || 0;
-				_this.targetCharge = _this.charge;
+				_this.targetCharge = _options.targetCharge || _this.charge;
 
 				_this.charges = [];
 				_this.maxMass = _this.mass;
@@ -10374,7 +10371,7 @@ var shaderHelper = {
 
 						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\t\t\t\tf_Scale = transform.z;\n\n\t\t\t\t// Transform the position\n\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.28 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.99 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;\n\n\t\t\t\tfloat w = 0.06;\n\t\t\t\tfloat t = f_Scale - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a *= smoothstep ( f_Scale, f_Scale - 0.1, sdfDist );\n\n\t\t\t\t// Outline\n\n\t\t\t\tgl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -10382,7 +10379,7 @@ var shaderHelper = {
 
 						vertex: "\n\t\t\tattribute vec4 transform;\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tmat4 scaleMatrix ( vec3 scale ) {\n\n\t\t\t\treturn mat4(scale.x, 0.0, 0.0, 0.0,\n\t\t\t\t            0.0, scale.y, 0.0, 0.0,\n\t\t\t\t            0.0, 0.0, scale.z, 0.0,\n\t\t\t\t            0.0, 0.0, 0.0, 1.0);\n\n\t\t\t}\n\n\t\t\tmat4 rotationMatrix(vec3 axis, float angle) {\n\n\t\t\t\taxis = normalize(axis);\n\t\t\t\tfloat s = sin(angle);\n\t\t\t\tfloat c = cos(angle);\n\t\t\t\tfloat oc = 1.0 - c;\n\t\t\t\t    \n\t\t\t\treturn mat4(oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,\n\t\t\t\t            oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,\n\t\t\t\t            oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,\n\t\t\t\t            0.0,                                0.0,                                0.0,                                1.0);\n\t\t\t\t\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tf_Uv = uv;\n\t\t\t\tvec4 outPosition = vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t\t// Transform the position\n\n\t\t\t\tf_Scale = transform.z;\n\t\t\t\toutPosition *= scaleMatrix ( vec3 ( transform.z ) );\n\t\t\t\toutPosition *= rotationMatrix ( vec3(0, 0, 1), transform.w );\n\t\t\t\t\n\n\t\t\t\toutPosition.x += transform.x;\n\t\t\t\toutPosition.y += transform.y;\n\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( outPosition.xyz, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
-						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z;\n\n\t\t\t\tfloat w = 0.22 / ( f_Scale + 1.0 );\n\t\t\t\tfloat t = 0.98 - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
+						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tvarying vec2 f_Uv;\n\t\t\tvarying float f_Scale;\n\n\t\t\tvoid main () {\n\n\t\t\t\tvec4 sdf = texture2D ( texture, f_Uv );\n\t\t\t\tfloat sdfDist = sdf.x * sdf.y * sdf.z * ( f_Scale * 1.04 );\n\n\t\t\t\tfloat w = 0.06;\n\t\t\t\tfloat t = f_Scale - w;\n\n\t\t\t\t// Background\n\n\t\t\t\tgl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.0 );\n\n\t\t\t\t// Outside\n\n\t\t\t\tgl_FragColor.a += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) ) * f_Color.a;\n\n\t\t\t}\n\n\t\t"
 
 			},
 
@@ -10658,6 +10655,14 @@ var shaderHelper = {
 						vertex: "\n\t\t\tattribute vec4 rgbaColor;\n\t\t\tvarying vec4 f_Color;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Color = rgbaColor;\n\t\t\t\tgl_PointSize = position.z;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
 
 						fragment: "\n\t\t\tuniform sampler2D texture;\n\t\t\tvarying vec4 f_Color;\n\t\t\tuniform float globalAlpha;\n\n\t\t\tfloat aastep ( float value ) {\n\n\t\t\t    #ifdef GL_OES_standard_derivatives\n\n\t\t\t      float afwidth = length ( vec2 ( dFdx ( value ), dFdy ( value ) ) ) * 0.70710678118654757;\n\n\t\t\t    #else\n\n\t\t\t      float afwidth = ( 1.0 / 32.0 ) * ( 1.4142135623730951 / ( 2.0 * gl_FragCoord.w ) );\n\n\t\t\t    #endif\n\n\t\t\t    return smoothstep ( 0.5 - afwidth, 0.5 + afwidth, value );\n\n\t\t\t}\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = length ( vec2 ( 0.5 ) - gl_PointCoord.xy ) * 2.0;\n\t\t\t    vec4 texColor = texture2D ( texture, gl_PointCoord.xy );\n\t\t\t    float alpha = aastep ( texColor.a );\n\t\t\t    gl_FragColor = f_Color;\n\t\t\t    gl_FragColor.a *= alpha * smoothstep ( 3.0, 0.0, cDist ) * globalAlpha;\n\n\t\t\t    // gl_FragColor = vec4 ( 1.0, 0.0, 0.0, 1.0 );\n\t\t\t    // if ( gl_FragColor.a < 0.0001 ) discard;\n\n\t\t\t    // gl_FragColor = texColor;\n\n\t\t\t}\n\n\t\t"
+
+			},
+
+			arrowLine: {
+
+						vertex: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tf_Uv = uv;\n\t\t\t\tgl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );\n\n\t\t\t}\n\n\t\t",
+
+						fragment: "\n\t\t\tvarying vec2 f_Uv;\n\n\t\t\tvoid main () {\n\n\t\t\t\tfloat cDist = ( 0.5 - f_Uv.x ) * 2.0;\n\t\t\t    gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );\n\t\t\t    gl_FragColor.a *= smoothstep ( 0.9, 0.84, cDist );\n\n\t\t\t}\n\n\t\t"
 
 			}
 
@@ -11462,7 +11467,7 @@ var IntroScene = exports.IntroScene = function () {
 
 												if (_dist < minDist) {
 
-														this.emitParticles(50, 0.1);
+														this.emitParticles(50, 120);
 														this.player.position = this.getRandomEdgePosition();
 														this.player.velocity = [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0];
 												}
@@ -11615,7 +11620,7 @@ var IntroScene = exports.IntroScene = function () {
 
 								if (dist < minDist) {
 
-										this.emitParticles(50, 0.1);
+										this.emitParticles(50, 120);
 										this.player.position = this.getRandomEdgePosition();
 										this.player.velocity = [(Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, 0];
 								} else {
@@ -11825,7 +11830,7 @@ var IntroScene = exports.IntroScene = function () {
 
 										if (dist < minDist - 0.1) {
 
-												this.emitParticles(50, 0.1);
+												this.emitParticles(50, 120);
 												this.player.position = this.getRandomEdgePosition();
 										}
 
@@ -12015,7 +12020,7 @@ var IntroScene = exports.IntroScene = function () {
 
 												position: this.player.position,
 												scale: [Math.random() * 10 * this.renderer.getPixelRatio() + 1.0, 0, 0],
-												acceleration: [(Math.random() - 0.5) * (_mag || 0.02), (Math.random() - 0.5) * (_mag || 0.02), 0],
+												acceleration: [(Math.random() - 0.5) * (_mag || 20), (Math.random() - 0.5) * (_mag || 20), 0],
 												velocity: vec3.scale(vec3.create(), this.player.velocity, 0.2),
 												canDye: true,
 												lifeSpan: 1000 * Math.random(),
@@ -12501,7 +12506,7 @@ var loop = require('raf-loop');
 
 				var stats = new Stats();
 				stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-				// document.body.appendChild( stats.dom );
+				document.body.appendChild(stats.dom);
 
 				// Events
 
@@ -12783,7 +12788,7 @@ Object.defineProperty(exports, "__esModule", {
 						value: true
 });
 
-var _fixedCharges, _fixedCharges2, _fixedCharges3, _fixedCharges4;
+var _fixedCharges, _fixedCharges2, _fixedCharges3;
 
 function _defineProperty(obj, key, value) { if (key in obj) { Object.defineProperty(obj, key, { value: value, enumerable: true, configurable: true, writable: true }); } else { obj[key] = value; } return obj; }
 
@@ -12794,59 +12799,9 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity',
-																		textIntro: '- G -\n\n1\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+																		textIntro: 'G\n\n1\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		playerDrag: 0.9855,
 																		elements: {
-
-																								planets: {
-
-																														elementType: 'Planet',
-																														static: true,
-																														manualMode: false,
-																														transparent: true,
-																														renderOrder: 1,
-																														buildFromInstances: true,
-																														drawInfos: true,
-																														maxInstancesNum: 3,
-																														textAlign: 'bottom',
-
-																														shaders: {
-
-																																				main: null,
-
-																																				normal: {
-
-																																										name: 'planet',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				scan: {
-
-																																										name: 'scanPlanet',
-																																										blanding: 'NormalBlending',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				},
-
-																																				infos: {
-
-																																										name: 'infoPlanet',
-																																										transparent: true,
-																																										textureUrl: './resources/textures/generic_circle_sdf.png',
-																																										uniforms: {}
-
-																																				}
-
-																														},
-
-																														instances: {}
-
-																								},
 
 																								blackMatter: {
 
@@ -12858,7 +12813,7 @@ var levels = {
 																														maxInstancesNum: 108,
 																														renderOrder: 3,
 																														drawInfos: true,
-																														mainInfoPointIndex: 3, // 0 - 8
+																														lineInfo: 'top',
 
 																														shaders: {
 
@@ -12896,6 +12851,54 @@ var levels = {
 
 																														instances: {}
 
+																								},
+
+																								planets: {
+
+																														elementType: 'Planet',
+																														static: true,
+																														manualMode: false,
+																														transparent: true,
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														lineInfo: 'bottom',
+
+																														shaders: {
+
+																																				main: null,
+
+																																				normal: {
+
+																																										name: 'planet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				scan: {
+
+																																										name: 'scanPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				},
+
+																																				infos: {
+
+																																										name: 'infoPlanet',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
+
+																																				}
+
+																														},
+
+																														instances: {}
+
 																								}
 
 																		}
@@ -12905,7 +12908,7 @@ var levels = {
 												1: {
 
 																		chapter: 'gravity',
-																		textIntro: '- G -\n\n2\n\nDrag on the screen to place objects along the particles stream to change its trajectory \n\nTry to direct it to the target\n\nClick to start',
+																		textIntro: 'G\n\n2\n\nDrag on the screen to place objects along the particles stream to change its trajectory \n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -12917,6 +12920,7 @@ var levels = {
 																														renderOrder: 1,
 																														buildFromInstances: true,
 																														drawInfos: true,
+																														lineInfo: 'bottom',
 																														maxInstancesNum: 3,
 
 																														shaders: {
@@ -12956,14 +12960,15 @@ var levels = {
 
 																																				0: {
 
-																																										infoPointIndex: 16 * 7 + 3,
+																																										manualPointIndex: 0,
 																																										enabled: true,
 																																										position: [-2, 0, 0],
 																																										radius: 4,
 																																										mass: 500000,
 																																										scale: [1.8, 1.8, 1.8],
 																																										color: [255 / 255, 222 / 255, 40 / 255, 1],
-																																										rotation: [0, 0, 0]
+																																										rotation: [0, 0, 0],
+																																										canDye: false
 
 																																				}
 
@@ -12981,7 +12986,6 @@ var levels = {
 																														maxInstancesNum: 108,
 																														renderOrder: 3,
 																														drawInfos: true,
-																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -13029,7 +13033,7 @@ var levels = {
 												2: {
 
 																		chapter: 'gravity',
-																		textIntro: '- G -\n\n3\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+																		textIntro: 'G\n\n3\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -13042,6 +13046,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 3,
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -13080,7 +13085,7 @@ var levels = {
 
 																																				1: {
 
-																																										infoPointIndex: 16 * 7 + 5,
+																																										manualPointIndex: 2,
 																																										position: [1.8, 0, 0],
 																																										radius: 2,
 																																										mass: 10000,
@@ -13091,7 +13096,7 @@ var levels = {
 
 																																				2: {
 
-																																										infoPointIndex: 16 * 7 + 3,
+																																										manualPointIndex: 0,
 																																										position: [-1.5, 1.5, 0],
 																																										radius: 2,
 																																										mass: 1000000,
@@ -13102,7 +13107,7 @@ var levels = {
 
 																																				3: {
 
-																																										infoPointIndex: 16 * 7 + 1,
+																																										manualPointIndex: 1,
 																																										position: [-1.8, -1.8, 0],
 																																										radius: 2,
 																																										mass: 100000,
@@ -13173,7 +13178,7 @@ var levels = {
 												3: {
 
 																		chapter: 'gravity',
-																		textIntro: '- G -\n\n4\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+																		textIntro: 'G\n\n4\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -13186,6 +13191,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 3,
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -13224,7 +13230,7 @@ var levels = {
 
 																																				0: {
 
-																																										infoPointIndex: 16 * 7 + 3,
+																																										manualPointIndex: 1,
 																																										position: [0, 0, 0],
 																																										radius: 2,
 																																										mass: 10000,
@@ -13235,7 +13241,7 @@ var levels = {
 
 																																				1: {
 
-																																										infoPointIndex: 16 * 7 + 5,
+																																										manualPointIndex: 2,
 																																										position: [1.8, -1.8, 0],
 																																										radius: 2,
 																																										mass: 500000,
@@ -13246,7 +13252,7 @@ var levels = {
 
 																																				2: {
 
-																																										infoPointIndex: 16 * 7 + 1,
+																																										manualPointIndex: 0,
 																																										position: [-1.8, 1.8, 0],
 																																										radius: 2,
 																																										mass: 500000,
@@ -13317,7 +13323,7 @@ var levels = {
 												4: {
 
 																		chapter: 'gravity',
-																		textIntro: '- G -\n\n5\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+																		textIntro: 'G\n\n5\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 																		elements: {
 
 																								planets: {
@@ -13330,6 +13336,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 3,
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -13368,7 +13375,7 @@ var levels = {
 
 																																				0: {
 
-																																										infoPointIndex: 16 * 7 + 1,
+																																										manualPointIndex: 0,
 																																										position: [-2.0, 0, 0],
 																																										radius: 2,
 																																										mass: 600000,
@@ -13379,7 +13386,7 @@ var levels = {
 
 																																				1: {
 
-																																										infoPointIndex: 16 * 7 + 5,
+																																										manualPointIndex: 2,
 																																										position: [0.5, 0, 0],
 																																										radius: 2,
 																																										mass: 50000,
@@ -13454,83 +13461,44 @@ var levels = {
 												0: {
 
 																		chapter: 'electric',
-																		textIntro: '- E -\n\n1\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target by adding some attractors\n\nClick to start',
+																		textIntro: 'E\n\n1\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target by adding some attractors\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 																		playerDrag: 0.9855,
 																		elements: {
 
-																								fixedCharges: (_fixedCharges = {
+																								fixedCharges: {
 
 																														elementType: 'ElectricParticle',
-																														static: false,
+																														static: true,
 																														manualMode: false,
 																														transparent: true,
-																														individual: false,
-																														maxInstancesNum: 20,
-																														renderOrder: 2,
-																														drawInfos: true
-																								}, _defineProperty(_fixedCharges, 'maxInstancesNum', 3), _defineProperty(_fixedCharges, 'textAlign', 'bottom'), _defineProperty(_fixedCharges, 'shaders', {
+																														renderOrder: 1,
+																														buildFromInstances: true,
+																														drawInfos: true,
+																														maxInstancesNum: 0,
 
-																														main: null,
+																														shaders: {
 
-																														normal: {
+																																				main: null,
 
-																																				name: 'fixedElectricCharge',
-																																				blending: 'MultiplyBlending',
-																																				transparent: true,
-																																				textureUrl: './resources/textures/generic_circle_sdf.png',
-																																				uniforms: {}
+																																				normal: {
 
-																														},
+																																										name: 'fixedElectricCharge',
+																																										transparent: true,
+																																										textureUrl: './resources/textures/generic_circle_sdf.png',
+																																										uniforms: {}
 
-																														scan: {
+																																				},
 
-																																				name: 'fixedElectricChargeScan',
-																																				transparent: true,
-																																				textureUrl: './resources/textures/generic_circle_sdf.png',
-																																				uniforms: {}
+																																				scan: null,
+
+																																				infos: null
 
 																														},
 
-																														infos: {
+																														instances: {}
 
-																																				name: 'fixedElectricChargeInfo',
-																																				transparent: true,
-																																				textureUrl: './resources/textures/generic_circle_sdf.png',
-																																				uniforms: {}
-
-																														}
-
-																								}), _defineProperty(_fixedCharges, 'instances', {
-
-																														// 0: {
-
-																														// 	infoPointIndex: 16 * 7 + 2,
-																														// 	enabled: false,
-																														// 	fixedRadius: true,
-																														//                       position: [ -2, 0, 0 ],
-																														//                       radius: 0,
-																														//                       targetRadius: 0.5,
-																														//                       sign: -1,
-																														//                       mass: 500000,
-																														//                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-
-																														//                   },
-
-																														//                   1: {
-
-																														// 	infoPointIndex: 16 * 7 + 4,
-																														// 	enabled: false,
-																														// 	fixedRadius: true,
-																														//                       position: [ 2, 0, 0 ],
-																														//                       radius: 0,
-																														//                       targetRadius: 0.5,
-																														//                       sign: 1,
-																														//                       mass: 500000,
-																														//                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-
-																														//                   },
-
-																								}), _fixedCharges),
+																								},
 
 																								charges: {
 
@@ -13542,7 +13510,6 @@ var levels = {
 																														maxInstancesNum: 20,
 																														renderOrder: 3,
 																														drawInfos: true,
-																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -13636,11 +13603,11 @@ var levels = {
 												1: {
 
 																		chapter: 'electric',
-																		textIntro: '- E -\n\n2\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target\n\nClick to start',
-
+																		textIntro: 'E\n\n2\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 																		elements: {
 
-																								fixedCharges: (_fixedCharges2 = {
+																								fixedCharges: (_fixedCharges = {
 
 																														elementType: 'ElectricParticle',
 																														static: false,
@@ -13650,7 +13617,7 @@ var levels = {
 																														maxInstancesNum: 1,
 																														renderOrder: 2,
 																														drawInfos: true
-																								}, _defineProperty(_fixedCharges2, 'maxInstancesNum', 3), _defineProperty(_fixedCharges2, 'textAlign', 'bottom'), _defineProperty(_fixedCharges2, 'shaders', {
+																								}, _defineProperty(_fixedCharges, 'maxInstancesNum', 1), _defineProperty(_fixedCharges, 'lineInfo', 'bottom'), _defineProperty(_fixedCharges, 'shaders', {
 
 																														main: null,
 
@@ -13682,11 +13649,11 @@ var levels = {
 
 																														}
 
-																								}), _defineProperty(_fixedCharges2, 'instances', {
+																								}), _defineProperty(_fixedCharges, 'instances', {
 
 																														0: {
 
-																																				infoPointIndex: 16 * 7 + 3,
+																																				manualPointIndex: 1,
 																																				enabled: false,
 																																				position: [0, 0, 0],
 																																				radius: 0,
@@ -13697,7 +13664,7 @@ var levels = {
 
 																														}
 
-																								}), _fixedCharges2),
+																								}), _fixedCharges),
 
 																								charges: {
 
@@ -13709,7 +13676,6 @@ var levels = {
 																														maxInstancesNum: 20,
 																														renderOrder: 3,
 																														drawInfos: true,
-																														mainInfoPointIndex: 3, // 0 - 8
 
 																														shaders: {
 
@@ -13790,8 +13756,8 @@ var levels = {
 												2: {
 
 																		chapter: 'electric',
-																		textIntro: '- E -\n\n3\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+																		textIntro: 'E\n\n3\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 																		elements: {
 
 																								fixedCharges: {
@@ -13825,22 +13791,7 @@ var levels = {
 
 																														},
 
-																														instances: {
-
-																																				1: {
-
-																																										infoPointIndex: 19 * 7 + 3,
-																																										hack: true,
-																																										position: [-100, -100, 0.0],
-																																										radius: 2,
-																																										mass: 0,
-																																										scale: [1.0, 0.12, 0.1],
-																																										rotation: [0, 0, Math.PI * -0.25],
-																																										color: [0.7, 0.7, 0.7, 1]
-
-																																				}
-
-																														}
+																														instances: {}
 
 																								},
 
@@ -13972,11 +13923,11 @@ var levels = {
 												3: {
 
 																		chapter: 'electric',
-																		textIntro: '- E -\n\n4\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+																		textIntro: 'E\n\n4\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 																		elements: {
 
-																								fixedCharges: (_fixedCharges3 = {
+																								fixedCharges: (_fixedCharges2 = {
 
 																														elementType: 'ElectricParticle',
 																														static: false,
@@ -13986,7 +13937,7 @@ var levels = {
 																														maxInstancesNum: 1,
 																														renderOrder: 2,
 																														drawInfos: true
-																								}, _defineProperty(_fixedCharges3, 'maxInstancesNum', 3), _defineProperty(_fixedCharges3, 'textAlign', 'bottom'), _defineProperty(_fixedCharges3, 'shaders', {
+																								}, _defineProperty(_fixedCharges2, 'maxInstancesNum', 3), _defineProperty(_fixedCharges2, 'lineInfo', 'bottom'), _defineProperty(_fixedCharges2, 'shaders', {
 
 																														main: null,
 
@@ -14017,22 +13968,21 @@ var levels = {
 																																				uniforms: {}
 
 																														}
-																								}), _defineProperty(_fixedCharges3, 'instances', {
+																								}), _defineProperty(_fixedCharges2, 'instances', {
 
 																														0: {
 
-																																				infoPointIndex: 16 * 7 + 3,
+																																				manualPointIndex: 1,
 																																				enabled: false,
 																																				position: [0, 0, 0],
 																																				radius: 0,
 																																				targetRadius: 0.6,
-																																				sign: -1,
 																																				mass: 500000,
 																																				rotation: [0, 0, Math.random() * Math.PI * 2]
 
 																														}
 
-																								}), _fixedCharges3),
+																								}), _fixedCharges2),
 
 																								charges: {
 
@@ -14162,8 +14112,8 @@ var levels = {
 												4: {
 
 																		chapter: 'electric',
-																		textIntro: '- E -\n\n5\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+																		textIntro: 'E\n\n5\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 																		elements: {
 
 																								charges: {
@@ -14216,7 +14166,7 @@ var levels = {
 
 																								},
 
-																								fixedCharges: (_fixedCharges4 = {
+																								fixedCharges: (_fixedCharges3 = {
 
 																														elementType: 'ElectricParticle',
 																														static: false,
@@ -14226,7 +14176,7 @@ var levels = {
 																														maxInstancesNum: 1,
 																														renderOrder: 2,
 																														drawInfos: true
-																								}, _defineProperty(_fixedCharges4, 'maxInstancesNum', 1), _defineProperty(_fixedCharges4, 'textAlign', 'bottom'), _defineProperty(_fixedCharges4, 'shaders', {
+																								}, _defineProperty(_fixedCharges3, 'maxInstancesNum', 1), _defineProperty(_fixedCharges3, 'textAlign', 'bottom'), _defineProperty(_fixedCharges3, 'shaders', {
 
 																														main: null,
 
@@ -14243,23 +14193,7 @@ var levels = {
 																														scan: null,
 
 																														infos: null
-																								}), _defineProperty(_fixedCharges4, 'instances', {
-
-																														0: {
-
-																																				hack: true,
-																																				infoPointIndex: 19 * 7 + 3,
-																																				enabled: true,
-																																				position: [-100, -100, 0],
-																																				radius: 0,
-																																				targetRadius: 0.6,
-																																				sign: -1,
-																																				mass: 0,
-																																				rotation: [0, 0, Math.random() * Math.PI * 2]
-
-																														}
-
-																								}), _fixedCharges4),
+																								}), _defineProperty(_fixedCharges3, 'instances', {}), _fixedCharges3),
 
 																								obstacles: {
 
@@ -14365,8 +14299,8 @@ var levels = {
 												0: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: '- G & E -\n\n1\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+																		textIntro: 'G & E\n\n1\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 																		elements: {
 
 																								planets: {
@@ -14379,7 +14313,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 3,
-																														textAlign: 'bottom',
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -14416,30 +14350,17 @@ var levels = {
 
 																														instances: {
 
-																																				0: {
-
-																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 2,
-																																										particles: [1, 3, 6, 12],
-																																										position: [-2, 0, 0],
-																																										radius: 4,
-																																										mass: 10000,
-																																										scale: [1.3, 1.3, 1.3],
-																																										color: [0.8, 0.8, 0.8, 1],
-																																										charge: 25
-
-																																				},
-
 																																				1: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 4,
-																																										particles: [1, 3, 6, 12],
+																																										manualPointIndex: 1,
+																																										particles: [1, 3, 6, 12, 12],
 																																										position: [2, 0, 0],
 																																										radius: 3.5,
-																																										mass: 10000,
-																																										scale: [1.3, 1.3, 1.3],
-																																										color: [0.8, 0.8, 0.8, 1]
+																																										mass: 1000000,
+																																										scale: [1.8, 1.8, 1.8],
+																																										color: [0.8, 0.8, 0.8, 1],
+																																										targetCharge: 27
 
 																																				}
 
@@ -14502,8 +14423,8 @@ var levels = {
 												1: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: '- G & E -\n\n2\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+																		textIntro: 'G & E\n\n2\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 																		elements: {
 
 																								planets: {
@@ -14516,7 +14437,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 3,
-																														textAlign: 'bottom',
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -14553,16 +14474,31 @@ var levels = {
 
 																														instances: {
 
+																																				0: {
+
+																																										name: 'electricPlanet',
+																																										manualPointIndex: 0,
+																																										particles: [1, 3, 6, 12],
+																																										position: [-2, 0, 0],
+																																										radius: 4,
+																																										mass: 10000,
+																																										scale: [1.3, 1.3, 1.3],
+																																										color: [0.8, 0.8, 0.8, 1],
+																																										targetCharge: 25
+
+																																				},
+
 																																				1: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 4,
-																																										particles: [1, 3, 6, 12, 12],
+																																										manualPointIndex: 1,
+																																										particles: [1, 3, 6, 12],
 																																										position: [2, 0, 0],
 																																										radius: 3.5,
-																																										mass: 1000000,
-																																										scale: [1.8, 1.8, 1.8],
-																																										color: [0.8, 0.8, 0.8, 1]
+																																										mass: 10000,
+																																										scale: [1.3, 1.3, 1.3],
+																																										color: [0.8, 0.8, 0.8, 1],
+																																										targetCharge: -25
 
 																																				}
 
@@ -14625,8 +14561,8 @@ var levels = {
 												2: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: '- G & E -\n\n3\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+																		textIntro: 'G & E\n\n3\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 																		elements: {
 
 																								planets: {
@@ -14639,7 +14575,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 4,
-																														textAlign: 'bottom',
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -14679,13 +14615,12 @@ var levels = {
 																																				0: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 1,
+																																										manualPointIndex: 2,
 																																										particles: [1, 3, 6, 7],
 																																										position: [-2, -2, 0],
 																																										radius: 3.5,
 																																										mass: 10000,
-																																										charge: 10,
-																																										sign: -1,
+																																										targetCharge: 10,
 																																										scale: [1, 1, 1],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -14694,12 +14629,12 @@ var levels = {
 																																				1: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 2,
+																																										manualPointIndex: 3,
 																																										particles: [1, 3, 6, 16],
 																																										position: [-2, 2, 0],
 																																										radius: 3.5,
 																																										mass: 1000000,
-																																										charge: 25,
+																																										targetCharge: -20,
 																																										scale: [1.4, 1.4, 1.4],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -14824,8 +14759,8 @@ var levels = {
 												3: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: '- G & E -\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+																		textIntro: 'G & E\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 																		elements: {
 
 																								planets: {
@@ -14838,7 +14773,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 4,
-																														textAlign: 'bottom',
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -14878,14 +14813,13 @@ var levels = {
 																																				0: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 4,
+																																										manualPointIndex: 1,
 																																										particles: [1, 3, 6, 7],
 																																										position: [2, -2, 0],
 																																										radius: 3.5,
 																																										mass: 10000,
-																																										charge: 15,
-																																										maxCharge: 30,
-																																										sign: -1,
+																																										targetCharge: 2,
+																																										maxCharge: 15,
 																																										scale: [1, 1, 1],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -14894,13 +14828,12 @@ var levels = {
 																																				1: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 2,
+																																										manualPointIndex: 0,
 																																										particles: [1, 3, 6, 7],
 																																										position: [-2, 2, 0],
 																																										radius: 3.5,
 																																										mass: 1000000,
-																																										charge: 25,
-																																										sign: -1,
+																																										targetCharge: -25,
 																																										scale: [1, 1, 1],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -15036,8 +14969,8 @@ var levels = {
 												4: {
 
 																		chapter: 'gravity-electric',
-																		textIntro: '- G & E -\n\n5\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+																		textIntro: 'G & E\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+																		legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 																		elements: {
 
 																								planets: {
@@ -15050,7 +14983,7 @@ var levels = {
 																														buildFromInstances: true,
 																														drawInfos: true,
 																														maxInstancesNum: 4,
-																														textAlign: 'bottom',
+																														lineInfo: 'bottom',
 
 																														shaders: {
 
@@ -15090,14 +15023,13 @@ var levels = {
 																																				0: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 4,
+																																										manualPointIndex: 0,
 																																										particles: [1, 3, 6, 7],
-																																										position: [2, -2, 0],
+																																										position: [-2, 0, 0],
 																																										radius: 3.5,
 																																										mass: 10000,
-																																										charge: 15,
+																																										charge: 0,
 																																										maxCharge: 30,
-																																										sign: -1,
 																																										scale: [1, 1, 1],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -15106,13 +15038,26 @@ var levels = {
 																																				1: {
 
 																																										name: 'electricPlanet',
-																																										infoPointIndex: 16 * 7 + 2,
+																																										manualPointIndex: 1,
 																																										particles: [1, 3, 6, 7],
-																																										position: [-2, 2, 0],
+																																										position: [2, 2.5, 0],
 																																										radius: 3.5,
 																																										mass: 1000000,
-																																										charge: 25,
-																																										sign: -1,
+																																										charge: 0,
+																																										scale: [1, 1, 1],
+																																										color: [0.8, 0.8, 0.8, 1]
+
+																																				},
+
+																																				2: {
+
+																																										name: 'electricPlanet',
+																																										manualPointIndex: 2,
+																																										particles: [1, 3, 6, 7],
+																																										position: [2, -2.5, 0],
+																																										radius: 3.5,
+																																										mass: 1000000,
+																																										charge: 0,
 																																										scale: [1, 1, 1],
 																																										color: [0.8, 0.8, 0.8, 1]
 
@@ -15217,22 +15162,11 @@ var levels = {
 
 																																				1: {
 
-																																										position: [1, 1, 0.0],
+																																										position: [-0.1, 0, 0.0],
 																																										radius: 2,
 																																										mass: 100000,
-																																										scale: [1.4, 0.12, 0.1],
-																																										rotation: [0, 0, Math.PI * -0.25],
-																																										color: [0.7, 0.7, 0.7, 1]
-
-																																				},
-
-																																				2: {
-
-																																										position: [-1, -1, 0.0],
-																																										radius: 2,
-																																										mass: 100000,
-																																										scale: [1.4, 0.12, 0.1],
-																																										rotation: [0, 0, Math.PI * -0.25],
+																																										scale: [0.8, 0.12, 0.1],
+																																										rotation: [0, 0, 0],
 																																										color: [0.7, 0.7, 0.7, 1]
 
 																																				}

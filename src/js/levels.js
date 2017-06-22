@@ -5,60 +5,9 @@ let levels = {
 		0: {
 
 			chapter: 'gravity',
-			textIntro: '- G -\n\n1\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+			textIntro: 'G\n\n1\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 			playerDrag: 0.9855,
 			elements: {
-
-				planets: {
-
-					elementType: 'Planet',
-					static: true,
-					manualMode: false,
-					transparent: true,
-					renderOrder: 1,
-					buildFromInstances: true,
-					drawInfos: true,
-					maxInstancesNum: 3,
-					textAlign: 'bottom',
-
-					shaders: {
-
-						main: null,
-
-						normal: {
-
-							name: 'planet',
-							transparent: true,
-							textureUrl: './resources/textures/generic_circle_sdf.png',
-							uniforms: {},
-
-						},
-
-						scan: {
-
-							name: 'scanPlanet',
-							blanding: 'NormalBlending',
-							transparent: true,
-							textureUrl: './resources/textures/generic_circle_sdf.png',
-							uniforms: {},
-
-						},
-
-						infos: {
-
-							name: 'infoPlanet',
-							transparent: true,
-							textureUrl: './resources/textures/generic_circle_sdf.png',
-							uniforms: {},
-
-						},
-
-					},
-
-
-					instances: {}
-
-				},
 
 				blackMatter: {
 
@@ -70,7 +19,7 @@ let levels = {
 					maxInstancesNum: 108,
 					renderOrder: 3,
 					drawInfos: true,
-					mainInfoPointIndex: 3, // 0 - 8
+					lineInfo: 'top',
 
 					shaders: {
 
@@ -109,7 +58,58 @@ let levels = {
 
 					instances: {}
 
-				}
+				},
+
+				planets: {
+
+					elementType: 'Planet',
+					static: true,
+					manualMode: false,
+					transparent: true,
+					renderOrder: 1,
+					buildFromInstances: true,
+					drawInfos: true,
+					lineInfo: 'bottom',
+
+					shaders: {
+
+						main: null,
+
+						normal: {
+
+							name: 'planet',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						scan: {
+
+							name: 'scanPlanet',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+						infos: {
+
+							name: 'infoPlanet',
+							transparent: true,
+							textureUrl: './resources/textures/generic_circle_sdf.png',
+							uniforms: {},
+
+						},
+
+					},
+
+
+					instances: {
+
+					}
+
+				},
 
 			}
 
@@ -118,7 +118,7 @@ let levels = {
 		1: {
 
 			chapter: 'gravity',
-			textIntro: '- G -\n\n2\n\nDrag on the screen to place objects along the particles stream to change its trajectory \n\nTry to direct it to the target\n\nClick to start',
+			textIntro: 'G\n\n2\n\nDrag on the screen to place objects along the particles stream to change its trajectory \n\nTry to direct it to the target\n\nClick to start',
 			elements: {
 
 				planets: {
@@ -130,6 +130,7 @@ let levels = {
 					renderOrder: 1,
 					buildFromInstances: true,
 					drawInfos: true,
+					lineInfo: 'bottom',
 					maxInstancesNum: 3,
 
 					shaders: {
@@ -170,7 +171,7 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 16 * 7 + 3,
+							manualPointIndex: 0,
 							enabled: true,
                             position: [ -2, 0, 0 ],
                             radius: 4,
@@ -178,6 +179,7 @@ let levels = {
                             scale: [ 1.8, 1.8, 1.8 ],
                             color: [ 255/255, 222/255, 40/255, 1 ],
                             rotation: [ 0, 0, 0 ],
+                            canDye: false,
 
                         },
 
@@ -195,7 +197,6 @@ let levels = {
 					maxInstancesNum: 108,
 					renderOrder: 3,
 					drawInfos: true,
-					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -244,7 +245,7 @@ let levels = {
 		2: {
 
 			chapter: 'gravity',
-			textIntro: '- G -\n\n3\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+			textIntro: 'G\n\n3\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 			elements: {
 
 				planets: {
@@ -257,6 +258,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 3,
+					lineInfo: 'bottom',
 
 					shaders: {
 
@@ -296,7 +298,7 @@ let levels = {
 
 						1: {
 
-							infoPointIndex: 16 * 7 + 5,
+							manualPointIndex: 2,
                             position: [ 1.8, 0, 0 ],
                             radius: 2,
                             mass: 10000,
@@ -307,7 +309,7 @@ let levels = {
 
                         2: {
 
-                        	infoPointIndex: 16 * 7 + 3,
+                        	manualPointIndex: 0,
                             position: [ -1.5, 1.5, 0 ],
                             radius: 2,
                             mass: 1000000,
@@ -318,7 +320,7 @@ let levels = {
 
                         3: {
 
-                        	infoPointIndex: 16 * 7 + 1,
+                        	manualPointIndex: 1,
                             position: [ -1.8, -1.8, 0 ],
                             radius: 2,
                             mass: 100000,
@@ -390,7 +392,7 @@ let levels = {
 		3: {
 
 			chapter: 'gravity',
-			textIntro: '- G -\n\n4\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+			textIntro: 'G\n\n4\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 			elements: {
 
 				planets: {
@@ -403,6 +405,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 3,
+					lineInfo: 'bottom',
 
 					shaders: {
 
@@ -442,7 +445,7 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 16 * 7 + 3,
+							manualPointIndex: 1,
                             position: [ 0, 0, 0 ],
                             radius: 2,
                             mass: 10000,
@@ -453,7 +456,7 @@ let levels = {
 
                         1: {
 
-                        	infoPointIndex: 16 * 7 + 5,
+                        	manualPointIndex: 2,
                             position: [ 1.8, -1.8, 0 ],
                             radius: 2,
                             mass: 500000,
@@ -464,7 +467,7 @@ let levels = {
 
                         2: {
 
-                        	infoPointIndex: 16 * 7 + 1,
+                        	manualPointIndex: 0,
                             position: [ -1.8, 1.8, 0 ],
                             radius: 2,
                             mass: 500000,
@@ -537,7 +540,7 @@ let levels = {
 		4: {
 
 			chapter: 'gravity',
-			textIntro: '- G -\n\n5\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
+			textIntro: 'G\n\n5\n\nDrag on the screen to place objects along the particles stream to change its trajectory\n\nTry to direct it to the target\n\nClick to start',
 			elements: {
 
 				planets: {
@@ -550,6 +553,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 3,
+					lineInfo: 'bottom',
 
 					shaders: {
 
@@ -589,7 +593,7 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 16 * 7 + 1,
+							manualPointIndex: 0,
                             position: [ -2.0, 0, 0 ],
                             radius: 2,
                             mass: 600000,
@@ -600,7 +604,7 @@ let levels = {
 
                         1: {
 
-                        	infoPointIndex: 16 * 7 + 5,
+                        	manualPointIndex: 2,
                             position: [ 0.5, 0, 0 ],
                             radius: 2,
                             mass: 50000,
@@ -676,22 +680,21 @@ let levels = {
 		0: {
 
 			chapter: 'electric',
-			textIntro: '- E -\n\n1\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target by adding some attractors\n\nClick to start',
+			textIntro: 'E\n\n1\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target by adding some attractors\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 			playerDrag: 0.9855,
 			elements: {
 
 				fixedCharges: {
 
 					elementType: 'ElectricParticle',
-					static: false,
+					static: true,
 					manualMode: false,
 					transparent: true,
-					individual: false,
-					maxInstancesNum: 20,
-					renderOrder: 2,
+					renderOrder: 1,
+					buildFromInstances: true,
 					drawInfos: true,
-					maxInstancesNum: 3,
-					textAlign: 'bottom',
+					maxInstancesNum: 0,
 
 					shaders: {
 
@@ -700,67 +703,19 @@ let levels = {
 						normal: {
 
 							name: 'fixedElectricCharge',
-							blending: 'MultiplyBlending',
 							transparent: true,
 							textureUrl: './resources/textures/generic_circle_sdf.png',
 							uniforms: {},
 
 						},
 
-						scan: {
+						scan: null,
 
-							name: 'fixedElectricChargeScan',
-							transparent: true,
-							textureUrl: './resources/textures/generic_circle_sdf.png',
-							uniforms: {},
-
-						},
-
-						infos: {
-
-							name: 'fixedElectricChargeInfo',
-							transparent: true,
-							textureUrl: './resources/textures/generic_circle_sdf.png',
-							uniforms: {},
-
-						},
+						infos: null,
 
 					},
 
-
-					instances: {
-
-
-
-						// 0: {
-
-						// 	infoPointIndex: 16 * 7 + 2,
-						// 	enabled: false,
-						// 	fixedRadius: true,
-      //                       position: [ -2, 0, 0 ],
-      //                       radius: 0,
-      //                       targetRadius: 0.5,
-      //                       sign: -1,
-      //                       mass: 500000,
-      //                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-
-      //                   },
-
-      //                   1: {
-
-						// 	infoPointIndex: 16 * 7 + 4,
-						// 	enabled: false,
-						// 	fixedRadius: true,
-      //                       position: [ 2, 0, 0 ],
-      //                       radius: 0,
-      //                       targetRadius: 0.5,
-      //                       sign: 1,
-      //                       mass: 500000,
-      //                       rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-
-      //                   },
-
-					}
+					instances: {}
 
 				},
 
@@ -774,7 +729,6 @@ let levels = {
 					maxInstancesNum: 20,
 					renderOrder: 3,
 					drawInfos: true,
-					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -870,8 +824,8 @@ let levels = {
 		1: {
 
 			chapter: 'electric',
-			textIntro: '- E -\n\n2\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target\n\nClick to start',
-
+			textIntro: 'E\n\n2\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 			elements: {
 
 				fixedCharges: {
@@ -884,8 +838,8 @@ let levels = {
 					maxInstancesNum: 1,
 					renderOrder: 2,
 					drawInfos: true,
-					maxInstancesNum: 3,
-					textAlign: 'bottom',
+					maxInstancesNum: 1,
+					lineInfo: 'bottom',
 
 					shaders: {
 
@@ -926,7 +880,7 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 16 * 7 + 3,
+							manualPointIndex: 1,
 							enabled: false,
                             position: [ 0, 0, 0 ],
                             radius: 0,
@@ -951,7 +905,6 @@ let levels = {
 					maxInstancesNum: 20,
 					renderOrder: 3,
 					drawInfos: true,
-					mainInfoPointIndex: 3, // 0 - 8
 
 					shaders: {
 
@@ -1034,8 +987,8 @@ let levels = {
 		2: {
 
 			chapter: 'electric',
-			textIntro: '- E -\n\n3\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+			textIntro: 'E\n\n3\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 			elements: {
 
 				fixedCharges: {
@@ -1070,22 +1023,7 @@ let levels = {
 					},
 
 
-					instances: {
-
-						1: {
-
-							infoPointIndex: 19 * 7 + 3,
-							hack: true,
-                            position: [ -100, -100, 0.0 ],
-                            radius: 2,
-                            mass: 0,
-                            scale: [ 1.0, 0.12, 0.1 ],
-                            rotation: [ 0, 0, Math.PI * -0.25],
-                            color: [ 0.7, 0.7, 0.7, 1 ],
-
-                        },
-
-					}
+					instances: {}
 
 				},
 
@@ -1219,8 +1157,8 @@ let levels = {
 		3: {
 
 			chapter: 'electric',
-			textIntro: '- E -\n\n4\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+			textIntro: 'E\n\n4\n\nClick and drag up or down to change the attractors polarity and balace the forces emittet by the static attractors\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 			elements: {
 
 				fixedCharges: {
@@ -1234,7 +1172,7 @@ let levels = {
 					renderOrder: 2,
 					drawInfos: true,
 					maxInstancesNum: 3,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 					shaders: {
 
@@ -1274,12 +1212,11 @@ let levels = {
 
 						0: {
 
-							infoPointIndex: 16 * 7 + 3,
+							manualPointIndex: 1,
 							enabled: false,
                             position: [ 0, 0, 0 ],
                             radius: 0,
                             targetRadius: 0.6,
-                            sign: -1,
                             mass: 500000,
                             rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
 
@@ -1419,8 +1356,8 @@ let levels = {
 		4: {
 
 			chapter: 'electric',
-			textIntro: '- E -\n\n5\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
-
+			textIntro: 'E\n\n5\n\nClick and drag up or down to change the attractors polarity\n\nTry to direct the particles stream to the target and avoid obstacles\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Resulting force on player [N]',
 			elements: {
 
 				charges: {
@@ -1506,23 +1443,7 @@ let levels = {
 						infos: null,
 					},
 
-					instances: {
-
-						0: {
-
-							hack: true,
-							infoPointIndex: 19 * 7 + 3,
-							enabled: true,
-                            position: [ -100, -100, 0 ],
-                            radius: 0,
-                            targetRadius: 0.6,
-                            sign: -1,
-                            mass: 0,
-                            rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
-
-                        },
-
-					}
+					instances: {}
 
 				},
 
@@ -1631,8 +1552,8 @@ let levels = {
 		0: {
 
 			chapter: 'gravity-electric',
-			textIntro: '- G & E -\n\n1\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+			textIntro: 'G & E\n\n1\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 			elements: {
 
 				planets: {
@@ -1645,7 +1566,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 3,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 
 					shaders: {
@@ -1684,30 +1605,17 @@ let levels = {
 
 					instances: {
 
-						0: {
-
-							name: 'electricPlanet',
-							infoPointIndex: 16 * 7 + 2,
-							particles: [ 1, 3, 6, 12 ],
-                            position: [ -2, 0, 0 ],
-                            radius: 4,
-                            mass: 10000,
-                            scale: [ 1.3, 1.3, 1.3 ],
-                            color: [ 0.8, 0.8, 0.8, 1 ],
-                            charge: 25,
-
-                        },
-
                         1: {
 
                         	name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 4,
-                        	particles: [ 1, 3, 6, 12 ],
+                        	manualPointIndex: 1,
+                        	particles: [ 1, 3, 6, 12, 12 ],
                             position: [ 2, 0, 0 ],
                             radius: 3.5,
-                            mass: 10000,
-                            scale: [ 1.3, 1.3, 1.3 ],
+                            mass: 1000000,
+                            scale: [ 1.8, 1.8, 1.8 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
+                            targetCharge: 27,
 
                         },
 
@@ -1772,8 +1680,8 @@ let levels = {
 		1: {
 
 			chapter: 'gravity-electric',
-			textIntro: '- G & E -\n\n2\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+			textIntro: 'G & E\n\n2\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 			elements: {
 
 				planets: {
@@ -1786,7 +1694,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 3,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 
 					shaders: {
@@ -1825,16 +1733,31 @@ let levels = {
 
 					instances: {
 
+						0: {
+
+							name: 'electricPlanet',
+							manualPointIndex: 0,
+							particles: [ 1, 3, 6, 12 ],
+                            position: [ -2, 0, 0 ],
+                            radius: 4,
+                            mass: 10000,
+                            scale: [ 1.3, 1.3, 1.3 ],
+                            color: [ 0.8, 0.8, 0.8, 1 ],
+                            targetCharge: 25,
+
+                        },
+
                         1: {
 
                         	name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 4,
-                        	particles: [ 1, 3, 6, 12, 12 ],
+                        	manualPointIndex: 1,
+                        	particles: [ 1, 3, 6, 12 ],
                             position: [ 2, 0, 0 ],
                             radius: 3.5,
-                            mass: 1000000,
-                            scale: [ 1.8, 1.8, 1.8 ],
+                            mass: 10000,
+                            scale: [ 1.3, 1.3, 1.3 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
+                            targetCharge: -25,
 
                         },
 
@@ -1899,8 +1822,8 @@ let levels = {
 		2: {
 
 			chapter: 'gravity-electric',
-			textIntro: '- G & E -\n\n3\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+			textIntro: 'G & E\n\n3\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 			elements: {
 
 				planets: {
@@ -1913,7 +1836,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 4,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 
 					shaders: {
@@ -1955,13 +1878,12 @@ let levels = {
 						0: {
 
 							name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 1,
+                        	manualPointIndex: 2,
                         	particles: [ 1, 3, 6, 7 ],
                             position: [ -2, -2, 0 ],
                             radius: 3.5,
                             mass: 10000,
-                            charge: 10,
-                            sign: -1,
+                            targetCharge: 10,
                             scale: [ 1, 1, 1 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -1970,12 +1892,12 @@ let levels = {
                         1: {
 
                         	name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 2,
+                        	manualPointIndex: 3,
                         	particles: [ 1, 3, 6, 16 ],
                             position: [ -2, 2, 0 ],
                             radius: 3.5,
                             mass: 1000000,
-                            charge: 25,
+                            targetCharge: -20,
                             scale: [ 1.4, 1.4, 1.4 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -2102,8 +2024,8 @@ let levels = {
 		3: {
 
 			chapter: 'gravity-electric',
-			textIntro: '- G & E -\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+			textIntro: 'G & E\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 			elements: {
 
 				planets: {
@@ -2116,7 +2038,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 4,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 
 					shaders: {
@@ -2158,14 +2080,13 @@ let levels = {
 						0: {
 
 							name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 4,
+                        	manualPointIndex: 1,
                         	particles: [ 1, 3, 6, 7 ],
                             position: [ 2, -2, 0 ],
                             radius: 3.5,
                             mass: 10000,
-                            charge: 15,
-                            maxCharge: 30,
-                            sign: -1,
+                            targetCharge: 2,
+                            maxCharge: 15,
                             scale: [ 1, 1, 1 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -2174,13 +2095,12 @@ let levels = {
                         1: {
 
                         	name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 2,
+                        	manualPointIndex: 0,
                         	particles: [ 1, 3, 6, 7 ],
                             position: [ -2, 2, 0 ],
                             radius: 3.5,
                             mass: 1000000,
-                            charge: 25,
-                            sign: -1,
+                            targetCharge: -25,
                             scale: [ 1, 1, 1 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -2318,8 +2238,8 @@ let levels = {
 		4: {
 
 			chapter: 'gravity-electric',
-			textIntro: '- G & E -\n\n5\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
-
+			textIntro: 'G & E\n\n4\n\nClick on the attractors and drag up or down to compensate their exerted force\n\nTry to direct the particles stream to the target.\n\nClick to start',
+			legend: '0: Attractors number\n1: Total charge [C]\n2: Total mass [kg]\n3: Resulting force on player [N]',
 			elements: {
 
 				planets: {
@@ -2332,7 +2252,7 @@ let levels = {
 					buildFromInstances: true,
 					drawInfos: true,
 					maxInstancesNum: 4,
-					textAlign: 'bottom',
+					lineInfo: 'bottom',
 
 
 					shaders: {
@@ -2374,14 +2294,13 @@ let levels = {
 						0: {
 
 							name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 4,
+                        	manualPointIndex: 0,
                         	particles: [ 1, 3, 6, 7 ],
-                            position: [ 2, -2, 0 ],
+                            position: [ -2, 0, 0 ],
                             radius: 3.5,
                             mass: 10000,
-                            charge: 15,
+                            charge: 0,
                             maxCharge: 30,
-                            sign: -1,
                             scale: [ 1, 1, 1 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -2390,13 +2309,26 @@ let levels = {
                         1: {
 
                         	name: 'electricPlanet',
-                        	infoPointIndex: 16 * 7 + 2,
+                        	manualPointIndex: 1,
                         	particles: [ 1, 3, 6, 7 ],
-                            position: [ -2, 2, 0 ],
+                            position: [ 2, 2.5, 0 ],
                             radius: 3.5,
                             mass: 1000000,
-                            charge: 25,
-                            sign: -1,
+                            charge: 0,
+                            scale: [ 1, 1, 1 ],
+                            color: [ 0.8, 0.8, 0.8, 1 ],
+
+                        },
+
+                        2: {
+
+                        	name: 'electricPlanet',
+                        	manualPointIndex: 2,
+                        	particles: [ 1, 3, 6, 7 ],
+                            position: [ 2, -2.5, 0 ],
+                            radius: 3.5,
+                            mass: 1000000,
+                            charge: 0,
                             scale: [ 1, 1, 1 ],
                             color: [ 0.8, 0.8, 0.8, 1 ],
 
@@ -2503,22 +2435,11 @@ let levels = {
 
                         1: {
 
-                            position: [ 1, 1, 0.0 ],
+                            position: [ -0.1, 0, 0.0 ],
                             radius: 2,
                             mass: 100000,
-                            scale: [ 1.4, 0.12, 0.1 ],
-                            rotation: [ 0, 0, Math.PI * -0.25 ],
-                            color: [ 0.7, 0.7, 0.7, 1 ],
-
-                        },
-
-                        2: {
-
-                            position: [ -1, -1, 0.0 ],
-                            radius: 2,
-                            mass: 100000,
-                            scale: [ 1.4, 0.12, 0.1 ],
-                            rotation: [ 0, 0, Math.PI * -0.25 ],
+                            scale: [ 0.8, 0.12, 0.1 ],
+                            rotation: [ 0, 0, 0 ],
                             color: [ 0.7, 0.7, 0.7, 1 ],
 
                         },

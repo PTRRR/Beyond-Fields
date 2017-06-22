@@ -45,6 +45,7 @@ export class ElementCore {
 
 	get lifePercent () {
 
+		if ( !this.canDye ) return 1;
 		return this.lifeLeft / this.lifeSpan;
 
 	}

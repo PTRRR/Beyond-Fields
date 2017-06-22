@@ -462,22 +462,22 @@ let shaderHelper = {
 			void main () {
 
 				vec4 sdf = texture2D ( texture, f_Uv );
-				float sdfDist = sdf.x * sdf.y * sdf.z;
+				float sdfDist = sdf.x * sdf.y * sdf.z * f_Scale;
 
-				float w = 0.28 / ( f_Scale + 1.0 );
-				float t = 0.99 - w;
+				float w = 0.06;
+				float t = f_Scale - w;
 
 				// Background
 
-				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 * f_Color.a );
+				gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 0.6 );
 
 				// Outside
 
-				gl_FragColor.a *= smoothstep ( 0.99, 0.95, sdfDist );
+				gl_FragColor.a *= smoothstep ( f_Scale, f_Scale - 0.1, sdfDist );
 
 				// Outline
 
-				gl_FragColor.rgba += smoothstep ( w, w - 0.2, abs ( t - sdfDist ) ) * f_Color.a;
+				gl_FragColor.rgba += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) ) * f_Color.a;
 
 			}
 
@@ -550,10 +550,10 @@ let shaderHelper = {
 			void main () {
 
 				vec4 sdf = texture2D ( texture, f_Uv );
-				float sdfDist = sdf.x * sdf.y * sdf.z;
+				float sdfDist = sdf.x * sdf.y * sdf.z * ( f_Scale * 1.04 );
 
-				float w = 0.22 / ( f_Scale + 1.0 );
-				float t = 0.98 - w;
+				float w = 0.06;
+				float t = f_Scale - w;
 
 				// Background
 
@@ -561,7 +561,7 @@ let shaderHelper = {
 
 				// Outside
 
-				gl_FragColor.a += smoothstep ( w, w - 0.1, abs ( t - sdfDist ) ) * f_Color.a;
+				gl_FragColor.a += smoothstep ( w, w - 0.05, abs ( t - sdfDist ) ) * f_Color.a;
 
 			}
 
@@ -2645,6 +2645,37 @@ let shaderHelper = {
 		`,
 
 	},
+
+	arrowLine: {
+
+		vertex: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				f_Uv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4 ( position.xy, 0.0, 1.0 );
+
+			}
+
+		`,
+
+		fragment: `\
+
+			varying vec2 f_Uv;
+
+			void main () {
+
+				float cDist = ( 0.5 - f_Uv.x ) * 2.0;
+			    gl_FragColor = vec4 ( 0.0, 0.0, 0.0, 1.0 );
+			    gl_FragColor.a *= smoothstep ( 0.9, 0.84, cDist );
+
+			}
+
+		`,
+
+	}
 
 }
 
