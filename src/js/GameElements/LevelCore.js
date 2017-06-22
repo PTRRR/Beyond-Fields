@@ -317,8 +317,8 @@ export class LevelCore {
 
 		// Sound
 
-		this.backgroundSound = this.soundManager.play ( 'Back_sound_' + Math.floor ( Math.random () * 4 ), { loop: -1, volume: 0.5 } ); 
-		this.playerSound = this.soundManager.play ( 'Player_sound_0', { loop: -1, volume: 0.10 } );
+		this.backgroundSound = this.soundManager.play ( 'Back_sound_' + Math.floor ( Math.random () * 4 ), { loop: -1, volume: 0.7 } ); 
+		this.playerSound = this.soundManager.play ( 'Player_sound_0', { loop: -1, volume: 0.05 } );
 
 		// Update screns size & position.
 
@@ -639,9 +639,9 @@ export class LevelCore {
 			} );
 
 			this.arrowHead = new THREE.Mesh ( this.quadGeometry, this.arrowHeadMaterial );
-			this.arrowHead.scale.set ( 0.1, 0.1, 0.1 );
+			this.arrowHead.scale.set ( 0.0000001, 0.0000001, 0.0000001 );
 			this.arrowLine = new THREE.Mesh ( this.quadGeometry, this.arrowLineMaterial );
-			this.arrowLine.scale.set ( 0.01, 1.0, 1.0 );
+			this.arrowLine.scale.set ( 0.01, 0.0000001, 0.0000001 );
 			this.infoArrow.add ( this.arrowHead );
 			this.infoArrow.add ( this.arrowLine );
 			this.infoScene.add ( this.infoArrow );
@@ -1964,7 +1964,7 @@ export class LevelCore {
 
 			this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
 			this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 4 ), { volume: 0.2 } );
-			this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
+			this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.3 } );
 
 		}
 
@@ -2078,13 +2078,13 @@ export class LevelCore {
 
 		if ( _string ) {
 
-			console.log ( 'loaded: ' + _string );
+			// console.log ( 'loaded: ' + _string );
 
 		}
 
 		if ( this.loadObjects == 0 ) {
 
-			console.log('\n*** Level loaded ***\n ');
+			// console.log('\n*** Level loaded ***\n ');
 
 			this.levelLoaded = true;
 
@@ -2326,7 +2326,7 @@ export class LevelCore {
 
 			this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 2 ), { volume: 0.2 } );
 			this.soundManager.play ( 'Gong_sound_' + ( Math.floor ( Math.random () * 2 ) + 2 ), { volume: 0.2 } );
-			this.soundManager.play ( 'Triangle_sound_' + Math.floor ( Math.random () * 2 ), { volume: 0.2 } );
+			this.soundManager.play ( 'Triangle_sound_' + Math.floor ( Math.random () * 2 ), { volume: 0.3 } );
 
 		}
 
@@ -2361,7 +2361,7 @@ export class LevelCore {
 
 	explosionSound () {
 
-		this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 1.0 } );
+		this.soundManager.play ( 'Hit_sound_' + Math.floor ( Math.random () * 4 ), { volume: 2.0 } );
 		this.soundManager.play ( 'Gong_sound_' + Math.floor ( Math.random () * 4 ), { volume: 0.05 } );
 		this.soundManager.play ( 'Explosion_sound_' + Math.floor ( Math.random () * 3 ), { volume: 0.1 } );
 

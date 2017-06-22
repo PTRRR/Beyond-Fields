@@ -404,7 +404,7 @@ let loop = require ( 'raf-loop' );
 
 		let stats = new Stats();
 		stats.showPanel( 0 ); // 0: fps, 1: ms, 2: mb, 3+: custom
-		document.body.appendChild( stats.dom );
+		// document.body.appendChild( stats.dom );
 
 		// Events
 
@@ -673,7 +673,7 @@ let loop = require ( 'raf-loop' );
 			} else {
 
 				introScene.update ();
-				mainPlayerSound.volume += ( 0.15 - mainPlayerSound.volume ) * 0.03;
+				mainPlayerSound.volume += ( 0.05 - mainPlayerSound.volume ) * 0.03;
 				if ( mainBackgroundSound ) mainBackgroundSound.volume += ( 1.0 - mainBackgroundSound.volume ) * 0.08;
 				
 			}
@@ -696,12 +696,12 @@ let loop = require ( 'raf-loop' );
 
 		var mainLoop = loop ( function ( deltaTime ) {
 
-			stats.begin ();
+			// stats.begin ();
 
 			update ( deltaTime );
 			render ( deltaTime );
 
-			stats.end ();
+			// stats.end ();
 
 		} ).start ();
 
@@ -711,7 +711,7 @@ let loop = require ( 'raf-loop' );
 	soundManager.onLoad ( function () {
 
 		init ( this );
-		soundManager.volume ( 0.0 );
+		// soundManager.volume ( 0.0 );
 
 	} );
 

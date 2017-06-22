@@ -7787,8 +7787,8 @@ var LevelCore = exports.LevelCore = function () {
 
 						// Sound
 
-						this.backgroundSound = this.soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1, volume: 0.5 });
-						this.playerSound = this.soundManager.play('Player_sound_0', { loop: -1, volume: 0.10 });
+						this.backgroundSound = this.soundManager.play('Back_sound_' + Math.floor(Math.random() * 4), { loop: -1, volume: 0.7 });
+						this.playerSound = this.soundManager.play('Player_sound_0', { loop: -1, volume: 0.05 });
 
 						// Update screns size & position.
 
@@ -8103,9 +8103,9 @@ var LevelCore = exports.LevelCore = function () {
 								});
 
 								this.arrowHead = new THREE.Mesh(this.quadGeometry, this.arrowHeadMaterial);
-								this.arrowHead.scale.set(0.1, 0.1, 0.1);
+								this.arrowHead.scale.set(0.0000001, 0.0000001, 0.0000001);
 								this.arrowLine = new THREE.Mesh(this.quadGeometry, this.arrowLineMaterial);
-								this.arrowLine.scale.set(0.01, 1.0, 1.0);
+								this.arrowLine.scale.set(0.01, 0.0000001, 0.0000001);
 								this.infoArrow.add(this.arrowHead);
 								this.infoArrow.add(this.arrowLine);
 								this.infoScene.add(this.infoArrow);
@@ -9335,7 +9335,7 @@ var LevelCore = exports.LevelCore = function () {
 
 								this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
 								this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 4), { volume: 0.2 });
-								this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
+								this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.3 });
 						}
 
 						// Add particles
@@ -9442,12 +9442,13 @@ var LevelCore = exports.LevelCore = function () {
 
 						if (_string) {
 
-								console.log('loaded: ' + _string);
+								// console.log ( 'loaded: ' + _string );
+
 						}
 
 						if (this.loadObjects == 0) {
 
-								console.log('\n*** Level loaded ***\n ');
+								// console.log('\n*** Level loaded ***\n ');
 
 								this.levelLoaded = true;
 
@@ -9658,7 +9659,7 @@ var LevelCore = exports.LevelCore = function () {
 
 								this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 2), { volume: 0.2 });
 								this.soundManager.play('Gong_sound_' + (Math.floor(Math.random() * 2) + 2), { volume: 0.2 });
-								this.soundManager.play('Triangle_sound_' + Math.floor(Math.random() * 2), { volume: 0.2 });
+								this.soundManager.play('Triangle_sound_' + Math.floor(Math.random() * 2), { volume: 0.3 });
 						}
 
 						// Update text intro
@@ -9692,7 +9693,7 @@ var LevelCore = exports.LevelCore = function () {
 				key: 'explosionSound',
 				value: function explosionSound() {
 
-						this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 1.0 });
+						this.soundManager.play('Hit_sound_' + Math.floor(Math.random() * 4), { volume: 2.0 });
 						this.soundManager.play('Gong_sound_' + Math.floor(Math.random() * 4), { volume: 0.05 });
 						this.soundManager.play('Explosion_sound_' + Math.floor(Math.random() * 3), { volume: 0.1 });
 				}
@@ -12506,7 +12507,7 @@ var loop = require('raf-loop');
 
 				var stats = new Stats();
 				stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-				document.body.appendChild(stats.dom);
+				// document.body.appendChild( stats.dom );
 
 				// Events
 
@@ -12746,7 +12747,7 @@ var loop = require('raf-loop');
 						} else {
 
 								introScene.update();
-								mainPlayerSound.volume += (0.15 - mainPlayerSound.volume) * 0.03;
+								mainPlayerSound.volume += (0.05 - mainPlayerSound.volume) * 0.03;
 								if (mainBackgroundSound) mainBackgroundSound.volume += (1.0 - mainBackgroundSound.volume) * 0.08;
 						}
 				}
@@ -12764,12 +12765,12 @@ var loop = require('raf-loop');
 
 				var mainLoop = loop(function (deltaTime) {
 
-						stats.begin();
+						// stats.begin ();
 
 						update(deltaTime);
 						render(deltaTime);
 
-						stats.end();
+						// stats.end ();
 				}).start();
 		}
 
@@ -12777,7 +12778,7 @@ var loop = require('raf-loop');
 		soundManager.onLoad(function () {
 
 				init(this);
-				soundManager.volume(0.0);
+				// soundManager.volume ( 0.0 );
 		});
 })();
 
@@ -13978,7 +13979,8 @@ var levels = {
 																																				radius: 0,
 																																				targetRadius: 0.6,
 																																				mass: 500000,
-																																				rotation: [0, 0, Math.random() * Math.PI * 2]
+																																				rotation: [0, 0, Math.random() * Math.PI * 2],
+																																				sign: -1
 
 																														}
 

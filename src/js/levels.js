@@ -1219,6 +1219,7 @@ let levels = {
                             targetRadius: 0.6,
                             mass: 500000,
                             rotation: [ 0, 0, Math.random () * Math.PI * 2 ],
+                            sign: -1,
 
                         },
 
